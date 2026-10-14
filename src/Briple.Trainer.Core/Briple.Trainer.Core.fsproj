@@ -13,6 +13,12 @@
     <Compile Include="Parser.fs" />
     <Compile Include="Projection.fsi" />
     <Compile Include="Projection.fs" />
+    <Compile Include="Atletas.fsi" />
+    <Compile Include="Atletas.fs" />
+    <Compile Include="Memorias.fsi" />
+    <Compile Include="Memorias.fs" />
+    <Compile Include="Parametros.fsi" />
+    <Compile Include="Parametros.fs" />
   </ItemGroup>
 
   <ItemGroup>

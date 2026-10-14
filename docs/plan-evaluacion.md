@@ -97,8 +97,8 @@ Pasos fijos antes de generar:
 
 - Tipos `Atleta`, `MarcaFeedback` (objetivo, etiqueta, fecha) y `Memoria` (resumen generado, delta paramétrico propuesto, origen, estado).
 - Inventario de cada campo del plan con su origen: perfil del atleta, memorias confirmadas, plan anterior, ajuste pedido, agente.
-- Gate: los tres planes existentes se descomponen como tres atletas: hombre 3d, hombre 5d, mujer 5d.
-- Gate: un cuarto atleta de prueba se define solo con parámetros, sin tocar tipos.
+- Gate: los tres planes existentes se descomponen como dos atletas reales: el hombre con dos variantes (3d y 5d) y la mujer con una (5d). Las variantes son del atleta, no personas distintas.
+- Gate: un tercer atleta de prueba se define solo con parámetros, sin tocar tipos.
 - Gate: una marca de feedback ("muy leve" en un ejercicio) se consolida en una memoria con delta paramétrico bien formado.
 - Gate: una memoria confirmada ("carga muy leve") se refleja en los parámetros de la solicitud siguiente.
 - Esfuerzo: 2 sesiones.

@@ -11,6 +11,9 @@
     <Compile Include="TestSupport.fs" />
     <Compile Include="Parser.Tests.fs" />
     <Compile Include="Projection.Tests.fs" />
+    <Compile Include="Atletas.Tests.fs" />
+    <Compile Include="Memorias.Tests.fs" />
+    <Compile Include="Parametros.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
