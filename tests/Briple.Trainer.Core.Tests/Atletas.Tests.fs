@@ -1,6 +1,6 @@
 module Atletas.Tests
 
-// Gate F2: los planes existentes se descomponen en dos atletas reales
+// Los planes existentes se descomponen en dos atletas reales
 // (el hombre con dos variantes, la mujer con una) y un atleta nuevo se
 // define solo con parámetros, sin tocar tipos.
 

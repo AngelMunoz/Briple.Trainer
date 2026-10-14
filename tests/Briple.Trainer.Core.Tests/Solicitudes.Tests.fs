@@ -1,6 +1,6 @@
 module Solicitudes.Tests
 
-// Gate F3: "mes 2" se expresa como ajuste sobre mes 1; los conteos
+// "Mes 2" se expresa como ajuste sobre mes 1; los conteos
 // 68/104/136 viajan en la solicitud como parámetros trazados.
 
 open System

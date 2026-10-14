@@ -1,6 +1,6 @@
 module Memorias.Tests
 
-// Gate F2: una marca "muy leve" en un ejercicio se consolida en una
+// Una marca "muy leve" en un ejercicio se consolida en una
 // memoria con delta paramétrico bien formado, y el ciclo
 // propuesta/confirmada/descartada queda fijo.
 

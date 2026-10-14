@@ -1,6 +1,6 @@
 module Parametros.Tests
 
-// Gate F2: una memoria confirmada se refleja en los parámetros de la
+// Una memoria confirmada se refleja en los parámetros de la
 // solicitud siguiente, y el inventario declara orígenes para cada
 // campo del plan.
 

@@ -1,6 +1,6 @@
 module Wizard.Tests
 
-// Gate F3: los seis pasos del wizard quedan especificados con entradas
+// Los seis pasos del wizard quedan especificados con entradas
 // y salidas; la salida de cada paso arma la entrada del siguiente.
 
 open System

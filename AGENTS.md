@@ -20,8 +20,8 @@ providers (GLM, DeepSeek, Meta Muse), all OpenAI-compatible.
 
 ## Commands
 
-- `dotnet build Briple.Trainer.slnx` - builds everything; the repo gate
-  requires zero errors and zero warnings.
+- `dotnet build Briple.Trainer.slnx` - builds everything; the build
+  must end with zero errors and zero warnings.
 - `dotnet run --project tests/Briple.Trainer.Core.Tests` - runs the Expecto
   suite; append `-- --summary` for a summary or `-- --filter <name>` for a
   subset.
