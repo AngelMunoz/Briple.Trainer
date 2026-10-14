@@ -52,7 +52,7 @@ let tests =
       let paso4 = DefinirPedido(atleta, [ confirmada ], 4)
 
       // 4: salida el pedido; 5: entrada la solicitud armada
-      let solicitud = solicitudNuevo atleta [ confirmada ] 4 pedido
+      let solicitud = solicitudNuevo atleta [ confirmada ] 4 pedido []
       let paso5 = Generar(PlanNuevo solicitud)
 
       // 5: salida el candidato validado; 6: entrada candidato + warnings

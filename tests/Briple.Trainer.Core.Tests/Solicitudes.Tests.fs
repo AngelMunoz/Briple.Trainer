@@ -119,7 +119,7 @@ let tests =
           (ConteoOpcion("3dias", 72, PlanAnterior))
           "sin cambio va del plan anterior")
 
-    testCase "el plan nuevo junta perfil, memorias y pedido" (fun () ->
+    testCase "el plan nuevo junta perfil, memorias, pedido y conteos" (fun () ->
       let mes1 = parsearFixture "plan_entrenamiento_4sem.txt"
 
       let hombre =
@@ -131,7 +131,7 @@ let tests =
       }
 
       let parametros =
-        solicitudNuevo hombre [ memoriaConfirmada ] 2 pedido
+        solicitudNuevo hombre [ memoriaConfirmada ] 2 pedido [ ("3dias", 36) ]
         |> parametrosDeNuevo
 
       Expect.contains
@@ -152,5 +152,10 @@ let tests =
       Expect.contains
         parametros
         (RirSemana(1, "3", AjustePedido))
-        "el RIR por semana del pedido")
+        "el RIR por semana del pedido"
+
+      Expect.contains
+        parametros
+        (ConteoOpcion("3dias", 36, AjustePedido))
+        "los conteos objetivo del pedido")
   ]

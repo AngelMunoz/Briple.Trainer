@@ -17,6 +17,7 @@ type SolicitudNuevoPlan = {
   Memorias: Memoria list
   Semanas: int
   Pedido: Pedido
+  Conteos: (string * int) list
 }
 
 type SolicitudAjuste = {
@@ -40,11 +41,12 @@ let conteosDelPlan (atleta: Atleta) (plan: Plan) : (string * int) list =
         semana.Dias |> List.sumBy(fun dia -> dia.Ejercicios.Length))))
   |> Option.defaultValue []
 
-let solicitudNuevo atleta memorias semanas pedido = {
+let solicitudNuevo atleta memorias semanas pedido conteos = {
   Atleta = atleta
   Memorias = memorias
   Semanas = semanas
   Pedido = pedido
+  Conteos = conteos
 }
 
 let solicitudAjuste atleta memorias semanas pedido planAnterior conteos = {
@@ -70,9 +72,15 @@ let delPedido (semanas: int) (pedido: Pedido) : Parametro list = [
 ]
 
 let parametrosDeNuevo(solicitud: SolicitudNuevoPlan) : Parametro list =
+  let conteos =
+    solicitud.Conteos
+    |> List.map(fun (opcion, total) ->
+      ConteoOpcion(opcion, total, AjustePedido))
+
   delPerfil solicitud.Atleta
   @ deMemoriasConfirmadas solicitud.Memorias
   @ delPedido solicitud.Semanas solicitud.Pedido
+  @ conteos
 
 let conteoParametro
   (atleta: Atleta)

@@ -2,8 +2,8 @@ module Briple.Trainer.Core.Solicitudes
 
 // El contrato de solicitud: lo que viaja al agente en cada flujo. Las
 // solicitudes son autocontenidas — atleta, memorias confirmadas,
-// período y pedido — sin memoria de conversación; el ajuste agrega el
-// plan anterior completo y los conteos objetivo.
+// período, pedido y conteos objetivo — sin memoria de conversación;
+// el ajuste agrega el plan anterior completo.
 
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Atletas
@@ -19,12 +19,14 @@ type Pedido = {
   Variantes: string list
 }
 
-/// Plan nuevo desde cero.
+/// Plan nuevo desde cero; los conteos objetivo por opción viajan
+/// explícitos y el validador los comprueba en la salida.
 type SolicitudNuevoPlan = {
   Atleta: Atleta
   Memorias: Memoria list
   Semanas: int
   Pedido: Pedido
+  Conteos: (string * int) list
 }
 
 /// Ajuste sobre el plan anterior; los conteos objetivo viajan
@@ -46,6 +48,7 @@ val solicitudNuevo:
   memorias: Memoria list ->
   semanas: int ->
   pedido: Pedido ->
+  conteos: (string * int) list ->
     SolicitudNuevoPlan
 
 val solicitudAjuste:
@@ -57,7 +60,8 @@ val solicitudAjuste:
   conteos: (string * int) list ->
     SolicitudAjuste
 
-/// Los parámetros trazados del plan nuevo: perfil, memorias y pedido.
+/// Los parámetros trazados del plan nuevo: perfil, memorias, pedido y
+/// conteos; sin plan anterior, los conteos siempre trazan al pedido.
 val parametrosDeNuevo: solicitud: SolicitudNuevoPlan -> Parametro list
 
 /// Los parámetros trazados del ajuste: los del plan nuevo más los

@@ -46,6 +46,7 @@ val generarAjuste:
   cliente: IChatClient -> solicitud: SolicitudAjuste -> Task<Corrida>
 
 /// El agente consolida las marcas en memorias propuestas. Las lineas
-/// que no siguen el protocolo se descartan.
+/// que no siguen el protocolo se descartan; los deltas numericos
+/// toleran signo y porcentaje (carga +5% lee como carga 5).
 val consolidarMarcas:
   cliente: IChatClient -> marcas: MarcaFeedback list -> Task<Memoria list>

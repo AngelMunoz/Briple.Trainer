@@ -81,16 +81,22 @@ let tests =
           [ CambiarConteos; OpcionesFueraDeVariantes; SalirseDelFormato ]
           "el ajuste no toca conteos, opciones ni formato")
 
-    testCase "el plan nuevo no prohíbe conteos porque no lleva" (fun () ->
-      let instrucciones = delNuevo(solicitudNuevo atletaHombre [] 4 pedido)
+    testCase "el plan nuevo fija y prohíbe sus conteos" (fun () ->
+      let instrucciones =
+        delNuevo(solicitudNuevo atletaHombre [] 4 pedido [ ("3dias", 68) ])
+
+      Expect.contains
+        instrucciones.Fijar
+        (ConteoOpcion("3dias", 68, AjustePedido))
+        "los conteos del pedido se fijan"
 
       Expect.equal
         instrucciones.Prohibir
-        [ OpcionesFueraDeVariantes; SalirseDelFormato ]
-        "sin conteos no hay nada que prohibir")
+        [ CambiarConteos; OpcionesFueraDeVariantes; SalirseDelFormato ]
+        "el nuevo no toca conteos, opciones ni formato")
 
     testCase "las semanas y las variantes se fijan en ambos flujos" (fun () ->
-      let nuevo = delNuevo(solicitudNuevo atletaHombre [] 4 pedido)
+      let nuevo = delNuevo(solicitudNuevo atletaHombre [] 4 pedido [])
 
       Expect.contains
         nuevo.Fijar

@@ -28,9 +28,10 @@ val revisarParametros:
     Fallo list
 
 /// Valida la salida de un plan nuevo: formato limpio, un bloque del
-/// genero del atleta, sus variantes, las semanas y el RIR del pedido.
+/// genero del atleta, sus variantes, las semanas, los conteos y el RIR
+/// del pedido.
 val validarNuevo: solicitud: SolicitudNuevoPlan -> salida: string -> Veredicto
 
-/// Valida la salida de un ajuste: lo anterior mas los conteos objetivo
-/// por opcion.
+/// Valida la salida de un ajuste: lo mismo sobre la solicitud de
+/// ajuste, cuyo plan anterior viaja como referencia.
 val validarAjuste: solicitud: SolicitudAjuste -> salida: string -> Veredicto

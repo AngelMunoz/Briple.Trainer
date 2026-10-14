@@ -21,6 +21,7 @@
     <Compile Include="Datos.Tests.fs" />
     <Compile Include="Validador.Tests.fs" />
     <Compile Include="Prompts.Tests.fs" />
+    <Compile Include="Agente.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -148,7 +148,7 @@ let sistema =
 let sistemaConsolidar =
   """You are a strength and conditioning coach who summarizes athlete feedback into training memories.
 Each memory is a persistent fact with a proposed parametric adjustment.
-Valid deltas: rir N, reps N, series N, carga P (percent), variante NOMBRE.
+Valid deltas: rir N, reps N, series N, carga P (percent), variante NOMBRE. Write numbers bare: carga 5, not carga +5% or carga 5%.
 Respond with one line per mark, in the same order, in this format:
 objetivo | etiqueta | resumen | delta[;delta...]
 Echo objetivo and etiqueta exactly as given in the marks. Write the resumen in Spanish, as one short sentence stating the fact.

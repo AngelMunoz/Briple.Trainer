@@ -38,7 +38,10 @@ let tests =
     testCase
       "el prompt del plan nuevo trae esquema, fijado y prohibido"
       (fun () ->
-        let prompt = promptNuevo(solicitudNuevo hombre [] 4 pedido)
+        let solicitud =
+          solicitudNuevo hombre [] 4 pedido [ ("3dias", 72); ("5dias", 72) ]
+
+        let prompt = promptNuevo solicitud
 
         Expect.stringContains
           prompt
@@ -54,6 +57,11 @@ let tests =
           prompt
           "- week 2 targets RIR 2-3 (added automatically, do not write it)"
           "el RIR se fija"
+
+        Expect.stringContains
+          prompt
+          "- option 3dias has exactly 72 exercises in total"
+          "los conteos se fijan"
 
         Expect.stringContains prompt "FORBIDDEN" "las prohibiciones van"
 
@@ -120,7 +128,7 @@ let tests =
         |> consolidar
         |> confirmar [ Carga 5 ]
 
-      let prompt = promptNuevo(solicitudNuevo hombre [ memoria ] 4 pedido)
+      let prompt = promptNuevo(solicitudNuevo hombre [ memoria ] 4 pedido [])
 
       Expect.stringContains
         prompt
@@ -136,7 +144,7 @@ let tests =
             Tecnica = "Sentadilla con salto"
           }
 
-        let prompt = promptNuevo(solicitudNuevo hombre [ memoria ] 4 pedido)
+        let prompt = promptNuevo(solicitudNuevo hombre [ memoria ] 4 pedido [])
 
         Expect.stringContains
           prompt

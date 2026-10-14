@@ -150,11 +150,15 @@ let generarNuevo
   return
     correr
       solicitud.Pedido.RirPorSemana
-      (revisarParametros solicitud.Atleta solicitud.Semanas solicitud.Pedido [])
+      (revisarParametros
+        solicitud.Atleta
+        solicitud.Semanas
+        solicitud.Pedido
+        solicitud.Conteos)
       respuesta
 }
 
-/// Genera un ajuste: lo mismo con los conteos objetivo por opcion.
+/// Genera un ajuste: lo mismo con el plan anterior como referencia.
 let generarAjuste
   (cliente: IChatClient)
   (solicitud: SolicitudAjuste)
@@ -174,13 +178,18 @@ let generarAjuste
 
 // --- Consolidacion de marcas -------------------------------------------------
 
+// el modelo decora los numeros con signo y porcentaje (carga +5%): el
+// protocolo ya declara que carga es porcentual, el adorno se descarta
+let numeroLimpio(texto: string) =
+  texto.Trim().TrimStart('+').TrimEnd('%')
+
 let deltaDe(texto: string) : Delta option =
   let partes = texto.Trim().Split(' ', 2)
 
   match partes.[0].ToLowerInvariant(), partes |> Array.tryItem 1 with
   | "variante", Some nombre -> Some(VariantePatron(nombre.Trim()))
   | clase, Some numeroText ->
-    match Int32.TryParse numeroText with
+    match numeroText |> numeroLimpio |> Int32.TryParse with
     | true, numero ->
       match clase with
       | "rir" -> Some(Delta.Rir numero)

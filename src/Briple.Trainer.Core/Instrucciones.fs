@@ -21,7 +21,7 @@ let pedidosAlAgente: Campo list =
 let delNuevo(solicitud: SolicitudNuevoPlan) : Instrucciones = {
   Fijar = parametrosDeNuevo solicitud
   Pedir = pedidosAlAgente
-  Prohibir = [ OpcionesFueraDeVariantes; SalirseDelFormato ]
+  Prohibir = [ CambiarConteos; OpcionesFueraDeVariantes; SalirseDelFormato ]
 }
 
 let delAjuste(solicitud: SolicitudAjuste) : Instrucciones = {

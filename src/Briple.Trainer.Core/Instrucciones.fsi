@@ -24,6 +24,6 @@ type Instrucciones = {
 /// Instrucciones del flujo de plan nuevo.
 val delNuevo: solicitud: SolicitudNuevoPlan -> Instrucciones
 
-/// Instrucciones del flujo de ajuste: agrega la prohibición de cambiar
-/// los conteos.
+/// Instrucciones del flujo de ajuste: los conteos pueden trazarse al
+/// plan anterior en lugar del pedido.
 val delAjuste: solicitud: SolicitudAjuste -> Instrucciones

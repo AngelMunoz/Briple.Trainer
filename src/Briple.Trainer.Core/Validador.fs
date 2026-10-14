@@ -108,12 +108,18 @@ let validarComun atleta semanas pedido conteos (salida: string) =
     | fallos -> Rechazado fallos
 
 /// Valida la salida de un plan nuevo: formato limpio, un bloque del
-/// genero del atleta, sus variantes, las semanas y el RIR del pedido.
+/// genero del atleta, sus variantes, las semanas, los conteos y el RIR
+/// del pedido.
 let validarNuevo (solicitud: SolicitudNuevoPlan) (salida: string) =
-  validarComun solicitud.Atleta solicitud.Semanas solicitud.Pedido [] salida
+  validarComun
+    solicitud.Atleta
+    solicitud.Semanas
+    solicitud.Pedido
+    solicitud.Conteos
+    salida
 
-/// Valida la salida de un ajuste: lo anterior mas los conteos objetivo
-/// por opcion.
+/// Valida la salida de un ajuste: lo mismo sobre la solicitud de
+/// ajuste, cuyo plan anterior viaja como referencia.
 let validarAjuste (solicitud: SolicitudAjuste) (salida: string) =
   validarComun
     solicitud.Atleta

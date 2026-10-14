@@ -20,4 +20,5 @@ let main args =
       Datos.Tests.tests
       Validador.Tests.tests
       Prompts.Tests.tests
+      Agente.Tests.tests
     ])

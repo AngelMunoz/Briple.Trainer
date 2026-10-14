@@ -58,28 +58,29 @@ let private esperarRegla regla veredicto =
 let tests =
   testList "Validador" [
     testCase "la salida del fixture valida como plan nuevo" (fun () ->
-      let solicitud = solicitudNuevo hombre [] 4 pedido
+      let solicitud =
+        solicitudNuevo hombre [] 4 pedido [ ("3dias", 72); ("5dias", 72) ]
 
       match validarNuevo solicitud (salidaHombre()) with
       | Valido plan -> Expect.equal plan.Semanas 4 "el veredicto trae el plan"
       | Rechazado fallos -> failtest $"se esperaba Valido: %A{fallos}")
 
     testCase "una salida con dos bloques se rechaza por genero" (fun () ->
-      let solicitud = solicitudNuevo hombre [] 4 pedido
+      let solicitud = solicitudNuevo hombre [] 4 pedido []
       let mes1 = parsear "plan_entrenamiento_4sem.txt"
 
       // el archivo completo trae el bloque de la mujer tambien
       esperarRegla "genero" (validarNuevo solicitud (escribir mes1.Plan)))
 
     testCase "las semanas distintas a las pedidas se rechazan" (fun () ->
-      let solicitud = solicitudNuevo hombre [] 5 pedido
+      let solicitud = solicitudNuevo hombre [] 5 pedido []
 
       esperarRegla "semanas" (validarNuevo solicitud (salidaHombre())))
 
     testCase "una opcion que no se pidio se rechaza" (fun () ->
       let pedidoUnVariante = { pedido with Variantes = [ "3dias" ] }
 
-      let solicitud = solicitudNuevo hombre [] 4 pedidoUnVariante
+      let solicitud = solicitudNuevo hombre [] 4 pedidoUnVariante []
 
       esperarRegla "opciones" (validarNuevo solicitud (salidaHombre())))
 
@@ -90,6 +91,11 @@ let tests =
         solicitudAjuste hombre [] 4 pedido mes1.Plan [ ("3dias", 68) ]
 
       esperarRegla "conteo" (validarAjuste solicitud (salidaHombre())))
+
+    testCase "un conteo incumplido se rechaza tambien en plan nuevo" (fun () ->
+      let solicitud = solicitudNuevo hombre [] 4 pedido [ ("3dias", 68) ]
+
+      esperarRegla "conteo" (validarNuevo solicitud (salidaHombre())))
 
     testCase "los conteos cumplidos validan el ajuste" (fun () ->
       let mes1 = parsear "plan_entrenamiento_4sem.txt"
@@ -110,17 +116,17 @@ let tests =
             RirPorSemana = [ (1, "0-0") ]
       }
 
-      let solicitud = solicitudNuevo hombre [] 4 pedidoRir
+      let solicitud = solicitudNuevo hombre [] 4 pedidoRir []
 
       esperarRegla "rir" (validarNuevo solicitud (salidaHombre())))
 
     testCase "una salida que no es del formato se rechaza" (fun () ->
-      let solicitud = solicitudNuevo hombre [] 4 pedido
+      let solicitud = solicitudNuevo hombre [] 4 pedido []
 
       esperarRegla "formato" (validarNuevo solicitud "esto no es un plan"))
 
     testCase "una salida con warnings de formato se rechaza" (fun () ->
-      let solicitud = solicitudNuevo hombre [] 4 pedido
+      let solicitud = solicitudNuevo hombre [] 4 pedido []
 
       // meta desconocida dentro del plan: parsea con warning
       let conWarning =
