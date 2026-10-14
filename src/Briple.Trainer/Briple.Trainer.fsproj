@@ -15,7 +15,6 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="NXUI" />
     <PackageReference Include="NXUI.Desktop" />
-    <PackageReference Include="SukiUI" />
     <PackageReference Include="Navs.Avalonia" />
 
     <!-- Datos -->

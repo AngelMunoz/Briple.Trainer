@@ -1,5 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Briple.Trainer/Briple.Trainer.fsproj" />
+    <Project Path="src/Briple.Trainer.Core/Briple.Trainer.Core.fsproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Briple.Trainer.Core.Tests/Briple.Trainer.Core.Tests.fsproj" />
   </Folder>
 </Solution>

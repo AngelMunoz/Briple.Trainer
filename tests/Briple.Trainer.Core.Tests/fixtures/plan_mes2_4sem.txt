@@ -1,0 +1,526 @@
+#start plan v1
+#meta titulo Plan de Entrenamiento - Mes 2 en Circuito (4 Semanas)
+#meta semanas 4
+#meta generado 2026-10-05
+#meta origen mesociclo 2, generado desde borrador aprobado (mes 1: plan_entrenamiento_4sem.txt)
+#start genero Hombre
+#start opcion 3dias
+#meta titulo FULL BODY A / B / C (LUNES · MIÉRCOLES · VIERNES)
+#start semana 1
+#start dia Lunes
+#meta titulo Full Body A
+#ej A|4|1|Sentadilla con barra|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|4|2|Press banca|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|4|3|Remo con barra|8-10|1-2|3 min|Torso ~45°
+#ej B|3|1|Press militar|8-12|1-2|2-3 min|-
+#ej B|3|2|Curl femoral tumbado|10-15|0-1|2 min|-
+#ej B|3|3|Elevaciones laterales|12-20|0-1|90 s|Con estiramiento abajo
+#end dia
+#start dia Miércoles
+#meta titulo Full Body B
+#ej A|4|1|Peso muerto rumano|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|4|2|Press inclinado con mancuernas|8-12|1-2|2-3 min|Banco 30°
+#ej A|4|3|Jalón al pecho|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej B|3|1|Zancadas búlgaras|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej B|3|2|Curl de bíceps con barra|10-15|0-1|90 s|-
+#ej B|3|3|Extensión de tríceps en polea|10-15|0-1|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Full Body C
+#ej A|4|1|Prensa profunda|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej A|4|2|Press banca con mancuernas|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|4|3|Remo en polea baja|10-12|1-2|2 min|Aprieta escápulas
+#ej B|3|1|Face pull|12-20|1-2|90 s|-
+#ej B|3|2|Plancha|30-45 s|-|90 s|-
+#end dia
+#end semana
+#start semana 2
+#start dia Lunes
+#meta titulo Full Body A
+#ej A|4|1|Sentadilla en multipower|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|4|2|Press banca con mancuernas|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|4|3|Remo en máquina con apoyo de pecho|8-10|1-2|3 min|Torso ~45°
+#ej B|3|1|Press militar con mancuernas|8-12|1-2|2-3 min|-
+#ej B|3|2|Curl femoral sentado|10-15|0-1|2 min|-
+#ej B|3|3|Elevaciones laterales en polea|12-20|0-1|90 s|Con estiramiento abajo
+#end dia
+#start dia Miércoles
+#meta titulo Full Body B
+#ej A|4|1|PM rumano con mancuernas|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|4|2|Press inclinado con barra|8-12|1-2|2-3 min|Banco 30°
+#ej A|4|3|Dominadas asistidas|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej B|3|1|Zancadas caminando|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej B|3|2|Curl inclinado en banco|10-15|0-1|90 s|-
+#ej B|3|3|Extensión sobre cabeza en polea|10-15|0-1|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Full Body C
+#ej A|4|1|Prensa con pies bajos|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej A|4|2|Press en máquina convergente|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|4|3|Remo en polea sentado|10-12|1-2|2 min|Aprieta escápulas
+#ej B|3|1|Cruzamientos invertidos en máquina|12-20|1-2|90 s|-
+#ej B|3|2|Plancha lateral|30-45 s|-|90 s|-
+#end dia
+#end semana
+#start semana 3
+#start dia Lunes
+#meta titulo Full Body A
+#ej A|5|1|Sentadilla frontal|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|5|2|Press en máquina convergente|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|5|3|Remo con mancuerna a una mano|8-10|1-2|3 min|Torso ~45°
+#ej B|4|1|Press Arnold|8-12|1-2|2-3 min|-
+#ej B|4|2|Curl femoral en polea|10-15|0-1|2 min|-
+#ej B|4|3|Elevaciones laterales en máquina|12-20|0-1|90 s|Con estiramiento abajo
+#end dia
+#start dia Miércoles
+#meta titulo Full Body B
+#ej A|5|1|PM rumano en multipower|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|5|2|Press inclinado en máquina|8-12|1-2|2-3 min|Banco 30°
+#ej A|5|3|Dominadas lastradas|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej B|4|1|Step-up a cajón|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej B|4|2|Curl martillo|10-15|0-1|90 s|-
+#ej B|4|3|Press francés con barra Z|10-15|0-1|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Full Body C
+#ej A|5|1|Prensa con pausa abajo|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej A|5|2|Press banca con barra|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|5|3|Remo en máquina con apoyo de pecho|10-12|1-2|2 min|Aprieta escápulas
+#ej B|4|1|Pájaros con mancuernas|12-20|1-2|90 s|-
+#ej B|4|2|Rueda abdominal|30-45 s|-|90 s|-
+#end dia
+#end semana
+#start semana 4
+#start dia Lunes
+#meta titulo Full Body A
+#ej A|5|1|Hack en máquina|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|5|2|Press banca con pausa abajo|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|5|3|Remo gironda en polea|8-10|1-2|3 min|Torso ~45°
+#ej B|4|1|Press militar en máquina|8-12|1-2|2-3 min|-
+#ej B|4|2|Curl nórdico excéntrico|10-15|0-1|2 min|-
+#ej B|4|3|Elevación lateral sentada|12-20|0-1|90 s|Con estiramiento abajo
+#end dia
+#start dia Miércoles
+#meta titulo Full Body B
+#ej A|5|1|PM rumano con déficit|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|5|2|Press inclinado en multipower|8-12|1-2|2-3 min|Banco 30°
+#ej A|5|3|Jalón unilateral|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej B|4|1|Prensa a una pierna|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej B|4|2|Curl en polea|10-15|0-1|90 s|-
+#ej B|4|3|Fondos en máquina|10-15|0-1|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Full Body C
+#ej A|5|1|Sentadilla en multipower con pausa|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej A|5|2|Press plano en multipower|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|5|3|Remo en polea con cuerda|10-12|1-2|2 min|Aprieta escápulas
+#ej B|4|1|Face pull con banda|12-20|1-2|90 s|-
+#ej B|4|2|Press Pallof (por lado)|30-45 s|-|90 s|-
+#end dia
+#end semana
+#end opcion
+#start opcion 5dias
+#meta titulo DÍAS MIXTOS, SIN SEGMENTAR TREN SUPERIOR/INFERIOR (LUNES A VIERNES)
+#start semana 1
+#start dia Lunes
+#meta titulo Mixto · básicos pesados
+#ej A|4|1|Sentadilla con barra|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|4|2|Press banca|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|4|3|Remo con barra|8-10|1-2|3 min|Torso ~45°
+#ej C|2|1|Elevaciones laterales|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|2|Plancha|30-45 s|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Mixto · accesorios
+#ej A|4|1|Press militar|8-12|1-2|2-3 min|-
+#ej A|4|2|Curl femoral tumbado|10-15|0-1|2 min|-
+#ej A|4|3|Elevaciones laterales|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|1|Curl de bíceps con barra|10-15|0-1|90 s|-
+#ej C|2|2|Extensión de tríceps en polea|10-15|0-1|90 s|-
+#ej C|2|3|Crunch en polea|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Mixto · básicos pesados
+#ej A|4|1|Peso muerto rumano|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|4|2|Press inclinado con mancuernas|8-12|1-2|2-3 min|Banco 30°
+#ej A|4|3|Jalón al pecho|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej A|4|4|Prensa profunda|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej C|2|1|Elevaciones de piernas colgado|10-15|-|90 s|-
+#ej C|2|2|Giros con disco|15-20 por lado|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Mixto · accesorios y core
+#ej A|3|1|Zancadas búlgaras|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej A|3|2|Face pull|12-20|1-2|90 s|-
+#ej C|2|1|Curl inclinado en banco|10-15|0-1|90 s|Posición estirada
+#ej C|2|2|Extensión de tríceps en polea|10-15|0-1|90 s|-
+#ej C|2|3|Plancha|30-45 s|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Mixto · empuje, tirón y brazos
+#ej A|4|1|Press banca con mancuernas|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|4|2|Remo en polea baja|10-12|1-2|2 min|Aprieta escápulas
+#ej B|3|1|Curl de bíceps con barra|10-15|0-1|90 s|-
+#ej B|3|2|Press francés con barra Z|10-15|0-1|90 s|-
+#end dia
+#end semana
+#start semana 2
+#start dia Lunes
+#meta titulo Mixto · básicos pesados
+#ej A|4|1|Sentadilla en multipower|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|4|2|Press banca con mancuernas|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|4|3|Remo en máquina con apoyo de pecho|8-10|1-2|3 min|Torso ~45°
+#ej C|2|1|Elevaciones laterales en polea|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|2|Plancha lateral|30-45 s|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Mixto · accesorios
+#ej A|4|1|Press militar con mancuernas|8-12|1-2|2-3 min|-
+#ej A|4|2|Curl femoral sentado|10-15|0-1|2 min|-
+#ej A|4|3|Elevaciones laterales en polea|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|1|Curl inclinado en banco|10-15|0-1|90 s|-
+#ej C|2|2|Extensión sobre cabeza en polea|10-15|0-1|90 s|-
+#ej C|2|3|Crunch completo en banco|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Mixto · básicos pesados
+#ej A|4|1|PM rumano con mancuernas|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|4|2|Press inclinado con barra|8-12|1-2|2-3 min|Banco 30°
+#ej A|4|3|Dominadas asistidas|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej A|4|4|Prensa con pies bajos|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej C|2|1|Elevaciones de piernas en banco plano|10-15|-|90 s|-
+#ej C|2|2|Giros laterales con mancuerna|15-20 por lado|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Mixto · accesorios y core
+#ej A|3|1|Zancadas caminando|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej A|3|2|Cruzamientos invertidos en máquina|12-20|1-2|90 s|-
+#ej C|2|1|Curl martillo|10-15|0-1|90 s|Posición estirada
+#ej C|2|2|Extensión sobre cabeza en polea|10-15|0-1|90 s|-
+#ej C|2|3|Plancha lateral|30-45 s|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Mixto · empuje, tirón y brazos
+#ej A|4|1|Press en máquina convergente|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|4|2|Remo en polea sentado|10-12|1-2|2 min|Aprieta escápulas
+#ej B|3|1|Curl inclinado en banco|10-15|0-1|90 s|-
+#ej B|3|2|Extensión sobre cabeza en polea|10-15|0-1|90 s|-
+#end dia
+#end semana
+#start semana 3
+#start dia Lunes
+#meta titulo Mixto · básicos pesados
+#ej A|5|1|Sentadilla frontal|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|5|2|Press en máquina convergente|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|5|3|Remo con mancuerna a una mano|8-10|1-2|3 min|Torso ~45°
+#ej C|2|1|Elevaciones laterales en máquina|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|2|Rueda abdominal|30-45 s|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Mixto · accesorios
+#ej A|5|1|Press Arnold|8-12|1-2|2-3 min|-
+#ej A|5|2|Curl femoral en polea|10-15|0-1|2 min|-
+#ej A|5|3|Elevaciones laterales en máquina|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|1|Curl martillo|10-15|0-1|90 s|-
+#ej C|2|2|Press francés con barra Z|10-15|0-1|90 s|-
+#ej C|2|3|Abdominales en banco inclinado|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Mixto · básicos pesados
+#ej A|5|1|PM rumano en multipower|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|5|2|Press inclinado en máquina|8-12|1-2|2-3 min|Banco 30°
+#ej A|5|3|Dominadas lastradas|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej A|5|4|Prensa con pausa abajo|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej C|2|1|Elevaciones de rodillas en apoyo|10-15|-|90 s|-
+#ej C|2|2|Medio crunch de lado|15-20 por lado|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Mixto · accesorios y core
+#ej A|4|1|Step-up a cajón|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej A|4|2|Pájaros con mancuernas|12-20|1-2|90 s|-
+#ej C|2|1|Curl en polea|10-15|0-1|90 s|Posición estirada
+#ej C|2|2|Press francés con barra Z|10-15|0-1|90 s|-
+#ej C|2|3|Rueda abdominal|30-45 s|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Mixto · empuje, tirón y brazos
+#ej A|5|1|Press banca con barra|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|5|2|Remo en máquina con apoyo de pecho|10-12|1-2|2 min|Aprieta escápulas
+#ej B|4|1|Curl martillo|10-15|0-1|90 s|-
+#ej B|4|2|Fondos en máquina|10-15|0-1|90 s|-
+#end dia
+#end semana
+#start semana 4
+#start dia Lunes
+#meta titulo Mixto · básicos pesados
+#ej A|5|1|Hack en máquina|6-8|1-2|3 min|Profunda (posición estirada)
+#ej A|5|2|Press banca con pausa abajo|6-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|5|3|Remo gironda en polea|8-10|1-2|3 min|Torso ~45°
+#ej C|2|1|Elevación lateral sentada|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|2|Press Pallof (por lado)|30-45 s|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Mixto · accesorios
+#ej A|5|1|Press militar en máquina|8-12|1-2|2-3 min|-
+#ej A|5|2|Curl nórdico excéntrico|10-15|0-1|2 min|-
+#ej A|5|3|Elevación lateral sentada|12-20|0-1|90 s|Con estiramiento abajo
+#ej C|2|1|Curl en polea|10-15|0-1|90 s|-
+#ej C|2|2|Fondos en máquina|10-15|0-1|90 s|-
+#ej C|2|3|Crunch con cable|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Mixto · básicos pesados
+#ej A|5|1|PM rumano con déficit|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej A|5|2|Press inclinado en multipower|8-12|1-2|2-3 min|Banco 30°
+#ej A|5|3|Jalón unilateral|8-12|1-2|2-3 min|Agarre neutro o prono ancho
+#ej A|5|4|Sentadilla en multipower con pausa|10-12|1-2|2-3 min|Rango completo, no cortes arriba
+#ej C|2|1|Elevaciones de piernas colgado (lento)|10-15|-|90 s|-
+#ej C|2|2|Giros en polea|15-20 por lado|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Mixto · accesorios y core
+#ej A|4|1|Prensa a una pierna|10-12|1-2|2 min|Profunda, torso ligeramente inclinado
+#ej A|4|2|Face pull con banda|12-20|1-2|90 s|-
+#ej C|2|1|Curl concentrado|10-15|0-1|90 s|Posición estirada
+#ej C|2|2|Fondos en máquina|10-15|0-1|90 s|-
+#ej C|2|3|Press Pallof (por lado)|30-45 s|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Mixto · empuje, tirón y brazos
+#ej A|5|1|Press plano en multipower|8-12|1-2|2-3 min|Rango completo abajo
+#ej A|5|2|Remo en polea con cuerda|10-12|1-2|2 min|Aprieta escápulas
+#ej B|4|1|Curl en polea|10-15|0-1|90 s|-
+#ej B|4|2|Extensión de tríceps en polea|10-15|0-1|90 s|-
+#end dia
+#end semana
+#end opcion
+#end genero
+#start genero Mujer
+#start opcion 5dias
+#meta titulo L-X-V TREN INFERIOR · M-J TREN SUPERIOR
+#start semana 1
+#start dia Lunes
+#meta titulo Tren inferior · día pesado (sentadilla + bisagra)
+#ej A|4|1|Sentadilla con barra|5-8|1-2|3 min|Profunda
+#ej A|4|2|Peso muerto rumano|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej B|3|1|Zancada búlgara (por pierna)|10-12|1-2|2 min|Torso ligeramente inclinado
+#ej B|3|2|Curl femoral tumbado|10-15|0-1|2 min|-
+#ej B|3|3|Abducción de cadera en máquina|12-20|0-1|90 s|-
+#ej C|2|1|Plancha|30-45 s|-|90 s|-
+#ej C|2|2|Elevaciones de piernas colgado|15-20|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Tren superior · empuje + tirón
+#ej A|4|1|Press banca con barra|5-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|4|2|Remo con barra|8-10|1-2|3 min|Torso ~45°
+#ej A|4|3|Elevaciones laterales|12-20|0-1|90 s|Con estiramiento abajo
+#ej B|3|1|Press inclinado con mancuernas|8-12|1-2|2-3 min|Banco 30°
+#ej B|3|2|Jalón agarre neutro|10-12|1-2|2 min|-
+#ej C|2|1|Extensión de tríceps en polea|10-15|0-1|90 s|-
+#ej C|2|2|Curl martillo|10-15|0-1|90 s|-
+#ej C|2|3|Crunch en polea|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Tren inferior · máquina y glúteo
+#ej A|3|1|Prensa profunda|10-12|1-2|2-3 min|Rango completo
+#ej A|3|2|Curl femoral sentado|10-15|1-2|2 min|-
+#ej B|3|1|Extensión de cuádriceps|12-15|0-1|90 s|-
+#ej B|3|2|Hip thrust con barra|8-12|1-2|2-3 min|Pausa arriba
+#ej C|2|1|Giros con disco|15-20 por lado|-|90 s|-
+#ej C|2|2|Elevaciones de piernas colgado|15-20|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Tren superior · tracción + empuje
+#ej A|4|1|Dominadas asistidas o lastradas|6-10|1-2|3 min|-
+#ej A|4|2|Press militar|8-12|1-2|2-3 min|-
+#ej B|3|1|Remo en polea|10-12|1-2|2 min|Aprieta escápulas
+#ej B|3|2|Press banca con mancuernas|8-12|1-2|2-3 min|-
+#ej B|3|3|Face pull|15-20|1-2|90 s|-
+#ej C|2|1|Curl inclinado en banco|8-12|0-1|90 s|Posición estirada
+#ej C|2|2|Extensión de tríceps (barra recta)|10-15|0-1|90 s|-
+#ej C|2|3|Medio crunch en máquina|15-20|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Tren inferior · glúteo (día flexible)
+#ej A|3|1|Hip thrust con barra (más ligero)|10-15|0-1|2-3 min|-
+#ej A|3|2|Curl femoral nórdico o tumbado|10-15|0-1|2 min|-
+#ej A|3|3|Abducción con banda|12-20|0-1|90 s|-
+#ej C|2|1|Giros con disco|15-20 por lado|-|90 s|-
+#ej C|2|2|Plancha|30-45 s|-|90 s|-
+#end dia
+#end semana
+#start semana 2
+#start dia Lunes
+#meta titulo Tren inferior · día pesado (sentadilla + bisagra)
+#ej A|4|1|Sentadilla en multipower|5-8|1-2|3 min|Profunda
+#ej A|4|2|PM rumano con mancuernas|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej B|3|1|Zancadas caminando|10-12|1-2|2 min|Torso ligeramente inclinado
+#ej B|3|2|Curl femoral sentado|10-15|0-1|2 min|-
+#ej B|3|3|Abducción con banda|12-20|0-1|90 s|-
+#ej C|2|1|Plancha lateral|30-45 s|-|90 s|-
+#ej C|2|2|Elevaciones de piernas en banco plano|15-20|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Tren superior · empuje + tirón
+#ej A|4|1|Press banca con mancuernas|5-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|4|2|Remo en máquina con apoyo de pecho|8-10|1-2|3 min|Torso ~45°
+#ej A|4|3|Elevaciones laterales en polea|12-20|0-1|90 s|Con estiramiento abajo
+#ej B|3|1|Press inclinado con barra|8-12|1-2|2-3 min|Banco 30°
+#ej B|3|2|Jalón agarre supino (estrecho)|10-12|1-2|2 min|-
+#ej C|2|1|Extensión sobre cabeza en polea|10-15|0-1|90 s|-
+#ej C|2|2|Curl con barra Z|10-15|0-1|90 s|-
+#ej C|2|3|Crunch completo en banco|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Tren inferior · máquina y glúteo
+#ej A|3|1|Prensa con pies bajos|10-12|1-2|2-3 min|Rango completo
+#ej A|3|2|Curl femoral tumbado|10-15|1-2|2 min|-
+#ej B|3|1|Extensión con pausa arriba|12-15|0-1|90 s|-
+#ej B|3|2|Hip thrust en máquina|8-12|1-2|2-3 min|Pausa arriba
+#ej C|2|1|Giros laterales con mancuerna|15-20 por lado|-|90 s|-
+#ej C|2|2|Elevaciones de piernas en banco plano|15-20|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Tren superior · tracción + empuje
+#ej A|4|1|Jalón al pecho prono|6-10|1-2|3 min|-
+#ej A|4|2|Press militar con mancuernas|8-12|1-2|2-3 min|-
+#ej B|3|1|Remo con barra|10-12|1-2|2 min|Aprieta escápulas
+#ej B|3|2|Press en máquina convergente|8-12|1-2|2-3 min|-
+#ej B|3|3|Cruzamientos invertidos en máquina|15-20|1-2|90 s|-
+#ej C|2|1|Curl martillo|8-12|0-1|90 s|Posición estirada
+#ej C|2|2|Fondos en máquina o lastrados|10-15|0-1|90 s|-
+#ej C|2|3|Medio crunch de lado|15-20|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Tren inferior · glúteo (día flexible)
+#ej A|3|1|Patada de glúteo en polea|10-15|0-1|2-3 min|-
+#ej A|3|2|Curl femoral en polea|10-15|0-1|2 min|-
+#ej A|3|3|Abducción en polea|12-20|0-1|90 s|-
+#ej C|2|1|Giros laterales con mancuerna|15-20 por lado|-|90 s|-
+#ej C|2|2|Plancha lateral|30-45 s|-|90 s|-
+#end dia
+#end semana
+#start semana 3
+#start dia Lunes
+#meta titulo Tren inferior · día pesado (sentadilla + bisagra)
+#ej A|5|1|Sentadilla frontal|5-8|1-2|3 min|Profunda
+#ej A|5|2|PM rumano en multipower|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej B|4|1|Step-up a cajón|10-12|1-2|2 min|Torso ligeramente inclinado
+#ej B|4|2|Curl femoral en polea|10-15|0-1|2 min|-
+#ej B|4|3|Abducción en polea|12-20|0-1|90 s|-
+#ej C|2|1|Rueda abdominal|30-45 s|-|90 s|-
+#ej C|2|2|Elevaciones de rodillas en apoyo|15-20|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Tren superior · empuje + tirón
+#ej A|5|1|Press en máquina convergente|5-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|5|2|Remo con mancuerna a una mano|8-10|1-2|3 min|Torso ~45°
+#ej A|5|3|Elevaciones laterales en máquina|12-20|0-1|90 s|Con estiramiento abajo
+#ej B|4|1|Press inclinado en máquina|8-12|1-2|2-3 min|Banco 30°
+#ej B|4|2|Jalón unilateral|10-12|1-2|2 min|-
+#ej C|2|1|Press francés con barra Z|10-15|0-1|90 s|-
+#ej C|2|2|Curl en polea|10-15|0-1|90 s|-
+#ej C|2|3|Abdominales en banco inclinado|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Tren inferior · máquina y glúteo
+#ej A|4|1|Prensa con pausa abajo|10-12|1-2|2-3 min|Rango completo
+#ej A|4|2|Curl nórdico excéntrico|10-15|1-2|2 min|-
+#ej B|4|1|Extensión a una pierna|12-15|0-1|90 s|-
+#ej B|4|2|Hip thrust a una pierna|8-12|1-2|2-3 min|Pausa arriba
+#ej C|2|1|Medio crunch de lado|15-20 por lado|-|90 s|-
+#ej C|2|2|Elevaciones de rodillas en apoyo|15-20|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Tren superior · tracción + empuje
+#ej A|5|1|Dominada con banda|6-10|1-2|3 min|-
+#ej A|5|2|Press Arnold|8-12|1-2|2-3 min|-
+#ej B|4|1|Remo en máquina con apoyo de pecho|10-12|1-2|2 min|Aprieta escápulas
+#ej B|4|2|Press banca con barra|8-12|1-2|2-3 min|-
+#ej B|4|3|Pájaros con mancuernas|15-20|1-2|90 s|-
+#ej C|2|1|Curl en banco Scott|8-12|0-1|90 s|Posición estirada
+#ej C|2|2|Press francés|10-15|0-1|90 s|-
+#ej C|2|3|Crunch en polea|15-20|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Tren inferior · glúteo (día flexible)
+#ej A|4|1|Hip thrust en máquina|10-15|0-1|2-3 min|-
+#ej A|4|2|Curl femoral sentado|10-15|0-1|2 min|-
+#ej A|4|3|Abducción de cadera en máquina|12-20|0-1|90 s|-
+#ej C|2|1|Medio crunch de lado|15-20 por lado|-|90 s|-
+#ej C|2|2|Rueda abdominal|30-45 s|-|90 s|-
+#end dia
+#end semana
+#start semana 4
+#start dia Lunes
+#meta titulo Tren inferior · día pesado (sentadilla + bisagra)
+#ej A|5|1|Sentadilla goblet con mancuerna|5-8|1-2|3 min|Profunda
+#ej A|5|2|PM rumano a una pierna|8-10|1-2|3 min|Cadera atrás, espalda neutra
+#ej B|4|1|Prensa a una pierna|10-12|1-2|2 min|Torso ligeramente inclinado
+#ej B|4|2|Curl femoral tumbado a una pierna|10-15|0-1|2 min|-
+#ej B|4|3|Abducción en máquina con torso inclinado|12-20|0-1|90 s|-
+#ej C|2|1|Press Pallof (por lado)|30-45 s|-|90 s|-
+#ej C|2|2|Elevaciones de piernas colgado (lento)|15-20|-|90 s|-
+#end dia
+#start dia Martes
+#meta titulo Tren superior · empuje + tirón
+#ej A|5|1|Press banca con pausa abajo|5-8|1-2|3 min|Pies firmes, escápulas retraídas
+#ej A|5|2|Remo en polea sentado|8-10|1-2|3 min|Torso ~45°
+#ej A|5|3|Elevación lateral sentada|12-20|0-1|90 s|Con estiramiento abajo
+#ej B|4|1|Press inclinado en multipower|8-12|1-2|2-3 min|Banco 30°
+#ej B|4|2|Jalón prono ancho|10-12|1-2|2 min|-
+#ej C|2|1|Fondos en máquina|10-15|0-1|90 s|-
+#ej C|2|2|Curl concentrado|10-15|0-1|90 s|-
+#ej C|2|3|Crunch con cable|15-20|-|90 s|-
+#end dia
+#start dia Miércoles
+#meta titulo Tren inferior · máquina y glúteo
+#ej A|4|1|Hack en máquina|10-12|1-2|2-3 min|Rango completo
+#ej A|4|2|Curl femoral en polea|10-15|1-2|2 min|-
+#ej B|4|1|Extensión excéntrica lenta|12-15|0-1|90 s|-
+#ej B|4|2|Hip thrust con pausa arriba|8-12|1-2|2-3 min|Pausa arriba
+#ej C|2|1|Giros en polea|15-20 por lado|-|90 s|-
+#ej C|2|2|Elevaciones de piernas colgado (lento)|15-20|-|90 s|-
+#end dia
+#start dia Jueves
+#meta titulo Tren superior · tracción + empuje
+#ej A|5|1|Jalón unilateral|6-10|1-2|3 min|-
+#ej A|5|2|Press militar en máquina|8-12|1-2|2-3 min|-
+#ej B|4|1|Remo gironda en polea|10-12|1-2|2 min|Aprieta escápulas
+#ej B|4|2|Press plano en multipower|8-12|1-2|2-3 min|-
+#ej B|4|3|Face pull con banda|15-20|1-2|90 s|-
+#ej C|2|1|Curl en polea|8-12|0-1|90 s|Posición estirada
+#ej C|2|2|Extensión sobre cabeza con mancuerna|10-15|0-1|90 s|-
+#ej C|2|3|Crunch completo|15-20|-|90 s|-
+#end dia
+#start dia Viernes
+#meta titulo Tren inferior · glúteo (día flexible)
+#ej A|4|1|Hip thrust a una pierna|10-15|0-1|2-3 min|-
+#ej A|4|2|Curl femoral sentado a una pierna|10-15|0-1|2 min|-
+#ej A|4|3|Abducción en máquina con torso inclinado|12-20|0-1|90 s|-
+#ej C|2|1|Giros en polea|15-20 por lado|-|90 s|-
+#ej C|2|2|Press Pallof (por lado)|30-45 s|-|90 s|-
+#end dia
+#end semana
+#end opcion
+#end genero
+#x decision | Mes 2: se elimina el trabajo dedicado de gemelos (4 series por sujeto por semana); los gemelos siguen recibiendo estímulo indirecto de sentadilla, prensa y desplantes.
+#x decision | Mes 2: se añade un tercer circuito C de bajo costo (deltoides lateral, brazos y core) a RIR 0-1, fijo en 2 vueltas en S1-S4; los circuitos A y B suben +1 vuelta en S3-S4.
+#x decision | Mes 2: los días que tenían un solo circuito en el hombre de 5 días ahora tienen 2 (A + C). El énfasis de core va en los días cortos (hombre jueves; mujer miércoles y viernes).
+#x decision | Hombre 3 días: estructura igual al mes 1 sin gemelos; su rampa de esfuerzo arranca más cerca del fallo (ver mesociclo). Hombre 5 días y mujer conservan la rampa del mes 1.
+#x mesociclo | Rampa RIR hombre 5 días y mujer: S1=3, S2=2-3, S3=1-2, S4=1 (cerca de MRV al cierre).
+#x mesociclo | Rampa RIR hombre 3 días: S1=2, S2=1-2, S3=1, S4=0-1.
+#x mesociclo | Vueltas: S1-S2 base (A=4, B=3, C=2). S3-S4: +1 vuelta en A y B; C se queda en 2 vueltas.
+#x mesociclo | Semana 5 (no planificada a propósito): deload con la mitad de vueltas, RIR 4-5 y mismos pesos. Se decide al cerrar la semana 4 con las señales de abajo.
+#x deload | Señal 1: bajas de reps o peso en los básicos 2 sesiones seguidas con sueño y comida normales.
+#x deload | Señal 2: dolor articular que empeora semana a semana.
+#x deload | Señal 3: técnica que se degrada en los últimos sets de forma consistente.
+#x regla-circuito | Cada circuito se hace en ciclos: 1 serie de cada ejercicio en orden (60-90 s entre ejercicios) y se repite hasta completar las vueltas.
+#x regla-circuito | En circuito la percepción de esfuerzo se infla por el pulso alto: ser estrictos con el RIR real; de vez en cuando llevar una serie al fallo controlado en la última vuelta.
+#x regla-circuito | Si un circuito deja sin aliento y las cargas caen, alargar el descanso entre ejercicios a 2 min.
+#x progresion | Doble progresión: al conseguir el tope del rango de reps en TODAS las vueltas con buena técnica, subir el peso 2.5 kg (o el salto mínimo) la siguiente semana.
+#x progresion | Si no se llega al mínimo del rango, bajar al peso anterior y quedarse ahí una semana más.
+#x descansos | Entre ejercicios del circuito: 60-90 s. Entre circuitos: 2-3 min. Básicos pesados: 3 min.
+#x cardio | Pesas primero, cardio después. Preferir bicicleta, elíptica o escaladora; moderar el trote. Días de tren inferior (sobre todo S3-S4): máximo 10-15 min fáciles o nada.
+#x recuperacion | Creatina: 3-5 g/día. Proteína: 1.6-2.2 g/kg/día. Sueño: 7-9 h. Superávit de 250-500 kcal si el objetivo es ganancia.
+#end plan

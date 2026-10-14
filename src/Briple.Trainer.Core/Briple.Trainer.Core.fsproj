@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <DebugType>embedded</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Parser.fsi" />
+    <Compile Include="Parser.fs" />
+    <Compile Include="Projection.fsi" />
+    <Compile Include="Projection.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Formato: el parser se mantiene con XParsec, como en Briple -->
+    <PackageReference Include="XParsec" />
+  </ItemGroup>
+
+</Project>

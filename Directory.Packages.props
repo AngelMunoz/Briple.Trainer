@@ -4,16 +4,21 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <!-- UI: Avalonia 12 + NXUI + SukiUI + Navs -->
+    <!-- UI: Avalonia 12 + NXUI + Navs -->
     <PackageVersion Include="Avalonia" Version="12.1.4" />
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.4" />
     <PackageVersion Include="NXUI" Version="12.0.0" />
     <PackageVersion Include="NXUI.Desktop" Version="12.0.0" />
-    <PackageVersion Include="SukiUI" Version="7.0.1" />
     <PackageVersion Include="Navs.Avalonia" Version="1.0.0" />
 
     <!-- Data -->
     <PackageVersion Include="Donald" Version="10.1.0" />
+
+    <!-- Formato del plan (parser, como en Briple) -->
+    <PackageVersion Include="XParsec" Version="1.0.0" />
+
+    <!-- Tests -->
+    <PackageVersion Include="Expecto" Version="11.1.1" />
 
     <!-- Core utilities -->
     <PackageVersion Include="FsToolkit.ErrorHandling" Version="5.2.0" />
