@@ -1,12 +1,12 @@
-module Parametros
+module Briple.Trainer.Core.Parametros
 
 // La capa de parámetros: los valores que viajan en la solicitud, cada
 // uno con su origen trazable. Solo el formato es determinista; conteos,
 // RIR y vueltas viajan como parámetros y el validador los comprueba
 // contra la salida.
 
-open Atletas
-open Memorias
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
 
 /// Clase de origen de un valor paramétrico; el inventario declara
 /// cuáles aplican a cada campo.

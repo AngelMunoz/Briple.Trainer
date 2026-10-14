@@ -1,4 +1,4 @@
-module Plan.Types
+module Briple.Trainer.Core.Plan.Types
 
 // Domain model of the training plan format, mirroring the file one-to-one
 // Reps/Rir/Descanso/Notas

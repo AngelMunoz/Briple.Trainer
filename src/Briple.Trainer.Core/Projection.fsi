@@ -1,11 +1,11 @@
-module Plan.Projection
+module Briple.Trainer.Core.Plan.Projection
 
 // Pure date -> session core. No DOM, no IndexedDB: every
 // screen renders from these functions. The assembly of week windows, day
 // matching and mesociclo extraction is internal.
 
 open System
-open Plan.Types
+open Briple.Trainer.Core.Plan.Types
 
 val daysBetween: a: DateOnly -> b: DateOnly -> int
 

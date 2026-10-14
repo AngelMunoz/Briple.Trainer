@@ -1,14 +1,14 @@
-module Solicitudes
+module Briple.Trainer.Core.Solicitudes
 
 // El contrato de solicitud: lo que viaja al agente en cada flujo. Las
 // solicitudes son autocontenidas — atleta, memorias confirmadas,
 // período y pedido — sin memoria de conversación; el ajuste agrega el
 // plan anterior completo y los conteos objetivo.
 
-open Plan.Types
-open Atletas
-open Memorias
-open Parametros
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Parametros
 
 /// El pedido del entrenador: ajustes sueltos, énfasis, RIR por semana
 /// y las variantes a generar (subconjunto de las del atleta).

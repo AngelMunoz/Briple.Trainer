@@ -1,4 +1,4 @@
-module Plan.Projection
+module Briple.Trainer.Core.Plan.Projection
 
 // Pure date -> session core. No DOM, no IndexedDB: every
 // screen renders from these functions.
@@ -11,8 +11,8 @@ module Plan.Projection
 // parse time): those dates are rest.
 
 open System
-open Plan.Types
-open Plan.Parser
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Plan.Parser
 
 // DateOnly math goes through DateTime on purpose: the module then relies only
 // on constructor/Year/Month/Day, which the Fable runtime guarantees.

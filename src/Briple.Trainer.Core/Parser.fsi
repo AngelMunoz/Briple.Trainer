@@ -1,7 +1,7 @@
-module Plan.Parser
+module Briple.Trainer.Core.Plan.Parser
 
 open System
-open Plan.Types
+open Briple.Trainer.Core.Plan.Types
 
 /// Parses a plan file into the domain model; recoverable problems come back
 /// as warnings, structural breakage as a hard error (both carry line numbers).

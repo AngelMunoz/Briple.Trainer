@@ -1,4 +1,4 @@
-module Memorias
+module Briple.Trainer.Core.Memorias
 
 open System
 

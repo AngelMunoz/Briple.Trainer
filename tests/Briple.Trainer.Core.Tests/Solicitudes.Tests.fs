@@ -1,16 +1,16 @@
-module Solicitudes.Tests
+module Briple.Trainer.Core.Tests.Solicitudes.Tests
 
 // "Mes 2" se expresa como ajuste sobre mes 1; los conteos
 // 68/104/136 viajan en la solicitud como parámetros trazados.
 
 open System
 open Expecto
-open Plan.Types
-open Plan.Parser
-open Atletas
-open Memorias
-open Parametros
-open Solicitudes
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Plan.Parser
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Solicitudes
 open Briple.Trainer.Core.Tests.TestSupport
 
 let private parsearFixture nombre =

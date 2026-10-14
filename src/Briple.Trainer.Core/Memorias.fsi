@@ -1,4 +1,4 @@
-module Memorias
+module Briple.Trainer.Core.Memorias
 
 // La capa de feedback y memorias: las marcas rápidas que se registran
 // sobre el plan activo y las memorias que de ellas se consolidan. Una

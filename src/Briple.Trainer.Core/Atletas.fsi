@@ -1,11 +1,11 @@
-module Atletas
+module Briple.Trainer.Core.Atletas
 
 // La capa de atletas: cada entrenado es un perfil propio con las
 // variantes que puede entrenar. Un plan lleva un bloque por atleta y
 // las opciones del bloque son sus variantes; el formato no tiene
 // nombres, el género discrimina al atleta dentro del archivo.
 
-open Plan.Types
+open Briple.Trainer.Core.Plan.Types
 
 /// Un entrenado. `Variantes` son las opciones que puede entrenar
 /// ("3dias", "5dias") para su propia flexibilidad; no son atletas

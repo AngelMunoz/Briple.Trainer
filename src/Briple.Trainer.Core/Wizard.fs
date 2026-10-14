@@ -1,9 +1,9 @@
-module Wizard
+module Briple.Trainer.Core.Wizard
 
-open Plan.Types
-open Atletas
-open Memorias
-open Solicitudes
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Solicitudes
 
 type Generacion =
   | PlanNuevo of solicitud: SolicitudNuevoPlan

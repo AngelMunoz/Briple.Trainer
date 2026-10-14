@@ -1,4 +1,4 @@
-module Memorias.Tests
+module Briple.Trainer.Core.Tests.Memorias.Tests
 
 // Una marca "muy leve" en un ejercicio se consolida en una
 // memoria con delta paramétrico bien formado, y el ciclo
@@ -6,7 +6,7 @@ module Memorias.Tests
 
 open System
 open Expecto
-open Memorias
+open Briple.Trainer.Core.Memorias
 
 let private marca etiqueta objetivo = {
   Objetivo = objetivo

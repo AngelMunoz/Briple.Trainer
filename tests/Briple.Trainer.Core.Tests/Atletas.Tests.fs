@@ -1,13 +1,13 @@
-module Atletas.Tests
+module Briple.Trainer.Core.Tests.Atletas.Tests
 
 // Los planes existentes se descomponen en dos atletas reales
 // (el hombre con dos variantes, la mujer con una) y un atleta nuevo se
 // define solo con parámetros, sin tocar tipos.
 
 open Expecto
-open Plan.Types
-open Plan.Parser
-open Atletas
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Plan.Parser
+open Briple.Trainer.Core.Atletas
 open Briple.Trainer.Core.Tests.TestSupport
 
 let private dosAtletasDe plan =

@@ -1,4 +1,4 @@
-module Instrucciones.Tests
+module Briple.Trainer.Core.Tests.Instrucciones.Tests
 
 // El mapeo parámetros → instrucciones: lo fijado viene de la
 // solicitud, lo pedido son los campos de origen agente del inventario,
@@ -6,12 +6,12 @@ module Instrucciones.Tests
 
 open System
 open Expecto
-open Plan.Types
-open Atletas
-open Memorias
-open Parametros
-open Solicitudes
-open Instrucciones
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Instrucciones
 
 let private atletaHombre = {
   Nombre = "hombre"

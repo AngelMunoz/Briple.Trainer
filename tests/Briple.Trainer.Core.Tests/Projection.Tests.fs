@@ -1,4 +1,4 @@
-module Projection.Tests
+module Briple.Trainer.Core.Tests.Projection.Tests
 
 // Expecto port of the browser-lane projection tests. Positive asserts
 // run against the real fixture (anchor Monday 2026-09-07); edge cases use
@@ -6,9 +6,9 @@ module Projection.Tests
 
 open System
 open Expecto
-open Plan.Types
-open Plan.Parser
-open Plan.Projection
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Plan.Parser
+open Briple.Trainer.Core.Plan.Projection
 open Briple.Trainer.Core.Tests.TestSupport
 
 let anchor = DateOnly(2026, 9, 7) // Monday

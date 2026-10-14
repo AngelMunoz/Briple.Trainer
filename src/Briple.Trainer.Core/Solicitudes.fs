@@ -1,9 +1,9 @@
-module Solicitudes
+module Briple.Trainer.Core.Solicitudes
 
-open Plan.Types
-open Atletas
-open Memorias
-open Parametros
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Parametros
 
 type Pedido = {
   Ajustes: (Objetivo * Delta list) list

@@ -1,12 +1,12 @@
-module Parser.Tests
+module Briple.Trainer.Core.Tests.Parser.Tests
 
 // Expecto port of the browser-lane parser tests. The positive lane runs
 // against the real 4-week plan files (mes 1, mes 2); negative fixtures are
 // inline strings with known line numbers.
 
 open Expecto
-open Plan.Types
-open Plan.Parser
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Tests.TestSupport
 
 let parse(text: string) = parsePlan text

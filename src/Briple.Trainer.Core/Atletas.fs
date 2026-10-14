@@ -1,6 +1,6 @@
-module Atletas
+module Briple.Trainer.Core.Atletas
 
-open Plan.Types
+open Briple.Trainer.Core.Plan.Types
 
 type Atleta = {
   Nombre: string

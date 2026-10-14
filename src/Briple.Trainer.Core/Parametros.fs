@@ -1,7 +1,7 @@
-module Parametros
+module Briple.Trainer.Core.Parametros
 
-open Atletas
-open Memorias
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
 
 type ClaseOrigen =
   | DelPerfil

@@ -1,12 +1,12 @@
-module Instrucciones
+module Briple.Trainer.Core.Instrucciones
 
 // El mapeo parámetros → instrucciones del agente: qué se fija, qué se
 // pide y qué se prohíbe. Lo fijado debe aparecer en la salida tal
 // cual; lo pedido lo produce el agente dentro de su origen declarado
 // en el inventario; lo prohibido no se toca.
 
-open Parametros
-open Solicitudes
+open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Solicitudes
 
 /// Lo que el agente no puede hacer.
 type Prohibicion =

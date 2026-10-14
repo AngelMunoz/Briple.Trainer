@@ -1,12 +1,12 @@
-module Wizard
+module Briple.Trainer.Core.Wizard
 
 // Los seis pasos del flujo de generación con confirmación. Cada caso
 // carga su entrada; la salida de un paso es la entrada del siguiente.
 
-open Plan.Types
-open Atletas
-open Memorias
-open Solicitudes
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Solicitudes
 
 /// Qué genera el paso 5: un plan nuevo o un ajuste.
 type Generacion =

@@ -1,4 +1,4 @@
-module Plan.Parser
+module Briple.Trainer.Core.Plan.Parser
 
 // Parser for the line-based training plan format (#start/#end blocks, #meta,
 // #ej rows, #x extras). Line bodies go through XParsec; block nesting is
@@ -16,7 +16,7 @@ open XParsec.Combinators
 open XParsec.Parsers
 open XParsec.CharParsers
 open XParsec.ErrorFormatting
-open Plan.Types
+open Briple.Trainer.Core.Plan.Types
 
 let runLine parser (line: string) : Result<'parsed, string> =
   match parser(Reader.ofString line ()) with
