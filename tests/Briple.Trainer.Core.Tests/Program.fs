@@ -13,4 +13,7 @@ let main args =
       Atletas.Tests.tests
       Memorias.Tests.tests
       Parametros.Tests.tests
+      Solicitudes.Tests.tests
+      Instrucciones.Tests.tests
+      Wizard.Tests.tests
     ])

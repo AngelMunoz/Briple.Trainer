@@ -19,6 +19,12 @@
     <Compile Include="Memorias.fs" />
     <Compile Include="Parametros.fsi" />
     <Compile Include="Parametros.fs" />
+    <Compile Include="Solicitudes.fsi" />
+    <Compile Include="Solicitudes.fs" />
+    <Compile Include="Instrucciones.fsi" />
+    <Compile Include="Instrucciones.fs" />
+    <Compile Include="Wizard.fsi" />
+    <Compile Include="Wizard.fs" />
   </ItemGroup>
 
   <ItemGroup>

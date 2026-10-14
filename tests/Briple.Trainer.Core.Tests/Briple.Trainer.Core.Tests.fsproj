@@ -14,6 +14,9 @@
     <Compile Include="Atletas.Tests.fs" />
     <Compile Include="Memorias.Tests.fs" />
     <Compile Include="Parametros.Tests.fs" />
+    <Compile Include="Solicitudes.Tests.fs" />
+    <Compile Include="Instrucciones.Tests.fs" />
+    <Compile Include="Wizard.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

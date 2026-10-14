@@ -20,6 +20,8 @@ type Origen =
 type Parametro =
   | SemanasPlan of semanas: int * origen: Origen
   | VariantesAtleta of variantes: string list * origen: Origen
+  | ConteoOpcion of opcion: string * total: int * origen: Origen
+  | RirSemana of semana: int * objetivo: string * origen: Origen
   | Ajuste of objetivo: Objetivo * deltas: Delta list * origen: Origen
 
 type Campo =
@@ -74,6 +76,28 @@ let origenesDe(campo: Campo) : ClaseOrigen list =
       DelAjustePedido
     ]
   | Extras -> [ DelPlanAnterior; DelAgente; DelAjustePedido ]
+
+let campos: Campo list = [
+  Titulo
+  Semanas
+  Generado
+  OrigenArchivo
+  Opciones
+  TituloOpcion
+  SemanasDeOpcion
+  Dias
+  TituloDia
+  NotasDia
+  Circuito
+  Vueltas
+  Orden
+  Nombre
+  Reps
+  Rir
+  Descanso
+  Notas
+  Extras
+]
 
 let claseDe(origen: Origen) : ClaseOrigen =
   match origen with

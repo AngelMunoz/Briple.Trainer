@@ -26,10 +26,12 @@ type Origen =
   | AjustePedido
   | Agente
 
-/// Un valor de la solicitud con su origen trazable.
+/// Un valor de la solicitud con su origen trazado.
 type Parametro =
   | SemanasPlan of semanas: int * origen: Origen
   | VariantesAtleta of variantes: string list * origen: Origen
+  | ConteoOpcion of opcion: string * total: int * origen: Origen
+  | RirSemana of semana: int * objetivo: string * origen: Origen
   | Ajuste of objetivo: Objetivo * deltas: Delta list * origen: Origen
 
 /// Cada campo del plan y de dónde puede salir su valor: el inventario
@@ -57,6 +59,9 @@ type Campo =
 
 /// Las clases de origen válidas de cada campo; nunca vacío.
 val origenesDe: campo: Campo -> ClaseOrigen list
+
+/// Todos los campos del plan, en el orden del formato.
+val campos: Campo list
 
 /// La clase de un origen trazado.
 val claseDe: origen: Origen -> ClaseOrigen
