@@ -1,0 +1,29 @@
+<Project>
+  <PropertyGroup>
+    <!-- Enable central package management, https://learn.microsoft.com/en-us/nuget/consume-packages/Central-Package-Management -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- UI: Avalonia 12 + NXUI + SukiUI + Navs -->
+    <PackageVersion Include="Avalonia" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageVersion Include="NXUI" Version="12.0.0" />
+    <PackageVersion Include="NXUI.Desktop" Version="12.0.0" />
+    <PackageVersion Include="SukiUI" Version="7.0.1" />
+    <PackageVersion Include="Navs.Avalonia" Version="1.0.0" />
+
+    <!-- Data -->
+    <PackageVersion Include="Donald" Version="10.1.0" />
+
+    <!-- Core utilities -->
+    <PackageVersion Include="FsToolkit.ErrorHandling" Version="5.2.0" />
+    <PackageVersion Include="IcedTasks" Version="0.11.9" />
+    <PackageVersion Include="JDeck" Version="1.1.0" />
+
+    <!-- IA: BYOK OpenAI-compatible (GLM, DeepSeek, Meta Muse) -->
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+    <PackageVersion Include="OpenAI" Version="2.14.0" />
+    <PackageVersion Include="AgentNet" Version="0.2.0" />
+  </ItemGroup>
+</Project>
