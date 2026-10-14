@@ -148,6 +148,8 @@ Pasos fijos antes de generar:
 8. **Edición del plan generado**: por campos en la revisión, no texto libre. Toda edición pasa el validador.
 9. **Persistencia**: SQLite. El Raw del plan confirmado es la fuente de verdad.
 10. **UI**: sin SukiUI. Tema Metro estricto propio sobre Avalonia: SimpleTheme de base y estilos planos (CornerRadius 0, un acento, Segoe UI). Tokens e idiomas portados de Briple y de `E:\metrino`, la fuente del lenguaje de diseño Metro para la web. NXUI se mantiene para autoría de UI en código.
+11. **El agente devuelve datos, no formato**: el modelo responde JSON con el contenido del plan; la Core lo decodifica (JDeck), lo valida contra los parámetros y `Escritor` genera el texto del formato de forma determinista. El modelo nunca escribe `#start`/`#ej`; las líneas de mesociclo con RIR se agregan desde la solicitud.
+12. **Evidencia y excepciones**: los prompts exigen entrenamiento informado por evidencia (instrucciones en inglés, contenido del plan en español). Las excepciones del entrenador —técnicas de alto riesgo prescritas a propósito— viajan como memorias que nacen confirmadas; el entrenador no justifica y las notas del ejercicio registran que es prescripción del entrenador y la razón basada en evidencia por la que no se sugiere normalmente.
 
 ## Fuera de alcance
 

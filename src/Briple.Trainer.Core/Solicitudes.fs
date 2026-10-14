@@ -56,7 +56,7 @@ let solicitudAjuste atleta memorias semanas pedido planAnterior conteos = {
   Conteos = conteos
 }
 
-let private delPedido (semanas: int) (pedido: Pedido) : Parametro list = [
+let delPedido (semanas: int) (pedido: Pedido) : Parametro list = [
   SemanasPlan(semanas, AjustePedido)
   VariantesAtleta(pedido.Variantes, AjustePedido)
   yield!
@@ -74,7 +74,7 @@ let parametrosDeNuevo(solicitud: SolicitudNuevoPlan) : Parametro list =
   @ deMemoriasConfirmadas solicitud.Memorias
   @ delPedido solicitud.Semanas solicitud.Pedido
 
-let private conteoParametro
+let conteoParametro
   (atleta: Atleta)
   (planAnterior: Plan)
   (opcion, total)

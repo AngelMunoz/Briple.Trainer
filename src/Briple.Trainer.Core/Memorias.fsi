@@ -26,6 +26,18 @@ type MarcaFeedback = {
   Fecha: DateOnly
 }
 
+/// Excepcion del entrenador: tecnica que las reglas de evidencia no
+/// sugieren, prescrita a proposito. El entrenador no justifica; la
+/// nota de por que no la sugerimos la escribe el sistema en las notas
+/// del ejercicio.
+type Excepcion = { Objetivo: Objetivo; Tecnica: string }
+
+/// El origen de una memoria: una marca del atleta o una excepcion del
+/// entrenador.
+type OrigenMemoria =
+  | Marca of MarcaFeedback
+  | Excepcion of excepcion: Excepcion
+
 /// Ajuste paramétrico predefinido: los cinco con los que el entrenador
 /// responde. Los numéricos son cambios relativos; la carga va en
 /// porcentaje.
@@ -48,7 +60,7 @@ type EstadoMemoria =
 type Memoria = {
   Resumen: string
   Deltas: Delta list
-  Origen: MarcaFeedback
+  Origen: OrigenMemoria
   Estado: EstadoMemoria
 }
 
@@ -66,3 +78,7 @@ val confirmar: deltas: Delta list -> memoria: Memoria -> Memoria
 
 /// Descarta la memoria: no llega a la solicitud siguiente.
 val descartar: memoria: Memoria -> Memoria
+
+/// La memoria de una excepcion del entrenador: nace confirmada, con
+/// la tecnica prescrita como variante.
+val memoriaDeExcepcion: excepcion: Excepcion -> Memoria

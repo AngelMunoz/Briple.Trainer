@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <DebugType>embedded</DebugType>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- los scripts de prueba cargan las DLL del bin de la Core -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,11 +27,29 @@
     <Compile Include="Instrucciones.fs" />
     <Compile Include="Wizard.fsi" />
     <Compile Include="Wizard.fs" />
+    <Compile Include="Plan.Escritor.fsi" />
+    <Compile Include="Plan.Escritor.fs" />
+    <Compile Include="Plan.Datos.fsi" />
+    <Compile Include="Plan.Datos.fs" />
+    <Compile Include="Validador.fsi" />
+    <Compile Include="Validador.fs" />
+    <Compile Include="Prompts.fsi" />
+    <Compile Include="Prompts.fs" />
+    <Compile Include="Agente.fsi" />
+    <Compile Include="Agente.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Formato: el parser se mantiene con XParsec, como en Briple -->
     <PackageReference Include="XParsec" />
+    <PackageReference Include="JDeck" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Agente: BYOK OpenAI-compatible (GLM, DeepSeek, Meta Muse) -->
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OpenAI" />
   </ItemGroup>
 
 </Project>

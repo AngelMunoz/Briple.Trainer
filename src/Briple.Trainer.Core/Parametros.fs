@@ -116,12 +116,11 @@ let deMemoriasConfirmadas(memorias: Memoria list) : Parametro list =
   |> List.choose(fun memoria ->
     match memoria.Estado with
     | Confirmada ->
-      Some(
-        Ajuste(
-          memoria.Origen.Objetivo,
-          memoria.Deltas,
-          MemoriaConfirmada memoria
-        )
-      )
+      let objetivo =
+        match memoria.Origen with
+        | Marca marca -> marca.Objetivo
+        | Excepcion excepcion -> excepcion.Objetivo
+
+      Some(Ajuste(objetivo, memoria.Deltas, MemoriaConfirmada memoria))
     | Propuesta
     | Descartada -> None)

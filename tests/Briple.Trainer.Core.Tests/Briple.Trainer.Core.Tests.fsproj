@@ -17,6 +17,10 @@
     <Compile Include="Solicitudes.Tests.fs" />
     <Compile Include="Instrucciones.Tests.fs" />
     <Compile Include="Wizard.Tests.fs" />
+    <Compile Include="Escritor.Tests.fs" />
+    <Compile Include="Datos.Tests.fs" />
+    <Compile Include="Validador.Tests.fs" />
+    <Compile Include="Prompts.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

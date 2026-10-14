@@ -15,8 +15,9 @@ providers (GLM, DeepSeek, Meta Muse), all OpenAI-compatible.
 6. Pull requests made with the `gh` command use a markdown file as the PR body, not inline escaped markdown.
 7. New F# files **MUST** be paired with its own signature file for app and library code, tests and samples do not require signature files.
 8. Comments go to the signature files. implementation quirk comments may stay in implementation files.
-9. Report to me only in ASD-STE100 Simplified Technical English, or plain Spanish when I write in Spanish.
-10. For non-reports, do not use LLM jargon, phrases that are textual noise without actual value. Speak simple plain, concise and direct english.
+9. **No `private` in files with an `.fsi`.** The signature already hides anything it does not export; `private` there is noise.
+10. Report to me only in ASD-STE100 Simplified Technical English, or plain Spanish when I write in Spanish.
+11. For non-reports, do not use LLM jargon, phrases that are textual noise without actual value. Speak simple plain, concise and direct english.
 
 ## Commands
 

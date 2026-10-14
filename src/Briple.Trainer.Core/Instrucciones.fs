@@ -14,7 +14,7 @@ type Instrucciones = {
   Prohibir: Prohibicion list
 }
 
-let private pedidosAlAgente: Campo list =
+let pedidosAlAgente: Campo list =
   campos
   |> List.filter(fun campo -> origenesDe campo |> List.contains DelAgente)
 

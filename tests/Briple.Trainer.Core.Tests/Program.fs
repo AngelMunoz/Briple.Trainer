@@ -16,4 +16,8 @@ let main args =
       Solicitudes.Tests.tests
       Instrucciones.Tests.tests
       Wizard.Tests.tests
+      Escritor.Tests.tests
+      Datos.Tests.tests
+      Validador.Tests.tests
+      Prompts.Tests.tests
     ])

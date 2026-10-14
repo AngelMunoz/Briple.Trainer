@@ -31,10 +31,13 @@ let tests =
         "muy leve"
         "el resumen narra el hecho"
 
-      Expect.equal
-        memoria.Origen.Objetivo
-        (Ejercicio "Press de banca")
-        "trae su origen")
+      match memoria.Origen with
+      | Marca marca ->
+        Expect.equal
+          marca.Objetivo
+          (Ejercicio "Press de banca")
+          "trae su origen"
+      | Excepcion _ -> failtest "nacio de una marca")
 
     testCase "una marca pesado baja la carga" (fun () ->
       let memoria = consolidar(marca Pesado (Dia "Lunes"))
@@ -71,4 +74,33 @@ let tests =
       let memoria = marca Pesado (Ejercicio "Remo") |> consolidar |> descartar
 
       Expect.equal memoria.Estado Descartada "queda descartada")
+
+    testCase
+      "una excepcion del entrenador nace confirmada con la tecnica"
+      (fun () ->
+        let memoria =
+          memoriaDeExcepcion {
+            Objetivo = Dia "Miércoles"
+            Tecnica = "Sentadilla con salto"
+          }
+
+        Expect.equal memoria.Estado Confirmada "no pasa por propuesta"
+
+        Expect.equal
+          memoria.Deltas
+          [ VariantePatron "Sentadilla con salto" ]
+          "la tecnica es la variante"
+
+        Expect.stringContains
+          memoria.Resumen
+          "el entrenador prescribió"
+          "el resumen narra la prescripcion"
+
+        (match memoria.Origen with
+         | Excepcion excepcion ->
+           Expect.equal
+             excepcion.Tecnica
+             "Sentadilla con salto"
+             "guarda la tecnica"
+         | Marca _ -> failtest "nacio de una excepcion"))
   ]

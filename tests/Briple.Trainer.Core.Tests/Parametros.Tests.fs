@@ -101,4 +101,24 @@ let tests =
       Expect.isEmpty
         (deMemoriasConfirmadas [ propuesta; descartada ])
         "nada llega sin confirmar")
+
+    testCase
+      "la excepcion del entrenador aporta su objetivo como ajuste"
+      (fun () ->
+        let memoria =
+          memoriaDeExcepcion {
+            Objetivo = Dia "Miércoles"
+            Tecnica = "Sentadilla con salto"
+          }
+
+        Expect.equal
+          (deMemoriasConfirmadas [ memoria ])
+          [
+            Ajuste(
+              Dia "Miércoles",
+              [ VariantePatron "Sentadilla con salto" ],
+              MemoriaConfirmada memoria
+            )
+          ]
+          "la excepcion confirmada viaja como ajuste")
   ]
