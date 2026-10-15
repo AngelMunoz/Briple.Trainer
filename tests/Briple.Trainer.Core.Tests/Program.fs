@@ -10,15 +10,15 @@ let main args =
     (testList "Briple.Trainer.Core" [
       Parser.Tests.tests
       Projection.Tests.tests
-      Atletas.Tests.tests
-      Memorias.Tests.tests
-      Parametros.Tests.tests
-      Solicitudes.Tests.tests
-      Instrucciones.Tests.tests
+      Athletes.Tests.tests
+      Memories.Tests.tests
+      Parameters.Tests.tests
+      Requests.Tests.tests
+      Instructions.Tests.tests
       Wizard.Tests.tests
-      Escritor.Tests.tests
-      Datos.Tests.tests
-      Validador.Tests.tests
+      Writer.Tests.tests
+      Data.Tests.tests
+      Validator.Tests.tests
       Prompts.Tests.tests
-      Agente.Tests.tests
+      Agent.Tests.tests
     ])

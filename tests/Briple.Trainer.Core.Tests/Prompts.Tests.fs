@@ -1,7 +1,8 @@
 module Briple.Trainer.Core.Tests.Prompts.Tests
 
-// El render del prompt: el formato, lo fijado (semanas, variantes,
-// conteos, RIR), lo prohibido, y el plan anterior en el ajuste.
+// The prompt render: the format, the fixed part (weeks, variants,
+// counts, RIR), the forbidden part, and the previous plan in the
+// adjustment.
 
 open System
 open Expecto
@@ -13,12 +14,12 @@ open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Prompts
 open Briple.Trainer.Core.Tests.TestSupport
 
-let private parsear nombre =
-  match readFixture nombre |> parsePlan with
+let private parse name =
+  match readFixture name |> parsePlan with
   | Error error -> failtest $"parse error at line {error.Line}"
   | Ok parsed -> parsed
 
-let private hombre = {
+let private man = {
   Name = "Pepe"
   Gender = Male
   Variants = [ "3dias"; "5dias" ]
@@ -26,7 +27,7 @@ let private hombre = {
   Focus = [ "gluteo" ]
 }
 
-let private pedido = {
+let private brief = {
   Adjustments = []
   Focus = []
   RirPerWeek = [ (1, "3"); (2, "2-3"); (4, "1") ]
@@ -36,145 +37,147 @@ let private pedido = {
 let tests =
   testList "Prompts" [
     testCase
-      "el prompt del plan nuevo trae esquema, fijado y prohibido"
+      "the new-plan prompt carries schema, fixed and forbidden"
       (fun () ->
-        let solicitud =
-          newRequest hombre [] 4 pedido [ ("3dias", 72); ("5dias", 72) ]
+        let request =
+          newRequest man [] 4 brief [ ("3dias", 72); ("5dias", 72) ]
 
-        let prompt = newPlanPrompt solicitud
+        let prompt = newPlanPrompt request
 
         Expect.stringContains
           prompt
           "- the plan covers 4 weeks"
-          "las semanas se fijan"
+          "the weeks get fixed"
 
         Expect.stringContains
           prompt
           "- the plan has one option per variant: 3dias, 5dias"
-          "las variantes se fijan"
+          "the variants get fixed"
 
         Expect.stringContains
           prompt
           "- week 2 targets RIR 2-3 (added automatically, do not write it)"
-          "el RIR se fija"
+          "the RIR gets fixed"
 
         Expect.stringContains
           prompt
           "- option 3dias has exactly 72 exercises in total"
-          "los conteos se fijan"
+          "the counts get fixed"
 
-        Expect.stringContains prompt "FORBIDDEN" "las prohibiciones van"
+        Expect.stringContains prompt "FORBIDDEN" "the prohibitions travel"
 
         Expect.stringContains
           system
           "RESPONSE SCHEMA"
-          "el sistema trae el esquema json"
+          "the system carries the json schema"
 
         Expect.stringContains
           system
           "\"exercises\": ["
-          "el esquema declara los ejercicios"
+          "the schema declares the exercises"
 
         Expect.stringContains
           system
           "EVIDENCE-BASED TRAINING"
-          "el sistema exige evidencia"
+          "the system demands evidence"
 
         Expect.stringContains
           system
           "VARIANT ROTATION"
-          "el sistema exige rotacion de variantes"
+          "the system demands variant rotation"
 
         Expect.stringContains
           system
           "an exercise name never repeats in the same day of the following week"
-          "la rotacion es entre semanas consecutivas"
+          "the rotation is between consecutive weeks"
 
         Expect.stringContains
           system
           "Respond with the JSON only"
-          "la instruccion de salida va en el sistema")
+          "the output instruction goes in the system")
 
     testCase
-      "el prompt del ajuste trae los conteos y el plan anterior"
+      "the adjustment prompt carries the counts and the previous plan"
       (fun () ->
-        let mes1 = parsear "plan_entrenamiento_4sem.txt"
+        let month1 = parse "training_plan_4w.txt"
 
-        let solicitud =
-          adjustmentRequest hombre [] 4 pedido mes1.Plan [
+        let request =
+          adjustmentRequest man [] 4 brief month1.Plan [
             ("3dias", 68)
             ("5dias", 104)
           ]
 
-        let prompt = adjustmentPrompt solicitud
+        let prompt = adjustmentPrompt request
 
         Expect.stringContains
           prompt
           "- option 3dias has exactly 68 exercises in total"
-          "conteo 68"
+          "count 68"
 
         Expect.stringContains
           prompt
           "- option 5dias has exactly 104 exercises in total"
-          "conteo 104"
+          "count 104"
 
         Expect.stringContains
           prompt
           "PREVIOUS PLAN"
-          "la referencia del ajuste va"
+          "the adjustment reference travels"
 
         Expect.stringContains
           prompt
           "Sentadilla con barra"
-          "el plan anterior viaja completo en el mismo esquema")
-
-    testCase "la memoria confirmada entra al prompt como ajuste" (fun () ->
-      let memoria =
-        {
-          Target = Exercise "Press de banca"
-          Label = Light
-          Date = DateOnly(2026, 10, 6)
-        }
-        |> consolidate
-        |> confirm [ Load 5 ]
-
-      let prompt = newPlanPrompt(newRequest hombre [ memoria ] 4 pedido [])
-
-      Expect.stringContains
-        prompt
-        "- on Press de banca: load 5"
-        "el delta de la memoria se fija")
+          "the previous plan travels complete in the same schema")
 
     testCase
-      "la excepcion del entrenador exige el indicativo en notas"
+      "the confirmed memory enters the prompt as an adjustment"
       (fun () ->
-        let memoria =
+        let memory =
+          {
+            Target = Exercise "Press de banca"
+            Label = Light
+            Date = DateOnly(2026, 10, 6)
+          }
+          |> consolidate
+          |> confirm [ Load 5 ]
+
+        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief [])
+
+        Expect.stringContains
+          prompt
+          "- on Press de banca: load 5"
+          "the memory's delta gets fixed")
+
+    testCase
+      "the trainer exemption demands the indicative in the notes"
+      (fun () ->
+        let memory =
           memoryOfExemption {
             Target = Day "Miércoles"
             Technique = "Sentadilla con salto"
           }
 
-        let prompt = newPlanPrompt(newRequest hombre [ memoria ] 4 pedido [])
+        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief [])
 
         Expect.stringContains
           prompt
           "- on day Miércoles: variant Sentadilla con salto — trainer exception"
-          "la excepcion viaja con su tecnica"
+          "the exemption travels with its technique"
 
         Expect.stringContains
           prompt
           "trainer-prescribed plus the evidence-based reason why it is not generally suggested"
-          "exige el indicativo en notas"
+          "it demands the indicative in the notes"
 
         Expect.stringContains
           system
           "TRAINER EXCEPTIONS: the trainer is the health expert"
-          "el sistema cede ante la prescripcion")
+          "the system yields to the prescription")
 
     testCase
-      "el prompt de consolidacion trae las marcas y el protocolo"
+      "the consolidation prompt carries the marks and the protocol"
       (fun () ->
-        let marcas = [
+        let marks = [
           {
             Target = Exercise "Press de banca"
             Label = Light
@@ -187,20 +190,20 @@ let tests =
           }
         ]
 
-        let prompt = consolidationPrompt marcas
+        let prompt = consolidationPrompt marks
 
         Expect.stringContains
           prompt
           "- Press de banca | light | 2026-10-06"
-          "la marca del ejercicio va"
+          "the exercise's mark goes in"
 
         Expect.stringContains
           prompt
           "- day Lunes | no-equipment | 2026-10-07"
-          "la marca del dia va"
+          "the day's mark goes in"
 
         Expect.stringContains
           consolidationSystem
           "target | label | summary | delta[;delta...]"
-          "el protocolo de respuesta va en el sistema")
+          "the response protocol goes in the system")
   ]

@@ -1,7 +1,7 @@
 module Briple.Trainer.Core.Tests.Wizard.Tests
 
-// Los seis pasos del wizard quedan especificados con entradas
-// y salidas; la salida de cada paso arma la entrada del siguiente.
+// The six wizard steps stay specified with inputs and outputs; the
+// output of each step assembles the next one's input.
 
 open System
 open Expecto
@@ -13,7 +13,7 @@ open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Wizard
 open Briple.Trainer.Core.Tests.TestSupport
 
-let private atleta = {
+let private athlete = {
   Name = "hombre"
   Gender = Male
   Variants = [ "3dias"; "5dias" ]
@@ -21,17 +21,17 @@ let private atleta = {
   Focus = []
 }
 
-let private marca = {
+let private mark = {
   Target = Exercise "Press de banca"
   Label = Light
   Date = DateOnly(2026, 10, 6)
 }
 
-let private propuesta = marca |> consolidate
+let private proposal = mark |> consolidate
 
-let private confirmada = propuesta |> confirm [ Load 5 ]
+let private confirmed = proposal |> confirm [ Load 5 ]
 
-let private pedido = {
+let private brief = {
   Adjustments = []
   Focus = []
   RirPerWeek = [ (1, "3") ]
@@ -40,62 +40,62 @@ let private pedido = {
 
 let tests =
   testList "Wizard" [
-    testCase "los seis pasos encadenan sus entradas y salidas" (fun () ->
-      // 1: salida el atleta elegido; 2: entrada ese atleta
-      let paso1 = initial()
-      let paso2 = ReviewMemories(atleta, [ propuesta ])
+    testCase "the six steps chain their inputs and outputs" (fun () ->
+      // 1: output the chosen athlete; 2: input that athlete
+      let step1 = initial()
+      let step2 = ReviewMemories(athlete, [ proposal ])
 
-      // 2: salida las confirmadas; 3: entrada el atleta
-      let paso3 = ChoosePeriod atleta
+      // 2: output the confirmed; 3: input the athlete
+      let step3 = ChoosePeriod athlete
 
-      // 3: salida las semanas; 4: entrada atleta + confirmadas + semanas
-      let paso4 = DefineBrief(atleta, [ confirmada ], 4)
+      // 3: output the weeks; 4: input athlete + confirmed + weeks
+      let step4 = DefineBrief(athlete, [ confirmed ], 4)
 
-      // 4: salida el pedido; 5: entrada la solicitud armada
-      let solicitud = newRequest atleta [ confirmada ] 4 pedido []
-      let paso5 = Generate(NewPlan solicitud)
+      // 4: output the brief; 5: input the assembled request
+      let request = newRequest athlete [ confirmed ] 4 brief []
+      let step5 = Generate(NewPlan request)
 
-      // 5: salida el candidato validado; 6: entrada candidato + warnings
-      let (candidato, warnings) =
-        match readFixture "plan_entrenamiento_4sem.txt" |> parsePlan with
+      // 5: output the validated candidate; 6: input candidate + warnings
+      let (candidate, warnings) =
+        match readFixture "training_plan_4w.txt" |> parsePlan with
         | Error error -> failtest $"parse error at line {error.Line}"
         | Ok parsed -> (parsed.Plan, parsed.Warnings)
 
-      let paso6 = Review(candidato, warnings)
+      let step6 = Review(candidate, warnings)
 
-      Expect.equal paso1 ChooseAthlete "paso 1 sin entrada"
+      Expect.equal step1 ChooseAthlete "step 1 without input"
 
-      let pasos = [ paso1; paso2; paso3; paso4; paso5; paso6 ]
+      let steps = [ step1; step2; step3; step4; step5; step6 ]
 
-      Expect.equal (List.distinct pasos).Length 6 "seis pasos distintos"
+      Expect.equal (List.distinct steps).Length 6 "six distinct steps"
 
-      Expect.equal solicitud.Weeks 4 "la salida del paso 3 entró al 4"
-
-      Expect.equal
-        (List.head solicitud.Memories)
-        confirmada
-        "la salida del paso 2 entró al 5"
+      Expect.equal request.Weeks 4 "step 3's output went into 4"
 
       Expect.equal
-        candidato.Weeks
+        (List.head request.Memories)
+        confirmed
+        "step 2's output went into 5"
+
+      Expect.equal
+        candidate.Weeks
         4
-        "la salida del paso 5 entra al 6 con sus warnings"
+        "step 5's output goes into 6 with its warnings"
 
-      Expect.isEmpty warnings "el candidato del fixture valida limpio")
+      Expect.isEmpty warnings "the fixture candidate validates clean")
 
-    testCase "el ajuste también genera desde el paso 5" (fun () ->
-      let mes1 =
-        match readFixture "plan_entrenamiento_4sem.txt" |> parsePlan with
+    testCase "the adjustment also generates from step 5" (fun () ->
+      let month1 =
+        match readFixture "training_plan_4w.txt" |> parsePlan with
         | Error error -> failtest $"parse error at line {error.Line}"
         | Ok parsed -> parsed.Plan
 
-      let solicitud =
-        adjustmentRequest atleta [] 4 pedido mes1 [ ("3dias", 68) ]
+      let request =
+        adjustmentRequest athlete [] 4 brief month1 [ ("3dias", 68) ]
 
-      let paso = Generate(PlanAdjustment solicitud)
+      let step = Generate(PlanAdjustment request)
 
       Expect.equal
-        paso
-        (Generate(PlanAdjustment solicitud))
-        "el paso 5 carga la solicitud de ajuste")
+        step
+        (Generate(PlanAdjustment request))
+        "step 5 carries the adjustment request")
   ]

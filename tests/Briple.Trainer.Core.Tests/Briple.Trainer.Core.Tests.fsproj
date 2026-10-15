@@ -11,17 +11,17 @@
     <Compile Include="TestSupport.fs" />
     <Compile Include="Parser.Tests.fs" />
     <Compile Include="Projection.Tests.fs" />
-    <Compile Include="Atletas.Tests.fs" />
-    <Compile Include="Memorias.Tests.fs" />
-    <Compile Include="Parametros.Tests.fs" />
-    <Compile Include="Solicitudes.Tests.fs" />
-    <Compile Include="Instrucciones.Tests.fs" />
+    <Compile Include="Athletes.Tests.fs" />
+    <Compile Include="Memories.Tests.fs" />
+    <Compile Include="Parameters.Tests.fs" />
+    <Compile Include="Requests.Tests.fs" />
+    <Compile Include="Instructions.Tests.fs" />
     <Compile Include="Wizard.Tests.fs" />
-    <Compile Include="Escritor.Tests.fs" />
-    <Compile Include="Datos.Tests.fs" />
-    <Compile Include="Validador.Tests.fs" />
+    <Compile Include="Writer.Tests.fs" />
+    <Compile Include="Data.Tests.fs" />
+    <Compile Include="Validator.Tests.fs" />
     <Compile Include="Prompts.Tests.fs" />
-    <Compile Include="Agente.Tests.fs" />
+    <Compile Include="Agent.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
