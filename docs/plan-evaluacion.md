@@ -120,6 +120,15 @@ Pasos fijos antes de generar:
 - Toda salida rechazada se descarta. No hay reparo automático en esta fase.
 - Esfuerzo: 2 sesiones.
 
+### F4.5 — Prescripción tipada y objetivos (antes de F5)
+
+- Formato `.briple` y claves JSON intactos: `reps` y `rir` siguen verbatim como fuente de verdad. Core agrega la capa parseada (`Prescription`): dosis como unión (`Reps` | `Timed`) y esfuerzo como unión (`Rir` | `Rpe` | `Zone` | ninguno).
+- Regla `prescription` del validador, siempre tolerante: no rechaza salidas; los avisos viajan con el veredicto para que la UI marque filas a revisar. Los planes origen traen estos patrones ("8-12 reps por ronda", "30-45 s por lado", `rir "-"` en 56 filas del mes 2) y el ajuste los hereda.
+- Instrucciones al modelo: reps puro (rango o duración, sin calificadores; "por lado" va a notas); `rir` nunca "-" en trabajo por repeticiones; equivalente rpe/zona en trabajo por tiempo; el nombre es un solo ejercicio (alternativas en notas); `load N` es porcentaje de la carga habitual, declarado en el system para que no se interprete como kg.
+- Objetivos: `PlanGoal` (Hypertrophy, WeightLoss, CardioVascularHealth, BasicBodyActivation, Strength) en el atleta y en el brief; el system del prompt pasa a función del objetivo, con bloque de evidencia por objetivo.
+- Gate: re-corrida del spike (new/adjust/consolidate) tras las instrucciones y tras los objetivos.
+- Esfuerzo: 2 sesiones.
+
 ### F5 — Consumer desktop
 
 - Tema Metro estricto propio: SimpleTheme de base más diccionario de estilos planos. CornerRadius 0, un acento, tipografía Segoe UI, app bar inferior, pivots con Navs. Tokens e idiomas visuales se portan de Briple (`Theme.fs`, acentos Metro de Metrino.Ripple). `E:\metrino` es la fuente del lenguaje de diseño para la web: tokens y especificaciones visuales salen de ahí.
@@ -152,6 +161,7 @@ Pasos fijos antes de generar:
 11. **El agente devuelve datos, no formato**: el modelo responde JSON con el contenido del plan; la Core lo decodifica (JDeck), lo valida contra los parámetros y `Escritor` genera el texto del formato de forma determinista. El modelo nunca escribe `#start`/`#ej`; las líneas de mesociclo con RIR se agregan desde la solicitud.
 12. **Evidencia y excepciones**: los prompts exigen entrenamiento informado por evidencia (instrucciones en inglés, contenido del plan en español). Las excepciones del entrenador —técnicas de alto riesgo prescritas a propósito— viajan como memorias que nacen confirmadas; el entrenador no justifica y las notas del ejercicio registran que es prescripción del entrenador y la razón basada en evidencia por la que no se sugiere normalmente.
 13. **Idioma del código e i18n**: el código fuente (identificadores, módulos, comentarios, nombres de test) va en inglés; los nombres de módulos en español se renombran (`Atletas`→`Athletes`, `Solicitudes`→`Requests`, etc.). La Core emite datos estructurados (regla más valores, nunca prosa); la localización de UI vive en resx del consumidor desde F5.
+14. **Prescripción y objetivos**: `reps` y `rir` siguen verbatim en el formato y el JSON; la tipificación (`Dose`, `Effort`) vive en una capa parseada de Core. El validador reporta prescripciones mal formadas sin bloquear (tolerante al contenido heredado de planes reales). Los objetivos de alto nivel (`PlanGoal`) viajan en el atleta y el brief, y seleccionan el bloque de evidencia del prompt. Un nombre de ejercicio es un solo ejercicio; las alternativas van en notas. `load N` es porcentaje de la carga habitual.
 
 ## Fuera de alcance
 
