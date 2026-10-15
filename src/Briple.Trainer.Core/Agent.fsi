@@ -1,18 +1,18 @@
-module Briple.Trainer.Core.Agente
+module Briple.Trainer.Core.Agent
 
 // The agent orchestration over Microsoft.Extensions.AI with BYOK
 // OpenAI-compatible providers. Responses stream in chunks inside a
 // cancellableTask. The model answers data as JSON; the domain plan is
-// converted with Plan.Datos, checked against the request parameters and
-// the format is written by Escritor deterministically. Rejected outputs
-// are discarded; there is no repair.
+// converted with Plan.Data, checked against the request parameters and
+// the format is written by Plan.Writer deterministically. Rejected
+// outputs are discarded; there is no repair.
 
 open System
 open System.Threading.Tasks
 open Microsoft.Extensions.AI
 open Briple.Trainer.Core.Memories
-open Briple.Trainer.Core.Solicitudes
-open Briple.Trainer.Core.Validador
+open Briple.Trainer.Core.Requests
+open Briple.Trainer.Core.Validator
 
 /// A BYOK OpenAI-compatible provider.
 type Provider = {
@@ -46,6 +46,6 @@ val generateAdjustment:
 
 /// The agent consolidates the marks into proposed memories. Lines that
 /// do not follow the protocol are discarded; numeric deltas tolerate
-/// sign and percentage (carga +5% reads as carga 5).
+/// sign and percentage (load +5% reads as load 5).
 val consolidateMarks:
   client: IChatClient -> marks: FeedbackMark list -> Task<Memory list>

@@ -1,4 +1,4 @@
-module Briple.Trainer.Core.Instrucciones
+module Briple.Trainer.Core.Instructions
 
 // The parameters → agent instructions mapping: what gets fixed, what
 // gets asked and what gets forbidden. The fixed part must appear in the
@@ -6,7 +6,7 @@ module Briple.Trainer.Core.Instrucciones
 // origin the inventory declares for it; the forbidden part is untouched.
 
 open Briple.Trainer.Core.Parameters
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 
 /// What the agent cannot do.
 type Prohibition =

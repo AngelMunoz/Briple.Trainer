@@ -10,8 +10,8 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Parameters
-open Briple.Trainer.Core.Solicitudes
-open Briple.Trainer.Core.Instrucciones
+open Briple.Trainer.Core.Requests
+open Briple.Trainer.Core.Instructions
 
 let private atletaHombre = {
   Name = "hombre"

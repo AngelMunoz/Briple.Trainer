@@ -21,22 +21,22 @@
     <Compile Include="Memories.fs" />
     <Compile Include="Parameters.fsi" />
     <Compile Include="Parameters.fs" />
-    <Compile Include="Solicitudes.fsi" />
-    <Compile Include="Solicitudes.fs" />
-    <Compile Include="Instrucciones.fsi" />
-    <Compile Include="Instrucciones.fs" />
+    <Compile Include="Requests.fsi" />
+    <Compile Include="Requests.fs" />
+    <Compile Include="Instructions.fsi" />
+    <Compile Include="Instructions.fs" />
     <Compile Include="Wizard.fsi" />
     <Compile Include="Wizard.fs" />
-    <Compile Include="Plan.Escritor.fsi" />
-    <Compile Include="Plan.Escritor.fs" />
-    <Compile Include="Plan.Datos.fsi" />
-    <Compile Include="Plan.Datos.fs" />
-    <Compile Include="Validador.fsi" />
-    <Compile Include="Validador.fs" />
+    <Compile Include="Plan.Writer.fsi" />
+    <Compile Include="Plan.Writer.fs" />
+    <Compile Include="Plan.Data.fsi" />
+    <Compile Include="Plan.Data.fs" />
+    <Compile Include="Validator.fsi" />
+    <Compile Include="Validator.fs" />
     <Compile Include="Prompts.fsi" />
     <Compile Include="Prompts.fs" />
-    <Compile Include="Agente.fsi" />
-    <Compile Include="Agente.fs" />
+    <Compile Include="Agent.fsi" />
+    <Compile Include="Agent.fs" />
   </ItemGroup>
 
   <ItemGroup>

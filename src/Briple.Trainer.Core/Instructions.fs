@@ -1,7 +1,7 @@
-module Briple.Trainer.Core.Instrucciones
+module Briple.Trainer.Core.Instructions
 
 open Briple.Trainer.Core.Parameters
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 
 type Prohibition =
   | ChangeCounts

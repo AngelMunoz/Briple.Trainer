@@ -6,7 +6,7 @@ module Briple.Trainer.Core.Prompts
 // the previous plan as reference.
 
 open Briple.Trainer.Core.Memories
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 
 /// System message of the generation flows: role, JSON response schema,
 /// fixed rules and variant rotation.

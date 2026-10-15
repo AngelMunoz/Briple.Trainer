@@ -10,7 +10,7 @@ open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Parameters
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Tests.TestSupport
 
 let private parsearFixture nombre =

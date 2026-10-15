@@ -2,16 +2,18 @@ module Briple.Trainer.Core.Prompts
 
 open System
 open Briple.Trainer.Core.Athletes
-open Briple.Trainer.Core.Instrucciones
+open Briple.Trainer.Core.Instructions
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Parameters
-open Briple.Trainer.Core.Plan.Datos
+open Briple.Trainer.Core.Plan.Data
 open Briple.Trainer.Core.Plan.Types
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 
-// Instructions are written in English; the data contract (schema
-// keys, day ids, labels, deltas) and the plan content stay in
-// Spanish because the decoder and the athlete-facing app expect them.
+// Instructions and the data contract (schema keys, labels, deltas) are
+// written in English; the plan content (titles, day ids, exercise
+// names, notes, extras, summaries) stays Spanish because the decoder
+// and the athlete-facing app expect it. The trainer picks the content
+// language in the desktop app.
 
 let join (separator: string) (parts: string list) =
   String.concat separator parts
@@ -25,9 +27,9 @@ let deltaText delta =
   match delta with
   | Delta.Rir n -> $"rir {n}"
   | Delta.Reps n -> $"reps {n}"
-  | Sets n -> $"series {n}"
-  | Load p -> $"carga {p}"
-  | PatternVariant name -> $"variante {name}"
+  | Sets n -> $"sets {n}"
+  | Load p -> $"load {p}"
+  | PatternVariant name -> $"variant {name}"
 
 let parameterText parameter =
   match parameter with
@@ -91,30 +93,30 @@ let requestedFields(instructions: Instructions) =
 let schemaText =
   """RESPONSE SCHEMA: respond only with valid JSON in this shape:
 {
-  "titulo": "texto",
-  "semanas": 4,
-  "generado": "2026-10-14",
-  "origen": "texto",
-  "genero": "hombre" o "mujer",
-  "opciones": [
+  "title": "text",
+  "weeks": 4,
+  "generated": "2026-10-14",
+  "origin": "text",
+  "gender": "male" or "female",
+  "variants": [
     {
       "id": "3dias",
-      "titulo": "texto (opcional)",
-      "semanas": [
-        { "numero": 1, "dias": [
-          { "id": "lunes", "titulo": "texto (opcional)", "ejercicios": [
-            { "circuito": "A", "vueltas": "4", "orden": 1, "nombre": "texto", "reps": "6-8", "rir": "1-2", "descanso": "3 min", "notas": "-" }
+      "title": "text (optional)",
+      "weeks": [
+        { "number": 1, "days": [
+          { "id": "lunes", "title": "text (optional)", "exercises": [
+            { "circuit": "A", "laps": "4", "order": 1, "name": "text", "reps": "6-8", "rir": "1-2", "rest": "3 min", "notes": "-" }
           ] }
         ] }
       ]
     }
   ],
-  "extras": ["texto libre"]
+  "extras": ["free text"]
 }
 Day ids are Spanish: lunes, martes, miercoles, jueves, viernes, sabado, domingo.
-The notas field uses "-" when it does not apply.
+The notes field uses "-" when it does not apply.
 Do not write mesociclo RIR lines in extras: they are added automatically.
-Write all content (titulo, titles, exercise names, reps, descanso, notas, extras) in Spanish."""
+Write all content (titles, exercise names, reps, rest, notes, extras) in Spanish."""
 
 let evidenceText =
   """EVIDENCE-BASED TRAINING:
@@ -155,11 +157,11 @@ let system =
 let consolidationSystem =
   """You are a strength and conditioning coach who summarizes athlete feedback into training memories.
 Each memory is a persistent fact with a proposed parametric adjustment.
-Valid deltas: rir N, reps N, series N, carga P (percent), variante NOMBRE. Write numbers bare: carga 5, not carga +5% or carga 5%.
+Valid deltas: rir N, reps N, sets N, load P (percent), variant NAME. Write numbers bare: load 5, not load +5% or load 5%.
 Respond with one line per mark, in the same order, in this format:
-objetivo | etiqueta | resumen | delta[;delta...]
-Echo objetivo and etiqueta exactly as given in the marks. Write the resumen in Spanish, as one short sentence stating the fact.
-The proposed delta corrects the mark: leve raises load, pesado lowers it, dolor and sin-equipo propose a variante.
+target | label | summary | delta[;delta...]
+Echo target and label exactly as given in the marks. Write the summary in Spanish, as one short sentence stating the fact.
+The proposed delta corrects the mark: light raises load, heavy lowers it, pain and no-equipment propose a variant.
 No explanations, no markdown."""
 
 /// User message for the new plan flow.
@@ -194,10 +196,10 @@ let adjustmentPrompt(request: AdjustmentRequest) =
 let consolidationPrompt(marks: FeedbackMark list) =
   let labelText label =
     match label with
-    | Light -> "leve"
-    | Heavy -> "pesado"
-    | Pain -> "dolor"
-    | NoEquipment -> "sin-equipo"
+    | Light -> "light"
+    | Heavy -> "heavy"
+    | Pain -> "pain"
+    | NoEquipment -> "no-equipment"
 
   let markText(mark: FeedbackMark) =
     let date = mark.Date.ToString("yyyy-MM-dd")

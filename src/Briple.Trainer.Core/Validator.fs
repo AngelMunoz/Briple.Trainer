@@ -1,10 +1,10 @@
-module Briple.Trainer.Core.Validador
+module Briple.Trainer.Core.Validator
 
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Projection
 open Briple.Trainer.Core.Athletes
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 
 type Violation = { Rule: string; Detail: string }
 
@@ -30,13 +30,13 @@ let checkParameters
   | _ ->
     violations.Add(
       violation
-        "genero"
-        $"se esperaba solo el bloque {Gender.toFileToken athlete.Gender}, hay {plan.Blocks.Length} bloques"
+        "gender"
+        $"expected only the {Gender.toProtocol athlete.Gender} block, found {plan.Blocks.Length}"
     )
 
   if plan.Weeks <> weeks then
     violations.Add(
-      violation "semanas" $"se esperaban {weeks}, el plan declara {plan.Weeks}"
+      violation "weeks" $"expected {weeks}, the plan declares {plan.Weeks}"
     )
 
   let variants =
@@ -49,7 +49,7 @@ let checkParameters
 
   if expected <> actual then
     violations.Add(
-      violation "opciones" $"se esperaban {expected}, el plan trae {actual}"
+      violation "variants" $"expected {expected}, the plan has {actual}"
     )
 
   for variant in variants do
@@ -58,8 +58,8 @@ let checkParameters
     if numbers <> [ 1..weeks ] then
       violations.Add(
         violation
-          "semanas-opcion"
-          $"la opcion {variant.Id} trae las semanas {numbers}, se esperaba 1..{weeks}"
+          "variant-weeks"
+          $"the variant {variant.Id} has weeks {numbers}, expected 1..{weeks}"
       )
 
   let actualCounts = planCounts athlete plan |> Map.ofList
@@ -70,12 +70,12 @@ let checkParameters
     | Some actual ->
       violations.Add(
         violation
-          "conteo"
-          $"la opcion {variant} debe tener {total} #ej, tiene {actual}"
+          "count"
+          $"the variant {variant} must have {total} #ej, has {actual}"
       )
     | None ->
       violations.Add(
-        violation "conteo" $"la opcion {variant} no existe en la salida"
+        violation "count" $"the variant {variant} does not exist in the output"
       )
 
   for week, target in brief.RirPerWeek do
@@ -85,11 +85,11 @@ let checkParameters
       violations.Add(
         violation
           "rir"
-          $"la semana {week} debe declarar RIR {target}, declara {actual}"
+          $"week {week} must declare RIR {target}, declares {actual}"
       )
     | None ->
       violations.Add(
-        violation "rir" $"la semana {week} no declara RIR {target}"
+        violation "rir" $"week {week} does not declare RIR {target}"
       )
 
   List.ofSeq violations
@@ -97,12 +97,12 @@ let checkParameters
 let validateCommon athlete weeks brief counts (output: string) =
   match parsePlan output with
   | Error error ->
-    Rejected [ violation "formato" $"linea {error.Line}: {error.Message}" ]
+    Rejected [ violation "format" $"line {error.Line}: {error.Message}" ]
   | Ok parsed ->
     let formatViolations =
       parsed.Warnings
       |> List.map(fun warning ->
-        violation "formato" $"linea {warning.Line}: {warning.Message}")
+        violation "format" $"line {warning.Line}: {warning.Message}")
 
     let parameterViolations =
       checkParameters athlete weeks brief counts parsed.Plan

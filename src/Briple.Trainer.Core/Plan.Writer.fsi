@@ -1,4 +1,4 @@
-module Briple.Trainer.Core.Plan.Escritor
+module Briple.Trainer.Core.Plan.Writer
 
 // Render of the model to the file text format: the inverse of the
 // parser. Day notes have no line in the format and are not emitted;

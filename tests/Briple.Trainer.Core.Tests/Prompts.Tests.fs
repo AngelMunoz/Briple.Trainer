@@ -9,7 +9,7 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Prompts
 open Briple.Trainer.Core.Tests.TestSupport
 
@@ -72,7 +72,7 @@ let tests =
 
         Expect.stringContains
           system
-          "\"ejercicios\": ["
+          "\"exercises\": ["
           "el esquema declara los ejercicios"
 
         Expect.stringContains
@@ -142,7 +142,7 @@ let tests =
 
       Expect.stringContains
         prompt
-        "- on Press de banca: carga 5"
+        "- on Press de banca: load 5"
         "el delta de la memoria se fija")
 
     testCase
@@ -158,7 +158,7 @@ let tests =
 
         Expect.stringContains
           prompt
-          "- on day Miércoles: variante Sentadilla con salto — trainer exception"
+          "- on day Miércoles: variant Sentadilla con salto — trainer exception"
           "la excepcion viaja con su tecnica"
 
         Expect.stringContains
@@ -191,16 +191,16 @@ let tests =
 
         Expect.stringContains
           prompt
-          "- Press de banca | leve | 2026-10-06"
+          "- Press de banca | light | 2026-10-06"
           "la marca del ejercicio va"
 
         Expect.stringContains
           prompt
-          "- day Lunes | sin-equipo | 2026-10-07"
+          "- day Lunes | no-equipment | 2026-10-07"
           "la marca del dia va"
 
         Expect.stringContains
           consolidationSystem
-          "objetivo | etiqueta | resumen | delta[;delta...]"
+          "target | label | summary | delta[;delta...]"
           "el protocolo de respuesta va en el sistema")
   ]

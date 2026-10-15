@@ -1,4 +1,4 @@
-module Briple.Trainer.Core.Solicitudes
+module Briple.Trainer.Core.Requests
 
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Athletes

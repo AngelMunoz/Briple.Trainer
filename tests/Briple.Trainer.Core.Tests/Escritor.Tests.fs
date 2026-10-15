@@ -5,7 +5,7 @@ module Briple.Trainer.Core.Tests.Escritor.Tests
 
 open Expecto
 open Briple.Trainer.Core.Plan.Parser
-open Briple.Trainer.Core.Plan.Escritor
+open Briple.Trainer.Core.Plan.Writer
 open Briple.Trainer.Core.Tests.TestSupport
 
 let tests =

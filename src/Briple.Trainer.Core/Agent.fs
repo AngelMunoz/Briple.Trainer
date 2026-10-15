@@ -1,4 +1,4 @@
-module Briple.Trainer.Core.Agente
+module Briple.Trainer.Core.Agent
 
 // the IChatClient adapter of the Responses API is experimental
 #nowarn "57"
@@ -14,12 +14,12 @@ open System.Threading.Tasks
 open Microsoft.Extensions.AI
 open OpenAI
 open Briple.Trainer.Core.Memories
-open Briple.Trainer.Core.Plan.Datos
-open Briple.Trainer.Core.Plan.Escritor
+open Briple.Trainer.Core.Plan.Data
+open Briple.Trainer.Core.Plan.Writer
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Prompts
-open Briple.Trainer.Core.Solicitudes
-open Briple.Trainer.Core.Validador
+open Briple.Trainer.Core.Requests
+open Briple.Trainer.Core.Validator
 
 /// Adds the provider headers to every request.
 type HeadersHandler(headers: (string * string) list) =
@@ -127,7 +127,7 @@ let run
       Verdict =
         Rejected(
           dataFailures
-          |> List.map(fun detail -> { Rule = "datos"; Detail = detail })
+          |> List.map(fun detail -> { Rule = "data"; Detail = detail })
         )
     }
   | Ok rawPlan ->
@@ -182,7 +182,7 @@ let generateAdjustment
 
 // --- Mark consolidation ------------------------------------------------------
 
-// the model decorates numbers with sign and percentage (carga +5%): the
+// the model decorates numbers with sign and percentage (load +5%): the
 // protocol already declares load as percentage, the adornment is dropped
 let cleanNumber(text: string) = text.Trim().TrimStart('+').TrimEnd('%')
 
@@ -190,26 +190,25 @@ let deltaOf(text: string) : Delta option =
   let parts = text.Trim().Split(' ', 2)
 
   match parts.[0].ToLowerInvariant(), parts |> Array.tryItem 1 with
-  | "variante", Some name -> Some(PatternVariant(name.Trim()))
+  | "variant", Some name -> Some(PatternVariant(name.Trim()))
   | kind, Some numberText ->
     match numberText |> cleanNumber |> Int32.TryParse with
     | true, number ->
       match kind with
       | "rir" -> Some(Delta.Rir number)
       | "reps" -> Some(Reps number)
-      | "series" -> Some(Sets number)
-      | "carga" -> Some(Load number)
+      | "sets" -> Some(Sets number)
+      | "load" -> Some(Load number)
       | _ -> None
     | _ -> None
   | _ -> None
 
 let labelOf(text: string) =
   match text.Trim().ToLowerInvariant() with
-  | "leve" -> Some Light
-  | "pesado" -> Some Heavy
-  | "dolor" -> Some Pain
-  | "sin-equipo"
-  | "sin equipo" -> Some NoEquipment
+  | "light" -> Some Light
+  | "heavy" -> Some Heavy
+  | "pain" -> Some Pain
+  | "no-equipment" -> Some NoEquipment
   | _ -> None
 
 let targetMatches (text: string) (target: Target) =

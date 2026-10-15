@@ -8,11 +8,11 @@ open System
 open Expecto
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
-open Briple.Trainer.Core.Plan.Escritor
+open Briple.Trainer.Core.Plan.Writer
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
-open Briple.Trainer.Core.Solicitudes
-open Briple.Trainer.Core.Validador
+open Briple.Trainer.Core.Requests
+open Briple.Trainer.Core.Validator
 open Briple.Trainer.Core.Tests.TestSupport
 
 let private parsear nombre =
@@ -70,19 +70,19 @@ let tests =
       let mes1 = parsear "plan_entrenamiento_4sem.txt"
 
       // el archivo completo trae el bloque de la mujer tambien
-      esperarRegla "genero" (validateNew solicitud (write mes1.Plan)))
+      esperarRegla "gender" (validateNew solicitud (write mes1.Plan)))
 
     testCase "las semanas distintas a las pedidas se rechazan" (fun () ->
       let solicitud = newRequest hombre [] 5 pedido []
 
-      esperarRegla "semanas" (validateNew solicitud (salidaHombre())))
+      esperarRegla "weeks" (validateNew solicitud (salidaHombre())))
 
     testCase "una opcion que no se pidio se rechaza" (fun () ->
       let pedidoUnVariante = { pedido with Variants = [ "3dias" ] }
 
       let solicitud = newRequest hombre [] 4 pedidoUnVariante []
 
-      esperarRegla "opciones" (validateNew solicitud (salidaHombre())))
+      esperarRegla "variants" (validateNew solicitud (salidaHombre())))
 
     testCase "un conteo que no se cumple se rechaza" (fun () ->
       let mes1 = parsear "plan_entrenamiento_4sem.txt"
@@ -90,12 +90,12 @@ let tests =
       let solicitud =
         adjustmentRequest hombre [] 4 pedido mes1.Plan [ ("3dias", 68) ]
 
-      esperarRegla "conteo" (validateAdjustment solicitud (salidaHombre())))
+      esperarRegla "count" (validateAdjustment solicitud (salidaHombre())))
 
     testCase "un conteo incumplido se rechaza tambien en plan nuevo" (fun () ->
       let solicitud = newRequest hombre [] 4 pedido [ ("3dias", 68) ]
 
-      esperarRegla "conteo" (validateNew solicitud (salidaHombre())))
+      esperarRegla "count" (validateNew solicitud (salidaHombre())))
 
     testCase "los conteos cumplidos validan el ajuste" (fun () ->
       let mes1 = parsear "plan_entrenamiento_4sem.txt"
@@ -123,7 +123,7 @@ let tests =
     testCase "una salida que no es del formato se rechaza" (fun () ->
       let solicitud = newRequest hombre [] 4 pedido []
 
-      esperarRegla "formato" (validateNew solicitud "esto no es un plan"))
+      esperarRegla "format" (validateNew solicitud "esto no es un plan"))
 
     testCase "una salida con warnings de formato se rechaza" (fun () ->
       let solicitud = newRequest hombre [] 4 pedido []
@@ -132,5 +132,5 @@ let tests =
       let conWarning =
         (salidaHombre()).Replace("#meta titulo ", "#meta titulox ")
 
-      esperarRegla "formato" (validateNew solicitud conWarning))
+      esperarRegla "format" (validateNew solicitud conWarning))
   ]

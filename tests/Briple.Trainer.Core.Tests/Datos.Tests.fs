@@ -7,7 +7,7 @@ module Briple.Trainer.Core.Tests.Datos.Tests
 open System
 open System.Text.Json
 open Expecto
-open Briple.Trainer.Core.Plan.Datos
+open Briple.Trainer.Core.Plan.Data
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Tests.TestSupport
@@ -15,32 +15,32 @@ open Briple.Trainer.Core.Tests.TestSupport
 let jsonValido =
   """
 {
-  "titulo": "Plan de prueba",
-  "semanas": 2,
-  "generado": "2026-10-14",
-  "origen": "spike",
-  "genero": "hombre",
-  "opciones": [
+  "title": "Plan de prueba",
+  "weeks": 2,
+  "generated": "2026-10-14",
+  "origin": "spike",
+  "gender": "male",
+  "variants": [
     {
       "id": "3dias",
-      "titulo": "Full body",
-      "semanas": [
+      "title": "Full body",
+      "weeks": [
         {
-          "numero": 1,
-          "dias": [
+          "number": 1,
+          "days": [
             {
               "id": "lunes",
-              "titulo": "A",
-              "ejercicios": [
+              "title": "A",
+              "exercises": [
                 {
-                  "circuito": "A",
-                  "vueltas": "4",
-                  "orden": 1,
-                  "nombre": "Sentadilla",
+                  "circuit": "A",
+                  "laps": "4",
+                  "order": 1,
+                  "name": "Sentadilla",
                   "reps": "6-8",
                   "rir": "1-2",
-                  "descanso": "3 min",
-                  "notas": "-"
+                  "rest": "3 min",
+                  "notes": "-"
                 }
               ]
             }
@@ -91,14 +91,14 @@ let tests =
       | Error fallos -> failtest $"se esperaba Ok: %A{fallos}")
 
     testCase "un genero desconocido acumula fallo" (fun () ->
-      let json = jsonValido.Replace("\"hombre\"", "\"alien\"")
+      let json = jsonValido.Replace("\"male\"", "\"alien\"")
 
       match fromJson json with
       | Ok _ -> failtest "se esperaba Error"
       | Error fallos ->
         Expect.exists
           fallos
-          (fun fallo -> fallo.Contains "genero")
+          (fun fallo -> fallo.Contains "gender")
           "el fallo nombra el genero")
 
     testCase "un dia no reconocido acumula fallo con su ruta" (fun () ->
@@ -109,12 +109,12 @@ let tests =
       | Error fallos ->
         Expect.exists
           fallos
-          (fun fallo -> fallo.Contains "dias[0]" && fallo.Contains "samedi")
+          (fun fallo -> fallo.Contains "days[0]" && fallo.Contains "samedi")
           "el fallo trae la ruta")
 
     testCase "un ejercicio sin nombre rechaza con fallo y ruta" (fun () ->
       let json =
-        jsonValido.Replace("\"nombre\": \"Sentadilla\"", "\"nombre\": \" \"")
+        jsonValido.Replace("\"name\": \"Sentadilla\"", "\"name\": \" \"")
 
       match fromJson json with
       | Ok _ -> failtest "se esperaba Error"
@@ -122,7 +122,7 @@ let tests =
         Expect.exists
           fallos
           (fun fallo ->
-            fallo.Contains "ejercicios[0]" && fallo.Contains "nombre vacio")
+            fallo.Contains "exercises[0]" && fallo.Contains "empty name")
           "el fallo trae la ruta")
 
     testCase "un json roto da fallo ilegible" (fun () ->
@@ -131,7 +131,7 @@ let tests =
       | Error fallos ->
         Expect.exists
           fallos
-          (fun fallo -> fallo.Contains "ilegible")
+          (fun fallo -> fallo.Contains "unreadable")
           "fallos ilegibles")
 
     testCase

@@ -1,4 +1,4 @@
-module Briple.Trainer.Core.Validador
+module Briple.Trainer.Core.Validator
 
 // The validator of agent outputs: the text format (a parse with no
 // warnings) and the parameters of the request (gender, variants, weeks,
@@ -6,7 +6,7 @@ module Briple.Trainer.Core.Validador
 
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Athletes
-open Briple.Trainer.Core.Solicitudes
+open Briple.Trainer.Core.Requests
 
 /// One violated rule, with the human-readable detail.
 type Violation = { Rule: string; Detail: string }

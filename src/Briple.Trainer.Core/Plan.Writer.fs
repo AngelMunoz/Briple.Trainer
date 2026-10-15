@@ -1,4 +1,4 @@
-module Briple.Trainer.Core.Plan.Escritor
+module Briple.Trainer.Core.Plan.Writer
 
 open Briple.Trainer.Core.Plan.Types
 

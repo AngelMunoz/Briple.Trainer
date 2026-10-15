@@ -10,7 +10,7 @@ open System.Threading.Tasks
 open Expecto
 open Microsoft.Extensions.AI
 open Briple.Trainer.Core.Memories
-open Briple.Trainer.Core.Agente
+open Briple.Trainer.Core.Agent
 
 /// Responde siempre el mismo texto, sin llamar a la red.
 type ClienteFalso(respuesta: string) =
@@ -79,7 +79,7 @@ let tests =
   testList "Agente" [
     testCase "un delta con signo y porcentaje se tolera" (fun () ->
       let memorias =
-        consolidarCon "Press de banca | leve | leve. | carga +5%" [
+        consolidarCon "Press de banca | light | light. | load +5%" [
           marcaPress
         ]
 
@@ -91,9 +91,7 @@ let tests =
       let marca = { marcaPress with Label = Heavy }
 
       let memorias =
-        consolidarCon "Press de banca | pesado | pesado. | carga -10%" [
-          marca
-        ]
+        consolidarCon "Press de banca | heavy | heavy. | load -10%" [ marca ]
 
       Expect.equal memorias.[0].Deltas [ Load -10 ] "queda -10")
 

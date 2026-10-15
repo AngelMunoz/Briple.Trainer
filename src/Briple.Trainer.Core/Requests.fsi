@@ -1,4 +1,4 @@
-module Briple.Trainer.Core.Solicitudes
+module Briple.Trainer.Core.Requests
 
 // The request contract: what travels to the agent on each flow. Requests
 // are self-contained — athlete, confirmed memories, period, brief and
