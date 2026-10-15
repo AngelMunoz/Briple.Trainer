@@ -2,6 +2,7 @@ module Briple.Trainer.Core.Plan.Data
 
 open System
 open System.Text.Json
+open System.Text.Json.Nodes
 open JDeck
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
@@ -337,42 +338,54 @@ let fromJson(json: string) : Result<Plan, string list> =
 let toJson(plan: Plan) : string =
   let block = List.head plan.Blocks
 
-  let data = {|
-    title = plan.Title
-    weeks = plan.Weeks
-    generated = plan.Generated
-    origin = plan.Origin
-    gender = Gender.toProtocol block.Gender
-    variants =
-      block.Variants
-      |> List.map(fun variant -> {|
-        id = variant.Id
-        title = variant.Title
-        weeks =
-          variant.Weeks
-          |> List.map(fun week -> {|
-            number = week.Number
-            days =
-              week.Days
-              |> List.map(fun day -> {|
-                id = day.Id
-                title = day.Title
-                exercises =
-                  day.Exercises
-                  |> List.map(fun exercise -> {|
-                    circuit = exercise.Circuit
-                    laps = exercise.Laps
-                    order = exercise.Order
-                    name = exercise.Name
-                    reps = exercise.Reps
-                    rir = exercise.Rir
-                    rest = exercise.Rest
-                    notes = exercise.Notes
-                  |})
-              |})
-          |})
-      |})
-    extras = plan.Extras
-  |}
+  // reflection serialization is disabled under Native AOT; the DOM writer
+  // carries an optional field only when it exists, never as json null
+  let field(name: string, value: string option) : (string * JsonNode) list =
+    match value with
+    | Some value -> [ name, Encode.string value ]
+    | None -> []
 
-  JsonSerializer.Serialize(data, JsonSerializerOptions(WriteIndented = true))
+  let exerciseEntity(exercise: Exercise) : JsonNode =
+    Json.object [
+      "circuit", Encode.string exercise.Circuit
+      "laps", Encode.string exercise.Laps
+      "order", Encode.int exercise.Order
+      "name", Encode.string exercise.Name
+      "reps", Encode.string exercise.Reps
+      "rir", Encode.string exercise.Rir
+      "rest", Encode.string exercise.Rest
+      "notes", Encode.string exercise.Notes
+    ]
+
+  let dayEntity(day: Day) : JsonNode =
+    Json.object [
+      "id", Encode.string day.Id
+      yield! field("title", day.Title)
+      "exercises", Json.sequence(day.Exercises, exerciseEntity)
+    ]
+
+  let weekEntity(week: Week) : JsonNode =
+    Json.object [
+      "number", Encode.int week.Number
+      "days", Json.sequence(week.Days, dayEntity)
+    ]
+
+  let variantEntity(variant: Variant) : JsonNode =
+    Json.object [
+      "id", Encode.string variant.Id
+      yield! field("title", variant.Title)
+      "weeks", Json.sequence(variant.Weeks, weekEntity)
+    ]
+
+  let data =
+    Json.object [
+      "title", Encode.string plan.Title
+      "weeks", Encode.int plan.Weeks
+      "generated", Encode.string plan.Generated
+      "origin", Encode.string plan.Origin
+      "gender", Encode.string(Gender.toProtocol block.Gender)
+      "variants", Json.sequence(block.Variants, variantEntity)
+      "extras", Json.sequence(plan.Extras, Encode.string)
+    ]
+
+  data.ToJsonString(JsonSerializerOptions(WriteIndented = true))

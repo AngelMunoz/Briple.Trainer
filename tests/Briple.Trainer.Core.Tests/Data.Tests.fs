@@ -5,8 +5,8 @@ module Briple.Trainer.Core.Tests.Data.Tests
 // unwraps before converting.
 
 open System
-open System.Text.Json
 open Expecto
+open JDeck
 open Briple.Trainer.Core.Plan.Data
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
@@ -84,7 +84,8 @@ let tests =
       | Error failures -> failtest $"expected Ok: %A{failures}")
 
     testCase "a json wrapped in data unwraps" (fun () ->
-      let wrapped = $"{{ \"data\": {JsonSerializer.Serialize validJson} }}"
+      let json = Encode.string validJson
+      let wrapped = $"{{ \"data\": {json.ToJsonString()} }}"
 
       match fromJson wrapped with
       | Ok plan -> Expect.equal plan.Title "Plan de prueba" "same plan"
