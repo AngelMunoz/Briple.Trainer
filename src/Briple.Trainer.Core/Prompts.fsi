@@ -1,26 +1,26 @@
 module Briple.Trainer.Core.Prompts
 
-// El render de la solicitud al prompt del agente: el formato estricto
-// del archivo, lo fijado (parametros trazados), lo que el agente
-// decide (campos de su origen) y lo prohibido. El ajuste agrega el
-// plan anterior como referencia.
+// The render of the request to the agent prompt: the strict file
+// format, the fixed part (traced parameters), what the agent decides
+// (fields of its origin) and the forbidden part. The adjustment adds
+// the previous plan as reference.
 
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Solicitudes
 
-/// Mensaje de sistema de los flujos de generacion: rol, esquema de
-/// respuesta JSON, reglas fijas y rotacion de variantes.
-val sistema: string
+/// System message of the generation flows: role, JSON response schema,
+/// fixed rules and variant rotation.
+val system: string
 
-/// Mensaje de sistema de la consolidacion de marcas.
-val sistemaConsolidar: string
+/// System message of the mark consolidation.
+val consolidationSystem: string
 
-/// Mensaje de usuario del flujo de plan nuevo.
-val promptNuevo: solicitud: SolicitudNuevoPlan -> string
+/// User message of the new-plan flow.
+val newPlanPrompt: request: NewPlanRequest -> string
 
-/// Mensaje de usuario del flujo de ajuste: el comun mas el plan
-/// anterior en el mismo esquema.
-val promptAjuste: solicitud: SolicitudAjuste -> string
+/// User message of the adjustment flow: the common part plus the
+/// previous plan in the same schema.
+val adjustmentPrompt: request: AdjustmentRequest -> string
 
-/// Mensaje de usuario de la consolidacion: las marcas registradas.
-val promptConsolidar: marcas: MarcaFeedback list -> string
+/// User message of the consolidation: the recorded marks.
+val consolidationPrompt: marks: FeedbackMark list -> string

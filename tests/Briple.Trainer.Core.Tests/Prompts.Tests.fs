@@ -7,8 +7,8 @@ open System
 open Expecto
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
-open Briple.Trainer.Core.Atletas
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Solicitudes
 open Briple.Trainer.Core.Prompts
 open Briple.Trainer.Core.Tests.TestSupport
@@ -19,18 +19,18 @@ let private parsear nombre =
   | Ok parsed -> parsed
 
 let private hombre = {
-  Nombre = "Pepe"
-  Genero = Male
-  Variantes = [ "3dias"; "5dias" ]
-  Metas = [ "fuerza" ]
-  Enfasis = [ "gluteo" ]
+  Name = "Pepe"
+  Gender = Male
+  Variants = [ "3dias"; "5dias" ]
+  Goals = [ "fuerza" ]
+  Focus = [ "gluteo" ]
 }
 
 let private pedido = {
-  Ajustes = []
-  Enfasis = []
-  RirPorSemana = [ (1, "3"); (2, "2-3"); (4, "1") ]
-  Variantes = [ "3dias"; "5dias" ]
+  Adjustments = []
+  Focus = []
+  RirPerWeek = [ (1, "3"); (2, "2-3"); (4, "1") ]
+  Variants = [ "3dias"; "5dias" ]
 }
 
 let tests =
@@ -39,9 +39,9 @@ let tests =
       "el prompt del plan nuevo trae esquema, fijado y prohibido"
       (fun () ->
         let solicitud =
-          solicitudNuevo hombre [] 4 pedido [ ("3dias", 72); ("5dias", 72) ]
+          newRequest hombre [] 4 pedido [ ("3dias", 72); ("5dias", 72) ]
 
-        let prompt = promptNuevo solicitud
+        let prompt = newPlanPrompt solicitud
 
         Expect.stringContains
           prompt
@@ -66,32 +66,32 @@ let tests =
         Expect.stringContains prompt "FORBIDDEN" "las prohibiciones van"
 
         Expect.stringContains
-          sistema
+          system
           "RESPONSE SCHEMA"
           "el sistema trae el esquema json"
 
         Expect.stringContains
-          sistema
+          system
           "\"ejercicios\": ["
           "el esquema declara los ejercicios"
 
         Expect.stringContains
-          sistema
+          system
           "EVIDENCE-BASED TRAINING"
           "el sistema exige evidencia"
 
         Expect.stringContains
-          sistema
+          system
           "VARIANT ROTATION"
           "el sistema exige rotacion de variantes"
 
         Expect.stringContains
-          sistema
+          system
           "an exercise name never repeats in the same day of the following week"
           "la rotacion es entre semanas consecutivas"
 
         Expect.stringContains
-          sistema
+          system
           "Respond with the JSON only"
           "la instruccion de salida va en el sistema")
 
@@ -101,12 +101,12 @@ let tests =
         let mes1 = parsear "plan_entrenamiento_4sem.txt"
 
         let solicitud =
-          solicitudAjuste hombre [] 4 pedido mes1.Plan [
+          adjustmentRequest hombre [] 4 pedido mes1.Plan [
             ("3dias", 68)
             ("5dias", 104)
           ]
 
-        let prompt = promptAjuste solicitud
+        let prompt = adjustmentPrompt solicitud
 
         Expect.stringContains
           prompt
@@ -131,14 +131,14 @@ let tests =
     testCase "la memoria confirmada entra al prompt como ajuste" (fun () ->
       let memoria =
         {
-          Objetivo = Ejercicio "Press de banca"
-          Etiqueta = Leve
-          Fecha = DateOnly(2026, 10, 6)
+          Target = Exercise "Press de banca"
+          Label = Light
+          Date = DateOnly(2026, 10, 6)
         }
-        |> consolidar
-        |> confirmar [ Carga 5 ]
+        |> consolidate
+        |> confirm [ Load 5 ]
 
-      let prompt = promptNuevo(solicitudNuevo hombre [ memoria ] 4 pedido [])
+      let prompt = newPlanPrompt(newRequest hombre [ memoria ] 4 pedido [])
 
       Expect.stringContains
         prompt
@@ -149,12 +149,12 @@ let tests =
       "la excepcion del entrenador exige el indicativo en notas"
       (fun () ->
         let memoria =
-          memoriaDeExcepcion {
-            Objetivo = Dia "Miércoles"
-            Tecnica = "Sentadilla con salto"
+          memoryOfExemption {
+            Target = Day "Miércoles"
+            Technique = "Sentadilla con salto"
           }
 
-        let prompt = promptNuevo(solicitudNuevo hombre [ memoria ] 4 pedido [])
+        let prompt = newPlanPrompt(newRequest hombre [ memoria ] 4 pedido [])
 
         Expect.stringContains
           prompt
@@ -167,7 +167,7 @@ let tests =
           "exige el indicativo en notas"
 
         Expect.stringContains
-          sistema
+          system
           "TRAINER EXCEPTIONS: the trainer is the health expert"
           "el sistema cede ante la prescripcion")
 
@@ -176,18 +176,18 @@ let tests =
       (fun () ->
         let marcas = [
           {
-            Objetivo = Ejercicio "Press de banca"
-            Etiqueta = Leve
-            Fecha = DateOnly(2026, 10, 6)
+            Target = Exercise "Press de banca"
+            Label = Light
+            Date = DateOnly(2026, 10, 6)
           }
           {
-            Objetivo = Dia "Lunes"
-            Etiqueta = SinEquipo
-            Fecha = DateOnly(2026, 10, 7)
+            Target = Day "Lunes"
+            Label = NoEquipment
+            Date = DateOnly(2026, 10, 7)
           }
         ]
 
-        let prompt = promptConsolidar marcas
+        let prompt = consolidationPrompt marcas
 
         Expect.stringContains
           prompt
@@ -200,7 +200,7 @@ let tests =
           "la marca del dia va"
 
         Expect.stringContains
-          sistemaConsolidar
+          consolidationSystem
           "objetivo | etiqueta | resumen | delta[;delta...]"
           "el protocolo de respuesta va en el sistema")
   ]

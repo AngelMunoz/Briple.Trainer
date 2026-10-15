@@ -1,36 +1,36 @@
 module Briple.Trainer.Core.Wizard
 
-// Los seis pasos del flujo de generación con confirmación. Cada caso
-// carga su entrada; la salida de un paso es la entrada del siguiente.
+// The six steps of the generation flow with confirmation. Each case
+// carries its input; the output of one step is the input of the next.
 
 open Briple.Trainer.Core.Plan.Types
-open Briple.Trainer.Core.Atletas
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Solicitudes
 
-/// Qué genera el paso 5: un plan nuevo o un ajuste.
-type Generacion =
-  | PlanNuevo of solicitud: SolicitudNuevoPlan
-  | AjusteDePlan of solicitud: SolicitudAjuste
+/// What step 5 produces: a new plan or an adjustment.
+type Generation =
+  | NewPlan of request: NewPlanRequest
+  | PlanAdjustment of request: AdjustmentRequest
 
-/// Un paso del wizard.
-type Paso =
-  /// 1. Entrada: los atletas registrados. Salida: el atleta elegido.
-  | ElegirAtleta
-  /// 2. Entrada: el atleta y sus memorias propuestas. Salida: las
-  /// memorias confirmadas, cada una con los deltas aceptados.
-  | RevisarMemorias of atleta: Atleta * propuestas: Memoria list
-  /// 3. Entrada: el atleta. Salida: el período en semanas (1 a 4).
-  | ElegirPeriodo of atleta: Atleta
-  /// 4. Entrada: atleta, memorias confirmadas y semanas. Salida: el
-  /// pedido (ajustes, énfasis, RIR, variantes).
-  | DefinirPedido of atleta: Atleta * confirmadas: Memoria list * semanas: int
-  /// 5. Entrada: la solicitud armada. Salida: el plan candidato y el
-  /// resultado del validador.
-  | Generar of generacion: Generacion
-  /// 6. Entrada: el candidato con sus warnings. Salida: confirmado al
-  /// historial, regenerado o descartado.
-  | Revisar of candidato: Plan * warnings: ParseWarning list
+/// One step of the wizard.
+type Step =
+  /// 1. Input: the registered athletes. Output: the chosen athlete.
+  | ChooseAthlete
+  /// 2. Input: the athlete and their proposed memories. Output: the
+  /// confirmed memories, each with the accepted deltas.
+  | ReviewMemories of athlete: Athlete * proposals: Memory list
+  /// 3. Input: the athlete. Output: the period in weeks (1 to 4).
+  | ChoosePeriod of athlete: Athlete
+  /// 4. Input: athlete, confirmed memories and weeks. Output: the
+  /// brief (adjustments, focus, RIR, variants).
+  | DefineBrief of athlete: Athlete * confirmed: Memory list * weeks: int
+  /// 5. Input: the assembled request. Output: the candidate plan and the
+  /// validator result.
+  | Generate of generation: Generation
+  /// 6. Input: the candidate with its warnings. Output: confirmed into
+  /// the history, regenerated or discarded.
+  | Review of candidate: Plan * warnings: ParseWarning list
 
-/// El primer paso del flujo.
-val inicial: unit -> Paso
+/// The first step of the flow.
+val initial: unit -> Step

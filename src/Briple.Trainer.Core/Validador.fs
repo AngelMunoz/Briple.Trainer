@@ -3,127 +3,131 @@ module Briple.Trainer.Core.Validador
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Projection
-open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Solicitudes
 
-type Fallo = { Regla: string; Detalle: string }
+type Violation = { Rule: string; Detail: string }
 
-type Veredicto =
-  | Valido of plan: Plan
-  | Rechazado of Fallo list
+type Verdict =
+  | Valid of plan: Plan
+  | Rejected of Violation list
 
-let fallo regla detalle = { Regla = regla; Detalle = detalle }
+let violation rule detail = { Rule = rule; Detail = detail }
 
-/// Revisa un plan ya convertido del dominio contra los parametros de
-/// la solicitud: genero, opciones, semanas, conteos y RIR.
-let revisarParametros
-  (atleta: Atleta)
-  (semanas: int)
-  (pedido: Pedido)
-  (conteos: (string * int) list)
+/// Checks a plan already converted to the domain against the parameters
+/// of the request: gender, variants, weeks, counts and RIR.
+let checkParameters
+  (athlete: Athlete)
+  (weeks: int)
+  (brief: Brief)
+  (counts: (string * int) list)
   (plan: Plan)
-  : Fallo list =
-  let fallos = ResizeArray<Fallo>()
+  : Violation list =
+  let violations = ResizeArray<Violation>()
 
   match plan.Blocks with
-  | [ bloque ] when bloque.Gender = atleta.Genero -> ()
+  | [ block ] when block.Gender = athlete.Gender -> ()
   | _ ->
-    fallos.Add(
-      fallo
+    violations.Add(
+      violation
         "genero"
-        $"se esperaba solo el bloque {Gender.toFileToken atleta.Genero}, hay {plan.Blocks.Length} bloques"
+        $"se esperaba solo el bloque {Gender.toFileToken athlete.Gender}, hay {plan.Blocks.Length} bloques"
     )
 
-  if plan.Weeks <> semanas then
-    fallos.Add(
-      fallo "semanas" $"se esperaban {semanas}, el plan declara {plan.Weeks}"
+  if plan.Weeks <> weeks then
+    violations.Add(
+      violation "semanas" $"se esperaban {weeks}, el plan declara {plan.Weeks}"
     )
 
-  let opciones =
+  let variants =
     plan.Blocks
-    |> List.filter(fun bloque -> bloque.Gender = atleta.Genero)
-    |> List.collect(fun bloque -> bloque.Variants)
+    |> List.filter(fun block -> block.Gender = athlete.Gender)
+    |> List.collect(fun block -> block.Variants)
 
-  let esperadas = List.sort pedido.Variantes
-  let reales = opciones |> List.map(fun opcion -> opcion.Id) |> List.sort
+  let expected = List.sort brief.Variants
+  let actual = variants |> List.map(fun variant -> variant.Id) |> List.sort
 
-  if esperadas <> reales then
-    fallos.Add(
-      fallo "opciones" $"se esperaban {esperadas}, el plan trae {reales}"
+  if expected <> actual then
+    violations.Add(
+      violation "opciones" $"se esperaban {expected}, el plan trae {actual}"
     )
 
-  for opcion in opciones do
-    let numeros = opcion.Weeks |> List.map(fun semana -> semana.Number)
+  for variant in variants do
+    let numbers = variant.Weeks |> List.map(fun week -> week.Number)
 
-    if numeros <> [ 1..semanas ] then
-      fallos.Add(
-        fallo
+    if numbers <> [ 1..weeks ] then
+      violations.Add(
+        violation
           "semanas-opcion"
-          $"la opcion {opcion.Id} trae las semanas {numeros}, se esperaba 1..{semanas}"
+          $"la opcion {variant.Id} trae las semanas {numbers}, se esperaba 1..{weeks}"
       )
 
-  let conteosReales = conteosDelPlan atleta plan |> Map.ofList
+  let actualCounts = planCounts athlete plan |> Map.ofList
 
-  for opcion, total in conteos do
-    match Map.tryFind opcion conteosReales with
+  for variant, total in counts do
+    match Map.tryFind variant actualCounts with
     | Some actual when actual = total -> ()
     | Some actual ->
-      fallos.Add(
-        fallo
+      violations.Add(
+        violation
           "conteo"
-          $"la opcion {opcion} debe tener {total} #ej, tiene {actual}"
+          $"la opcion {variant} debe tener {total} #ej, tiene {actual}"
       )
     | None ->
-      fallos.Add(fallo "conteo" $"la opcion {opcion} no existe en la salida")
+      violations.Add(
+        violation "conteo" $"la opcion {variant} no existe en la salida"
+      )
 
-  for semana, objetivo in pedido.RirPorSemana do
-    match tryMesocycleRir plan semana with
-    | Some actual when actual = objetivo -> ()
+  for week, target in brief.RirPerWeek do
+    match tryMesocycleRir plan week with
+    | Some actual when actual = target -> ()
     | Some actual ->
-      fallos.Add(
-        fallo
+      violations.Add(
+        violation
           "rir"
-          $"la semana {semana} debe declarar RIR {objetivo}, declara {actual}"
+          $"la semana {week} debe declarar RIR {target}, declara {actual}"
       )
     | None ->
-      fallos.Add(fallo "rir" $"la semana {semana} no declara RIR {objetivo}")
+      violations.Add(
+        violation "rir" $"la semana {week} no declara RIR {target}"
+      )
 
-  List.ofSeq fallos
+  List.ofSeq violations
 
-let validarComun atleta semanas pedido conteos (salida: string) =
-  match parsePlan salida with
+let validateCommon athlete weeks brief counts (output: string) =
+  match parsePlan output with
   | Error error ->
-    Rechazado [ fallo "formato" $"linea {error.Line}: {error.Message}" ]
+    Rejected [ violation "formato" $"linea {error.Line}: {error.Message}" ]
   | Ok parsed ->
-    let fallosFormato =
+    let formatViolations =
       parsed.Warnings
       |> List.map(fun warning ->
-        fallo "formato" $"linea {warning.Line}: {warning.Message}")
+        violation "formato" $"linea {warning.Line}: {warning.Message}")
 
-    let fallosParametros =
-      revisarParametros atleta semanas pedido conteos parsed.Plan
+    let parameterViolations =
+      checkParameters athlete weeks brief counts parsed.Plan
 
-    match fallosFormato @ fallosParametros with
-    | [] -> Valido parsed.Plan
-    | fallos -> Rechazado fallos
+    match formatViolations @ parameterViolations with
+    | [] -> Valid parsed.Plan
+    | violations -> Rejected violations
 
-/// Valida la salida de un plan nuevo: formato limpio, un bloque del
-/// genero del atleta, sus variantes, las semanas, los conteos y el RIR
-/// del pedido.
-let validarNuevo (solicitud: SolicitudNuevoPlan) (salida: string) =
-  validarComun
-    solicitud.Atleta
-    solicitud.Semanas
-    solicitud.Pedido
-    solicitud.Conteos
-    salida
+/// Validates the output of a new plan: clean format, one block of the
+/// athlete's gender, their variants, the weeks, the counts and the
+/// brief's RIR.
+let validateNew (request: NewPlanRequest) (output: string) =
+  validateCommon
+    request.Athlete
+    request.Weeks
+    request.Brief
+    request.Counts
+    output
 
-/// Valida la salida de un ajuste: lo mismo sobre la solicitud de
-/// ajuste, cuyo plan anterior viaja como referencia.
-let validarAjuste (solicitud: SolicitudAjuste) (salida: string) =
-  validarComun
-    solicitud.Atleta
-    solicitud.Semanas
-    solicitud.Pedido
-    solicitud.Conteos
-    salida
+/// Validates the output of an adjustment: the same over the adjustment
+/// request, whose previous plan travels as reference.
+let validateAdjustment (request: AdjustmentRequest) (output: string) =
+  validateCommon
+    request.Athlete
+    request.Weeks
+    request.Brief
+    request.Counts
+    output

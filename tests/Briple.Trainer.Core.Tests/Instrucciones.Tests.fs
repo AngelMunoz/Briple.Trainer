@@ -7,42 +7,42 @@ module Briple.Trainer.Core.Tests.Instrucciones.Tests
 open System
 open Expecto
 open Briple.Trainer.Core.Plan.Types
-open Briple.Trainer.Core.Atletas
-open Briple.Trainer.Core.Memorias
-open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Parameters
 open Briple.Trainer.Core.Solicitudes
 open Briple.Trainer.Core.Instrucciones
 
 let private atletaHombre = {
-  Nombre = "hombre"
-  Genero = Male
-  Variantes = [ "3dias"; "5dias" ]
-  Metas = []
-  Enfasis = []
+  Name = "hombre"
+  Gender = Male
+  Variants = [ "3dias"; "5dias" ]
+  Goals = []
+  Focus = []
 }
 
 let private pedido = {
-  Ajustes = []
-  Enfasis = []
-  RirPorSemana = []
-  Variantes = [ "3dias"; "5dias" ]
+  Adjustments = []
+  Focus = []
+  RirPerWeek = []
+  Variants = [ "3dias"; "5dias" ]
 }
 
 let private camposDelAgente = [
-  Titulo
-  Generado
-  OrigenArchivo
-  TituloOpcion
-  TituloDia
-  NotasDia
-  Circuito
-  Vueltas
-  Orden
-  Nombre
+  Title
+  Generated
+  FileOrigin
+  VariantTitle
+  DayTitle
+  DayNotes
+  Circuit
+  Laps
+  Order
+  Name
   Reps
   Rir
-  Descanso
-  Notas
+  Rest
+  Notes
   Extras
 ]
 
@@ -62,49 +62,48 @@ let tests =
         }
 
         let solicitud =
-          solicitudAjuste atletaHombre [] 4 pedido candidato [ ("3dias", 68) ]
+          adjustmentRequest atletaHombre [] 4 pedido candidato [
+            ("3dias", 68)
+          ]
 
-        let instrucciones = delAjuste solicitud
+        let instrucciones = forAdjustment solicitud
 
         Expect.contains
-          instrucciones.Fijar
-          (ConteoOpcion("3dias", 68, AjustePedido))
+          instrucciones.Fix
+          (VariantCount("3dias", 68, TrainerBrief))
           "los conteos se fijan"
 
         Expect.equal
-          instrucciones.Pedir
+          instrucciones.Ask
           camposDelAgente
           "el agente produce solo los campos de su origen"
 
         Expect.equal
-          instrucciones.Prohibir
-          [ CambiarConteos; OpcionesFueraDeVariantes; SalirseDelFormato ]
+          instrucciones.Forbid
+          [ ChangeCounts; OutsideVariants; LeaveFormat ]
           "el ajuste no toca conteos, opciones ni formato")
 
     testCase "el plan nuevo fija y prohíbe sus conteos" (fun () ->
       let instrucciones =
-        delNuevo(solicitudNuevo atletaHombre [] 4 pedido [ ("3dias", 68) ])
+        forNew(newRequest atletaHombre [] 4 pedido [ ("3dias", 68) ])
 
       Expect.contains
-        instrucciones.Fijar
-        (ConteoOpcion("3dias", 68, AjustePedido))
+        instrucciones.Fix
+        (VariantCount("3dias", 68, TrainerBrief))
         "los conteos del pedido se fijan"
 
       Expect.equal
-        instrucciones.Prohibir
-        [ CambiarConteos; OpcionesFueraDeVariantes; SalirseDelFormato ]
+        instrucciones.Forbid
+        [ ChangeCounts; OutsideVariants; LeaveFormat ]
         "el nuevo no toca conteos, opciones ni formato")
 
     testCase "las semanas y las variantes se fijan en ambos flujos" (fun () ->
-      let nuevo = delNuevo(solicitudNuevo atletaHombre [] 4 pedido [])
+      let nuevo = forNew(newRequest atletaHombre [] 4 pedido [])
+
+      Expect.contains nuevo.Fix (PlanWeeks(4, TrainerBrief)) "semanas fijas"
 
       Expect.contains
-        nuevo.Fijar
-        (SemanasPlan(4, AjustePedido))
-        "semanas fijas"
-
-      Expect.contains
-        nuevo.Fijar
-        (VariantesAtleta([ "3dias"; "5dias" ], AjustePedido))
+        nuevo.Fix
+        (AthleteVariants([ "3dias"; "5dias" ], TrainerBrief))
         "variantes fijas")
   ]

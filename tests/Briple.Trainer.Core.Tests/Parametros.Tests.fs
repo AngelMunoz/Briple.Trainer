@@ -7,117 +7,117 @@ module Briple.Trainer.Core.Tests.Parametros.Tests
 open System
 open Expecto
 open Briple.Trainer.Core.Plan.Types
-open Briple.Trainer.Core.Atletas
-open Briple.Trainer.Core.Memorias
-open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Parameters
 
 let private marca etiqueta objetivo = {
-  Objetivo = objetivo
-  Etiqueta = etiqueta
-  Fecha = DateOnly(2026, 10, 13)
+  Target = objetivo
+  Label = etiqueta
+  Date = DateOnly(2026, 10, 13)
 }
 
 let private memoriaDe etiqueta objetivo deltas =
-  marca etiqueta objetivo |> consolidar |> confirmar deltas
+  marca etiqueta objetivo |> consolidate |> confirm deltas
 
 let tests =
   testList "Parametros" [
     testCase "el inventario declara orígenes para cada campo" (fun () ->
       let campos = [
-        Titulo
-        Semanas
-        Generado
-        OrigenArchivo
-        Opciones
-        TituloOpcion
-        SemanasDeOpcion
-        Dias
-        TituloDia
-        NotasDia
-        Circuito
-        Vueltas
-        Orden
-        Nombre
+        Title
+        Weeks
+        Generated
+        FileOrigin
+        Variants
+        VariantTitle
+        VariantWeeks
+        Days
+        DayTitle
+        DayNotes
+        Circuit
+        Laps
+        Order
+        Name
         Reps
         Rir
-        Descanso
-        Notas
+        Rest
+        Notes
         Extras
       ]
 
       for campo in campos do
-        Expect.isNonEmpty (origenesDe campo) $"campo %A{campo} sin orígenes")
+        Expect.isNonEmpty (originsFor campo) $"campo %A{campo} sin orígenes")
 
     testCase "los ajustes del atleta salen del perfil" (fun () ->
       let atleta = {
-        Nombre = "Pepe"
-        Genero = Male
-        Variantes = [ "3dias"; "5dias" ]
-        Metas = []
-        Enfasis = []
+        Name = "Pepe"
+        Gender = Male
+        Variants = [ "3dias"; "5dias" ]
+        Goals = []
+        Focus = []
       }
 
       Expect.equal
-        (delPerfil atleta)
-        [ VariantesAtleta([ "3dias"; "5dias" ], PerfilDelAtleta) ]
+        (ofProfile atleta)
+        [ AthleteVariants([ "3dias"; "5dias" ], AthleteProfile) ]
         "el perfil fija las variantes")
 
     testCase
       "una memoria confirmada se refleja en la solicitud siguiente"
       (fun () ->
-        let memoria = memoriaDe Leve (Ejercicio "Press de banca") [ Carga 10 ]
+        let memoria = memoriaDe Light (Exercise "Press de banca") [ Load 10 ]
 
         Expect.equal
-          (deMemoriasConfirmadas [ memoria ])
+          (ofConfirmedMemories [ memoria ])
           [
-            Ajuste(
-              Ejercicio "Press de banca",
-              [ Carga 10 ],
-              MemoriaConfirmada memoria
+            Adjustment(
+              Exercise "Press de banca",
+              [ Load 10 ],
+              ConfirmedMemory memoria
             )
           ]
           "el delta confirmado viaja como ajuste trazado")
 
     testCase "la memoria trazada mapea a su clase de origen" (fun () ->
-      let memoria = memoriaDe Leve (Ejercicio "Press de banca") [ Carga 10 ]
+      let memoria = memoriaDe Light (Exercise "Press de banca") [ Load 10 ]
 
       Expect.equal
-        (claseDe(MemoriaConfirmada memoria))
-        DeMemoriaConfirmada
+        (classOf(ConfirmedMemory memoria))
+        FromConfirmedMemory
         "memoria"
 
-      Expect.equal (claseDe PerfilDelAtleta) DelPerfil "perfil"
+      Expect.equal (classOf AthleteProfile) FromProfile "perfil"
 
-      Expect.equal (claseDe PlanAnterior) DelPlanAnterior "plan anterior"
+      Expect.equal (classOf PreviousPlan) FromPreviousPlan "plan anterior"
 
-      Expect.equal (claseDe AjustePedido) DelAjustePedido "ajuste pedido"
+      Expect.equal (classOf TrainerBrief) FromBrief "ajuste pedido"
 
-      Expect.equal (claseDe Agente) DelAgente "agente")
+      Expect.equal (classOf Agent) FromAgent "agente")
 
     testCase "propuestas y descartadas no aportan parámetros" (fun () ->
-      let propuesta = marca Leve (Ejercicio "Press de banca") |> consolidar
-      let descartada = propuesta |> descartar
+      let propuesta = marca Light (Exercise "Press de banca") |> consolidate
+      let descartada = propuesta |> discard
 
       Expect.isEmpty
-        (deMemoriasConfirmadas [ propuesta; descartada ])
+        (ofConfirmedMemories [ propuesta; descartada ])
         "nada llega sin confirmar")
 
     testCase
       "la excepcion del entrenador aporta su objetivo como ajuste"
       (fun () ->
         let memoria =
-          memoriaDeExcepcion {
-            Objetivo = Dia "Miércoles"
-            Tecnica = "Sentadilla con salto"
+          memoryOfExemption {
+            Target = Day "Miércoles"
+            Technique = "Sentadilla con salto"
           }
 
         Expect.equal
-          (deMemoriasConfirmadas [ memoria ])
+          (ofConfirmedMemories [ memoria ])
           [
-            Ajuste(
-              Dia "Miércoles",
-              [ VariantePatron "Sentadilla con salto" ],
-              MemoriaConfirmada memoria
+            Adjustment(
+              Day "Miércoles",
+              [ PatternVariant "Sentadilla con salto" ],
+              ConfirmedMemory memoria
             )
           ]
           "la excepcion confirmada viaja como ajuste")

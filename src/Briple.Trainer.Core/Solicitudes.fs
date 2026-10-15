@@ -1,107 +1,112 @@
 module Briple.Trainer.Core.Solicitudes
 
 open Briple.Trainer.Core.Plan.Types
-open Briple.Trainer.Core.Atletas
-open Briple.Trainer.Core.Memorias
-open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Parameters
 
-type Pedido = {
-  Ajustes: (Objetivo * Delta list) list
-  Enfasis: string list
-  RirPorSemana: (int * string) list
-  Variantes: string list
+type Brief = {
+  Adjustments: (Target * Delta list) list
+  Focus: string list
+  RirPerWeek: (int * string) list
+  Variants: string list
 }
 
-type SolicitudNuevoPlan = {
-  Atleta: Atleta
-  Memorias: Memoria list
-  Semanas: int
-  Pedido: Pedido
-  Conteos: (string * int) list
+type NewPlanRequest = {
+  Athlete: Athlete
+  Memories: Memory list
+  Weeks: int
+  Brief: Brief
+  Counts: (string * int) list
 }
 
-type SolicitudAjuste = {
-  Atleta: Atleta
-  Memorias: Memoria list
-  Semanas: int
-  Pedido: Pedido
-  PlanAnterior: Plan
-  Conteos: (string * int) list
+type AdjustmentRequest = {
+  Athlete: Athlete
+  Memories: Memory list
+  Weeks: int
+  Brief: Brief
+  PreviousPlan: Plan
+  Counts: (string * int) list
 }
 
-let conteosDelPlan (atleta: Atleta) (plan: Plan) : (string * int) list =
+let planCounts (athlete: Athlete) (plan: Plan) : (string * int) list =
   plan.Blocks
-  |> List.tryFind(fun bloque -> bloque.Gender = atleta.Genero)
-  |> Option.map(fun bloque ->
-    bloque.Variants
-    |> List.map(fun opcion ->
-      opcion.Id,
-      opcion.Weeks
-      |> List.sumBy(fun semana ->
-        semana.Days |> List.sumBy(fun dia -> dia.Exercises.Length))))
+  |> List.tryFind(fun block -> block.Gender = athlete.Gender)
+  |> Option.map(fun block ->
+    block.Variants
+    |> List.map(fun variant ->
+      variant.Id,
+      variant.Weeks
+      |> List.sumBy(fun week ->
+        week.Days |> List.sumBy(fun day -> day.Exercises.Length))))
   |> Option.defaultValue []
 
-let solicitudNuevo atleta memorias semanas pedido conteos = {
-  Atleta = atleta
-  Memorias = memorias
-  Semanas = semanas
-  Pedido = pedido
-  Conteos = conteos
+let newRequest athlete memories weeks brief counts : NewPlanRequest = {
+  Athlete = athlete
+  Memories = memories
+  Weeks = weeks
+  Brief = brief
+  Counts = counts
 }
 
-let solicitudAjuste atleta memorias semanas pedido planAnterior conteos = {
-  Atleta = atleta
-  Memorias = memorias
-  Semanas = semanas
-  Pedido = pedido
-  PlanAnterior = planAnterior
-  Conteos = conteos
+let adjustmentRequest
+  athlete
+  memories
+  weeks
+  brief
+  previousPlan
+  counts
+  : AdjustmentRequest = {
+  Athlete = athlete
+  Memories = memories
+  Weeks = weeks
+  Brief = brief
+  PreviousPlan = previousPlan
+  Counts = counts
 }
 
-let delPedido (semanas: int) (pedido: Pedido) : Parametro list = [
-  SemanasPlan(semanas, AjustePedido)
-  VariantesAtleta(pedido.Variantes, AjustePedido)
+let ofBrief (weeks: int) (brief: Brief) : Parameter list = [
+  PlanWeeks(weeks, TrainerBrief)
+  AthleteVariants(brief.Variants, TrainerBrief)
   yield!
-    pedido.RirPorSemana
-    |> List.map(fun (semana, objetivo) ->
-      RirSemana(semana, objetivo, AjustePedido))
+    brief.RirPerWeek
+    |> List.map(fun (week, target) -> WeekRir(week, target, TrainerBrief))
   yield!
-    pedido.Ajustes
-    |> List.map(fun (objetivo, deltas) ->
-      Ajuste(objetivo, deltas, AjustePedido))
+    brief.Adjustments
+    |> List.map(fun (target, deltas) ->
+      Adjustment(target, deltas, TrainerBrief))
 ]
 
-let parametrosDeNuevo(solicitud: SolicitudNuevoPlan) : Parametro list =
-  let conteos =
-    solicitud.Conteos
-    |> List.map(fun (opcion, total) ->
-      ConteoOpcion(opcion, total, AjustePedido))
+let parametersForNew(request: NewPlanRequest) : Parameter list =
+  let counts =
+    request.Counts
+    |> List.map(fun (variant, total) ->
+      VariantCount(variant, total, TrainerBrief))
 
-  delPerfil solicitud.Atleta
-  @ deMemoriasConfirmadas solicitud.Memorias
-  @ delPedido solicitud.Semanas solicitud.Pedido
-  @ conteos
+  ofProfile request.Athlete
+  @ ofConfirmedMemories request.Memories
+  @ ofBrief request.Weeks request.Brief
+  @ counts
 
-let conteoParametro
-  (atleta: Atleta)
-  (planAnterior: Plan)
-  (opcion, total)
-  : Parametro =
-  let anterior =
-    conteosDelPlan atleta planAnterior
-    |> List.tryFind(fun (id, _) -> id = opcion)
+let countParameter
+  (athlete: Athlete)
+  (previousPlan: Plan)
+  (variant, total)
+  : Parameter =
+  let previous =
+    planCounts athlete previousPlan |> List.tryFind(fun (id, _) -> id = variant)
 
-  match anterior with
-  | Some(_, totalAnterior) when totalAnterior = total ->
-    ConteoOpcion(opcion, total, PlanAnterior)
-  | _ -> ConteoOpcion(opcion, total, AjustePedido)
+  match previous with
+  | Some(_, previousTotal) when previousTotal = total ->
+    VariantCount(variant, total, PreviousPlan)
+  | _ -> VariantCount(variant, total, TrainerBrief)
 
-let parametrosDeAjuste(solicitud: SolicitudAjuste) : Parametro list =
-  let baseParametros =
-    delPerfil solicitud.Atleta
-    @ deMemoriasConfirmadas solicitud.Memorias
-    @ delPedido solicitud.Semanas solicitud.Pedido
+let parametersForAdjustment(request: AdjustmentRequest) : Parameter list =
+  let baseParameters =
+    ofProfile request.Athlete
+    @ ofConfirmedMemories request.Memories
+    @ ofBrief request.Weeks request.Brief
 
-  baseParametros
-  @ (solicitud.Conteos
-     |> List.map(conteoParametro solicitud.Atleta solicitud.PlanAnterior))
+  baseParameters
+  @ (request.Counts
+     |> List.map(countParameter request.Athlete request.PreviousPlan))

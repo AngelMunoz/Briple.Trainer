@@ -1,29 +1,29 @@
 module Briple.Trainer.Core.Instrucciones
 
-// El mapeo parámetros → instrucciones del agente: qué se fija, qué se
-// pide y qué se prohíbe. Lo fijado debe aparecer en la salida tal
-// cual; lo pedido lo produce el agente dentro de su origen declarado
-// en el inventario; lo prohibido no se toca.
+// The parameters → agent instructions mapping: what gets fixed, what
+// gets asked and what gets forbidden. The fixed part must appear in the
+// output verbatim; the asked part is produced by the agent within the
+// origin the inventory declares for it; the forbidden part is untouched.
 
-open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Parameters
 open Briple.Trainer.Core.Solicitudes
 
-/// Lo que el agente no puede hacer.
-type Prohibicion =
-  | CambiarConteos
-  | OpcionesFueraDeVariantes
-  | SalirseDelFormato
+/// What the agent cannot do.
+type Prohibition =
+  | ChangeCounts
+  | OutsideVariants
+  | LeaveFormat
 
-/// El mapeo completo de una solicitud.
-type Instrucciones = {
-  Fijar: Parametro list
-  Pedir: Campo list
-  Prohibir: Prohibicion list
+/// The full mapping of a request.
+type Instructions = {
+  Fix: Parameter list
+  Ask: Field list
+  Forbid: Prohibition list
 }
 
-/// Instrucciones del flujo de plan nuevo.
-val delNuevo: solicitud: SolicitudNuevoPlan -> Instrucciones
+/// Instructions of the new-plan flow.
+val forNew: request: NewPlanRequest -> Instructions
 
-/// Instrucciones del flujo de ajuste: los conteos pueden trazarse al
-/// plan anterior en lugar del pedido.
-val delAjuste: solicitud: SolicitudAjuste -> Instrucciones
+/// Instructions of the adjustment flow: the counts may trace to the
+/// previous plan instead of the brief.
+val forAdjustment: request: AdjustmentRequest -> Instructions

@@ -7,53 +7,53 @@ open System
 open Expecto
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
-open Briple.Trainer.Core.Atletas
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Solicitudes
 open Briple.Trainer.Core.Wizard
 open Briple.Trainer.Core.Tests.TestSupport
 
 let private atleta = {
-  Nombre = "hombre"
-  Genero = Male
-  Variantes = [ "3dias"; "5dias" ]
-  Metas = []
-  Enfasis = []
+  Name = "hombre"
+  Gender = Male
+  Variants = [ "3dias"; "5dias" ]
+  Goals = []
+  Focus = []
 }
 
 let private marca = {
-  Objetivo = Ejercicio "Press de banca"
-  Etiqueta = Leve
-  Fecha = DateOnly(2026, 10, 6)
+  Target = Exercise "Press de banca"
+  Label = Light
+  Date = DateOnly(2026, 10, 6)
 }
 
-let private propuesta = marca |> consolidar
+let private propuesta = marca |> consolidate
 
-let private confirmada = propuesta |> confirmar [ Carga 5 ]
+let private confirmada = propuesta |> confirm [ Load 5 ]
 
 let private pedido = {
-  Ajustes = []
-  Enfasis = []
-  RirPorSemana = [ (1, "3") ]
-  Variantes = [ "3dias"; "5dias" ]
+  Adjustments = []
+  Focus = []
+  RirPerWeek = [ (1, "3") ]
+  Variants = [ "3dias"; "5dias" ]
 }
 
 let tests =
   testList "Wizard" [
     testCase "los seis pasos encadenan sus entradas y salidas" (fun () ->
       // 1: salida el atleta elegido; 2: entrada ese atleta
-      let paso1 = inicial()
-      let paso2 = RevisarMemorias(atleta, [ propuesta ])
+      let paso1 = initial()
+      let paso2 = ReviewMemories(atleta, [ propuesta ])
 
       // 2: salida las confirmadas; 3: entrada el atleta
-      let paso3 = ElegirPeriodo atleta
+      let paso3 = ChoosePeriod atleta
 
       // 3: salida las semanas; 4: entrada atleta + confirmadas + semanas
-      let paso4 = DefinirPedido(atleta, [ confirmada ], 4)
+      let paso4 = DefineBrief(atleta, [ confirmada ], 4)
 
       // 4: salida el pedido; 5: entrada la solicitud armada
-      let solicitud = solicitudNuevo atleta [ confirmada ] 4 pedido []
-      let paso5 = Generar(PlanNuevo solicitud)
+      let solicitud = newRequest atleta [ confirmada ] 4 pedido []
+      let paso5 = Generate(NewPlan solicitud)
 
       // 5: salida el candidato validado; 6: entrada candidato + warnings
       let (candidato, warnings) =
@@ -61,18 +61,18 @@ let tests =
         | Error error -> failtest $"parse error at line {error.Line}"
         | Ok parsed -> (parsed.Plan, parsed.Warnings)
 
-      let paso6 = Revisar(candidato, warnings)
+      let paso6 = Review(candidato, warnings)
 
-      Expect.equal paso1 ElegirAtleta "paso 1 sin entrada"
+      Expect.equal paso1 ChooseAthlete "paso 1 sin entrada"
 
       let pasos = [ paso1; paso2; paso3; paso4; paso5; paso6 ]
 
       Expect.equal (List.distinct pasos).Length 6 "seis pasos distintos"
 
-      Expect.equal solicitud.Semanas 4 "la salida del paso 3 entró al 4"
+      Expect.equal solicitud.Weeks 4 "la salida del paso 3 entró al 4"
 
       Expect.equal
-        (List.head solicitud.Memorias)
+        (List.head solicitud.Memories)
         confirmada
         "la salida del paso 2 entró al 5"
 
@@ -89,12 +89,13 @@ let tests =
         | Error error -> failtest $"parse error at line {error.Line}"
         | Ok parsed -> parsed.Plan
 
-      let solicitud = solicitudAjuste atleta [] 4 pedido mes1 [ ("3dias", 68) ]
+      let solicitud =
+        adjustmentRequest atleta [] 4 pedido mes1 [ ("3dias", 68) ]
 
-      let paso = Generar(AjusteDePlan solicitud)
+      let paso = Generate(PlanAdjustment solicitud)
 
       Expect.equal
         paso
-        (Generar(AjusteDePlan solicitud))
+        (Generate(PlanAdjustment solicitud))
         "el paso 5 carga la solicitud de ajuste")
   ]

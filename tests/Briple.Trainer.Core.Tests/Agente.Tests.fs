@@ -9,7 +9,7 @@ open System
 open System.Threading.Tasks
 open Expecto
 open Microsoft.Extensions.AI
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Agente
 
 /// Responde siempre el mismo texto, sin llamar a la red.
@@ -65,15 +65,15 @@ type ClienteFalso(respuesta: string) =
     member _.Dispose() = ()
 
 let private marcaPress = {
-  Objetivo = Ejercicio "Press de banca"
-  Etiqueta = Leve
-  Fecha = DateOnly(2026, 10, 6)
+  Target = Exercise "Press de banca"
+  Label = Light
+  Date = DateOnly(2026, 10, 6)
 }
 
 let private consolidarCon respuesta marcas =
   use cliente = new ClienteFalso(respuesta)
 
-  consolidarMarcas cliente marcas |> Async.AwaitTask |> Async.RunSynchronously
+  consolidateMarks cliente marcas |> Async.AwaitTask |> Async.RunSynchronously
 
 let tests =
   testList "Agente" [
@@ -85,17 +85,17 @@ let tests =
 
       Expect.equal memorias.Length 1 "la marca sobrevive"
 
-      Expect.equal memorias.[0].Deltas [ Carga 5 ] "el adorno se descarta")
+      Expect.equal memorias.[0].Deltas [ Load 5 ] "el adorno se descarta")
 
     testCase "un delta con signo negativo y porcentaje se tolera" (fun () ->
-      let marca = { marcaPress with Etiqueta = Pesado }
+      let marca = { marcaPress with Label = Heavy }
 
       let memorias =
         consolidarCon "Press de banca | pesado | pesado. | carga -10%" [
           marca
         ]
 
-      Expect.equal memorias.[0].Deltas [ Carga -10 ] "queda -10")
+      Expect.equal memorias.[0].Deltas [ Load -10 ] "queda -10")
 
     testCase "una linea fuera del protocolo se descarta" (fun () ->
       let memorias = consolidarCon "nota suelta sin pipes" [ marcaPress ]

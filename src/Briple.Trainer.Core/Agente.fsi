@@ -1,53 +1,51 @@
 module Briple.Trainer.Core.Agente
 
-// La orquestacion del agente sobre Microsoft.Extensions.AI con
-// proveedores BYOK OpenAI-compatible. Las respuestas se transmiten por
-// trozos dentro de un cancellableTask. El modelo responde datos en
-// JSON; el plan del dominio se convierte con Plan.Datos, se revisa
-// contra los parametros de la solicitud y el formato lo escribe
-// Escritor de forma determinista. Las salidas rechazadas se
-// descartan; no hay reparo automatico.
+// The agent orchestration over Microsoft.Extensions.AI with BYOK
+// OpenAI-compatible providers. Responses stream in chunks inside a
+// cancellableTask. The model answers data as JSON; the domain plan is
+// converted with Plan.Datos, checked against the request parameters and
+// the format is written by Escritor deterministically. Rejected outputs
+// are discarded; there is no repair.
 
 open System
 open System.Threading.Tasks
 open Microsoft.Extensions.AI
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Solicitudes
 open Briple.Trainer.Core.Validador
 
-/// Un proveedor BYOK OpenAI-compatible.
-type Proveedor = {
-  Nombre: string
+/// A BYOK OpenAI-compatible provider.
+type Provider = {
+  Name: string
   Endpoint: Uri
-  Modelo: string
-  /// User-Agent propio; algunos proveedores lo piden en lugar del
-  /// generico del SDK.
-  AgenteUsuario: string
-  /// Encabezados extra del proveedor (p. ej. x-opencode-session).
-  Encabezados: (string * string) list
+  Model: string
+  /// Own User-Agent; some providers ask for it instead of the SDK's
+  /// generic one.
+  UserAgent: string
+  /// Extra provider headers (e.g. x-opencode-session).
+  Headers: (string * string) list
 }
 
-/// El cliente de chat del proveedor con su clave, user agent y
-/// encabezados aplicados. Un endpoint que termina en /responses usa
-/// el cliente de la API Responses con esa base.
-val crearCliente: clave: string -> proveedor: Proveedor -> IChatClient
+/// The provider's chat client with its key, user agent and headers
+/// applied. An endpoint ending in /responses uses the Responses API
+/// client with that base.
+val createClient: key: string -> provider: Provider -> IChatClient
 
-/// Una corrida del flujo de generacion: la respuesta cruda del modelo,
-/// el plan renderizado al formato y el veredicto.
-type Corrida = {
-  Respuesta: string
-  Salida: string
-  Veredicto: Veredicto
+/// One run of the generation flow: the raw model response, the plan
+/// rendered to the format and the verdict.
+type Run = {
+  Response: string
+  Output: string
+  Verdict: Verdict
 }
 
-val generarNuevo:
-  cliente: IChatClient -> solicitud: SolicitudNuevoPlan -> Task<Corrida>
+val generateNew: client: IChatClient -> request: NewPlanRequest -> Task<Run>
 
-val generarAjuste:
-  cliente: IChatClient -> solicitud: SolicitudAjuste -> Task<Corrida>
+val generateAdjustment:
+  client: IChatClient -> request: AdjustmentRequest -> Task<Run>
 
-/// El agente consolida las marcas en memorias propuestas. Las lineas
-/// que no siguen el protocolo se descartan; los deltas numericos
-/// toleran signo y porcentaje (carga +5% lee como carga 5).
-val consolidarMarcas:
-  cliente: IChatClient -> marcas: MarcaFeedback list -> Task<Memoria list>
+/// The agent consolidates the marks into proposed memories. Lines that
+/// do not follow the protocol are discarded; numeric deltas tolerate
+/// sign and percentage (carga +5% reads as carga 5).
+val consolidateMarks:
+  client: IChatClient -> marks: FeedbackMark list -> Task<Memory list>

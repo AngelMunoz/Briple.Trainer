@@ -325,7 +325,7 @@ let convertir(dato: PlanDato) : Result<Plan, string list> =
 /// Convierte el JSON del modelo en un Plan del dominio. Cada campo
 /// invalido acumula un fallo con su ruta; el dia debe tener nombre
 /// reconocido y el genero debe ser hombre o mujer.
-let deJson(json: string) : Result<Plan, string list> =
+let fromJson(json: string) : Result<Plan, string list> =
   try
     match decodificar json with
     | Error motivo -> Error [ motivo ]
@@ -335,7 +335,7 @@ let deJson(json: string) : Result<Plan, string list> =
 
 /// Serializa un Plan como el JSON que el modelo recibe de referencia
 /// en el flujo de ajuste.
-let aJson(plan: Plan) : string =
+let toJson(plan: Plan) : string =
   let bloque = List.head plan.Blocks
 
   let dato = {|

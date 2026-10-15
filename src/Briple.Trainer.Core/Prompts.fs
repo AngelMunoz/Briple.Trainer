@@ -1,10 +1,10 @@
 module Briple.Trainer.Core.Prompts
 
 open System
-open Briple.Trainer.Core.Atletas
+open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Instrucciones
-open Briple.Trainer.Core.Memorias
-open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Parameters
 open Briple.Trainer.Core.Plan.Datos
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Solicitudes
@@ -13,82 +13,82 @@ open Briple.Trainer.Core.Solicitudes
 // keys, day ids, labels, deltas) and the plan content stay in
 // Spanish because the decoder and the athlete-facing app expect them.
 
-let separar (separador: string) (partes: string list) =
-  String.concat separador partes
+let join (separator: string) (parts: string list) =
+  String.concat separator parts
 
-let objetivoTexto objetivo =
-  match objetivo with
-  | Ejercicio nombre -> nombre
-  | Dia id -> $"day {id}"
+let targetText target =
+  match target with
+  | Exercise name -> name
+  | Day id -> $"day {id}"
 
-let deltaTexto delta =
+let deltaText delta =
   match delta with
   | Delta.Rir n -> $"rir {n}"
-  | Repeticiones n -> $"reps {n}"
-  | Series n -> $"series {n}"
-  | Carga p -> $"carga {p}"
-  | VariantePatron nombre -> $"variante {nombre}"
+  | Delta.Reps n -> $"reps {n}"
+  | Sets n -> $"series {n}"
+  | Load p -> $"carga {p}"
+  | PatternVariant name -> $"variante {name}"
 
-let parametroTexto parametro =
-  match parametro with
-  | SemanasPlan(semanas, _) -> $"- the plan covers {semanas} weeks"
-  | VariantesAtleta(variantes, _) ->
-    let lista = separar ", " variantes
+let parameterText parameter =
+  match parameter with
+  | PlanWeeks(weeks, _) -> $"- the plan covers {weeks} weeks"
+  | AthleteVariants(variants, _) ->
+    let list = join ", " variants
 
-    $"- the plan has one option per variant: {lista}"
-  | ConteoOpcion(opcion, total, _) ->
-    $"- option {opcion} has exactly {total} exercises in total"
-  | RirSemana(semana, objetivo, _) ->
-    $"- week {semana} targets RIR {objetivo} (added automatically, do not write it)"
-  | Ajuste(objetivo, deltas, MemoriaConfirmada memoria) ->
-    let ajustes = deltas |> List.map deltaTexto |> separar "; "
+    $"- the plan has one option per variant: {list}"
+  | VariantCount(variant, total, _) ->
+    $"- option {variant} has exactly {total} exercises in total"
+  | WeekRir(week, target, _) ->
+    $"- week {week} targets RIR {target} (added automatically, do not write it)"
+  | Adjustment(target, deltas, ConfirmedMemory memory) ->
+    let adjustments = deltas |> List.map deltaText |> join "; "
 
-    match memoria.Origen with
-    | Excepcion _ ->
-      $"- on {objetivoTexto objetivo}: {ajustes} — trainer exception: the trainer prescribed this technique. Follow it, and write in that exercise's notas that it is trainer-prescribed plus the evidence-based reason why it is not generally suggested."
-    | Marca _ -> $"- on {objetivoTexto objetivo}: {ajustes}"
-  | Ajuste(objetivo, deltas, _) ->
-    let ajustes = deltas |> List.map deltaTexto |> separar "; "
+    match memory.Origin with
+    | Exemption _ ->
+      $"- on {targetText target}: {adjustments} — trainer exception: the trainer prescribed this technique. Follow it, and write in that exercise's notas that it is trainer-prescribed plus the evidence-based reason why it is not generally suggested."
+    | Mark _ -> $"- on {targetText target}: {adjustments}"
+  | Adjustment(target, deltas, _) ->
+    let adjustments = deltas |> List.map deltaText |> join "; "
 
-    $"- on {objetivoTexto objetivo}: {ajustes}"
+    $"- on {targetText target}: {adjustments}"
 
-let prohibicionTexto prohibicion =
-  match prohibicion with
-  | CambiarConteos -> "- do not change the exercise counts per option"
-  | OpcionesFueraDeVariantes ->
+let prohibitionText prohibition =
+  match prohibition with
+  | ChangeCounts -> "- do not change the exercise counts per option"
+  | OutsideVariants ->
     "- do not add options or genders other than the requested ones"
-  | SalirseDelFormato -> "- do not invent fields outside the schema"
+  | LeaveFormat -> "- do not invent fields outside the schema"
 
-let campoTexto campo =
-  match campo with
-  | Titulo -> "the plan title"
-  | Semanas -> "the week count"
-  | Generado -> "the generation date"
-  | OrigenArchivo -> "the origin line"
-  | Opciones -> "the options"
-  | TituloOpcion -> "each option title"
-  | SemanasDeOpcion -> "how many weeks each option spans"
-  | Dias -> "which days of the week are training days"
-  | TituloDia -> "each day title"
-  | NotasDia -> "day notes"
-  | Circuito -> "each exercise circuit"
-  | Vueltas -> "each circuit rounds"
-  | Orden -> "the exercise order"
-  | Nombre -> "each exercise name"
+let fieldText field =
+  match field with
+  | Title -> "the plan title"
+  | Weeks -> "the week count"
+  | Generated -> "the generation date"
+  | FileOrigin -> "the origin line"
+  | Variants -> "the options"
+  | VariantTitle -> "each option title"
+  | VariantWeeks -> "how many weeks each option spans"
+  | Days -> "which days of the week are training days"
+  | DayTitle -> "each day title"
+  | DayNotes -> "day notes"
+  | Circuit -> "each exercise circuit"
+  | Laps -> "each circuit rounds"
+  | Order -> "the exercise order"
+  | Name -> "each exercise name"
   | Reps -> "the rep ranges (text like 6-8 or 30-45 s)"
-  | Campo.Rir -> "the RIR (text like 1-2, or - when it does not apply)"
-  | Descanso -> "the rest periods (like 3 min)"
-  | Notas -> "each exercise notes (or -)"
+  | Field.Rir -> "the RIR (text like 1-2, or - when it does not apply)"
+  | Rest -> "the rest periods (like 3 min)"
+  | Notes -> "each exercise notes (or -)"
   | Extras ->
     "the extras: guidance lines (no mesociclo; that is added automatically)"
 
 // the schema has no place for day notes: they are not requested
-let camposPedidos(instrucciones: Instrucciones) =
-  instrucciones.Pedir
-  |> List.filter(fun campo -> campo <> NotasDia)
-  |> List.map campoTexto
+let requestedFields(instructions: Instructions) =
+  instructions.Ask
+  |> List.filter(fun field -> field <> DayNotes)
+  |> List.map fieldText
 
-let esquemaTexto =
+let schemaText =
   """RESPONSE SCHEMA: respond only with valid JSON in this shape:
 {
   "titulo": "texto",
@@ -116,7 +116,7 @@ The notas field uses "-" when it does not apply.
 Do not write mesociclo RIR lines in extras: they are added automatically.
 Write all content (titulo, titles, exercise names, reps, descanso, notas, extras) in Spanish."""
 
-let evidenciaTexto =
+let evidenceText =
   """EVIDENCE-BASED TRAINING:
 - Every exercise must serve a clear purpose for this athlete, backed by current strength and conditioning evidence: specificity, progressive overload, volume landmarks, fatigue management.
 - Educated guesses are acceptable where evidence is thin. Uninformed choices are not.
@@ -124,38 +124,35 @@ let evidenciaTexto =
 - If you cannot state why an exercise helps this athlete, replace it with one you can justify.
 TRAINER EXCEPTIONS: the trainer is the health expert for this athlete and does not need to justify a prescription. When a trainer exception prescribes a technique, follow it. In that exercise's notas, record that it is trainer-prescribed and state the evidence-based reason why it is not generally suggested."""
 
-// la rotacion de variantes evita la monotonia: el patron de cada dia se
-// mantiene y la variante cambia semana a semana
-let variabilidadTexto =
+// variant rotation avoids monotony: the pattern of each day holds and
+// the variant changes week to week
+let variabilityText =
   """VARIANT ROTATION:
 - Within each option, every training day keeps the same movement patterns across the weeks.
 - The exercise variant changes every week: rotate equipment, grip or angle, so an exercise name never repeats in the same day of the following week.
 - Progress the work across the weeks through the circuit rounds and rep ranges, not by repeating identical exercises."""
 
-let atletaTexto(atleta: Atleta) =
-  let genero =
-    match atleta.Genero with
-    | Male -> "male"
-    | Female -> "female"
+let athleteText(athlete: Athlete) =
+  let gender = Gender.toProtocol athlete.Gender
 
-  let metas = separar ", " atleta.Metas
-  let enfasis = separar ", " atleta.Enfasis
+  let goals = join ", " athlete.Goals
+  let focus = join ", " athlete.Focus
 
-  $"Athlete: {atleta.Nombre} ({genero}). Goals: {metas}. Focus: {enfasis}."
+  $"Athlete: {athlete.Name} ({gender}). Goals: {goals}. Focus: {focus}."
 
 /// System message for the generation flows: role, schema, evidence
 /// rules, variant rotation and output discipline.
-let sistema =
+let system =
   "You are a strength and conditioning coach who writes training plans.\n\n"
-  + esquemaTexto
+  + schemaText
   + "\n\n"
-  + evidenciaTexto
+  + evidenceText
   + "\n\n"
-  + variabilidadTexto
+  + variabilityText
   + "\n\nRespond with the JSON only: no markdown, no extra text."
 
 /// System message for feedback consolidation.
-let sistemaConsolidar =
+let consolidationSystem =
   """You are a strength and conditioning coach who summarizes athlete feedback into training memories.
 Each memory is a persistent fact with a proposed parametric adjustment.
 Valid deltas: rir N, reps N, series N, carga P (percent), variante NOMBRE. Write numbers bare: carga 5, not carga +5% or carga 5%.
@@ -166,55 +163,47 @@ The proposed delta corrects the mark: leve raises load, pesado lowers it, dolor 
 No explanations, no markdown."""
 
 /// User message for the new plan flow.
-let promptNuevo(solicitud: SolicitudNuevoPlan) =
-  let instrucciones = delNuevo solicitud
+let newPlanPrompt(request: NewPlanRequest) =
+  let instructions = forNew request
 
-  // perfil and pedido fix the same variants: say it once
-  let fijado =
-    instrucciones.Fijar
-    |> List.map parametroTexto
-    |> List.distinct
-    |> separar "\n"
+  // profile and brief fix the same variants: say it once
+  let fixedLines =
+    instructions.Fix |> List.map parameterText |> List.distinct |> join "\n"
 
-  let pedido = camposPedidos instrucciones |> separar ", "
+  let asked = requestedFields instructions |> join ", "
 
-  let prohibido =
-    instrucciones.Prohibir |> List.map prohibicionTexto |> separar "\n"
+  let forbidden = instructions.Forbid |> List.map prohibitionText |> join "\n"
 
-  $"ATHLETE\n{atletaTexto solicitud.Atleta}\n\nMANDATORY IN THE RESPONSE:\n{fijado}\n\nWHAT YOU DECIDE:\n{pedido}\n\nFORBIDDEN:\n{prohibido}"
+  $"ATHLETE\n{athleteText request.Athlete}\n\nMANDATORY IN THE RESPONSE:\n{fixedLines}\n\nWHAT YOU DECIDE:\n{asked}\n\nFORBIDDEN:\n{forbidden}"
 
 /// User message for the adjustment flow: the common part plus the
 /// previous plan as reference in the same schema.
-let promptAjuste(solicitud: SolicitudAjuste) =
-  let instrucciones = delAjuste solicitud
+let adjustmentPrompt(request: AdjustmentRequest) =
+  let instructions = forAdjustment request
 
-  let fijado =
-    instrucciones.Fijar
-    |> List.map parametroTexto
-    |> List.distinct
-    |> separar "\n"
+  let fixedLines =
+    instructions.Fix |> List.map parameterText |> List.distinct |> join "\n"
 
-  let pedido = camposPedidos instrucciones |> separar ", "
+  let asked = requestedFields instructions |> join ", "
 
-  let prohibido =
-    instrucciones.Prohibir |> List.map prohibicionTexto |> separar "\n"
+  let forbidden = instructions.Forbid |> List.map prohibitionText |> join "\n"
 
-  $"ATHLETE\n{atletaTexto solicitud.Atleta}\n\nMANDATORY IN THE RESPONSE:\n{fijado}\n\nWHAT YOU DECIDE:\n{pedido}\n\nFORBIDDEN:\n{prohibido}\n\nPREVIOUS PLAN (adjustment reference, same schema):\n{aJson solicitud.PlanAnterior}"
+  $"ATHLETE\n{athleteText request.Athlete}\n\nMANDATORY IN THE RESPONSE:\n{fixedLines}\n\nWHAT YOU DECIDE:\n{asked}\n\nFORBIDDEN:\n{forbidden}\n\nPREVIOUS PLAN (adjustment reference, same schema):\n{toJson request.PreviousPlan}"
 
 /// User message for consolidation: the recorded marks.
-let promptConsolidar(marcas: MarcaFeedback list) =
-  let etiquetaTexto etiqueta =
-    match etiqueta with
-    | Leve -> "leve"
-    | Pesado -> "pesado"
-    | Dolor -> "dolor"
-    | SinEquipo -> "sin-equipo"
+let consolidationPrompt(marks: FeedbackMark list) =
+  let labelText label =
+    match label with
+    | Light -> "leve"
+    | Heavy -> "pesado"
+    | Pain -> "dolor"
+    | NoEquipment -> "sin-equipo"
 
-  let marcaTexto(marca: MarcaFeedback) =
-    let fecha = marca.Fecha.ToString("yyyy-MM-dd")
+  let markText(mark: FeedbackMark) =
+    let date = mark.Date.ToString("yyyy-MM-dd")
 
-    $"- {objetivoTexto marca.Objetivo} | {etiquetaTexto marca.Etiqueta} | {fecha}"
+    $"- {targetText mark.Target} | {labelText mark.Label} | {date}"
 
-  let marcasTexto = marcas |> List.map marcaTexto |> separar "\n"
+  let marksText = marks |> List.map markText |> join "\n"
 
-  $"RECORDED MARKS:\n{marcasTexto}"
+  $"RECORDED MARKS:\n{marksText}"

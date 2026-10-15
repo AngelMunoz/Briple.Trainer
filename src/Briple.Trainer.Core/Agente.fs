@@ -1,6 +1,6 @@
 module Briple.Trainer.Core.Agente
 
-// el adaptador IChatClient de la API Responses es experimental
+// the IChatClient adapter of the Responses API is experimental
 #nowarn "57"
 
 open System
@@ -13,7 +13,7 @@ open System.Threading
 open System.Threading.Tasks
 open Microsoft.Extensions.AI
 open OpenAI
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Datos
 open Briple.Trainer.Core.Plan.Escritor
 open Briple.Trainer.Core.Plan.Types
@@ -21,245 +21,238 @@ open Briple.Trainer.Core.Prompts
 open Briple.Trainer.Core.Solicitudes
 open Briple.Trainer.Core.Validador
 
-/// Agrega los encabezados del proveedor a cada request.
-type EncabezadosHandler(encabezados: (string * string) list) =
+/// Adds the provider headers to every request.
+type HeadersHandler(headers: (string * string) list) =
   inherit DelegatingHandler(new SocketsHttpHandler())
 
   override this.SendAsync
-    (request: HttpRequestMessage, cancelacion: CancellationToken)
+    (request: HttpRequestMessage, cancellation: CancellationToken)
     : Task<HttpResponseMessage> =
-    for nombre, valor in encabezados do
-      request.Headers.Add(nombre, valor) |> ignore
+    for name, value in headers do
+      request.Headers.Add(name, value) |> ignore
 
-    base.SendAsync(request, cancelacion)
+    base.SendAsync(request, cancellation)
 
-/// Un proveedor BYOK OpenAI-compatible.
-type Proveedor = {
-  Nombre: string
+/// A BYOK OpenAI-compatible provider.
+type Provider = {
+  Name: string
   Endpoint: Uri
-  Modelo: string
-  AgenteUsuario: string
-  Encabezados: (string * string) list
+  Model: string
+  UserAgent: string
+  Headers: (string * string) list
 }
 
-/// Una corrida del flujo de generacion: la respuesta cruda del modelo,
-/// el plan renderizado al formato y el veredicto.
-type Corrida = {
-  Respuesta: string
-  Salida: string
-  Veredicto: Veredicto
+/// One run of the generation flow: the raw model response, the plan
+/// rendered to the format and the verdict.
+type Run = {
+  Response: string
+  Output: string
+  Verdict: Verdict
 }
 
-/// El cliente de chat del proveedor con su clave, user agent y
-/// encabezados aplicados. Un endpoint que termina en /responses usa
-/// el cliente de la API Responses con esa base.
-let crearCliente (clave: string) (proveedor: Proveedor) : IChatClient =
-  let uri = proveedor.Endpoint.AbsoluteUri.TrimEnd('/')
+/// The provider's chat client with its key, user agent and headers
+/// applied. An endpoint ending in /responses uses the Responses API
+/// client with that base.
+let createClient (key: string) (provider: Provider) : IChatClient =
+  let uri = provider.Endpoint.AbsoluteUri.TrimEnd('/')
 
-  let usaResponses = uri.EndsWith("/responses")
+  let usesResponses = uri.EndsWith("/responses")
 
   let baseUri =
-    if usaResponses then
+    if usesResponses then
       Uri(uri.Substring(0, uri.Length - "/responses".Length))
     else
-      proveedor.Endpoint
+      provider.Endpoint
 
-  let opciones =
+  let options =
     OpenAIClientOptions(
       Endpoint = baseUri,
       Transport =
         new HttpClientPipelineTransport(
-          new HttpClient(new EncabezadosHandler(proveedor.Encabezados))
+          new HttpClient(new HeadersHandler(provider.Headers))
         )
     )
 
-  if proveedor.AgenteUsuario <> "" then
-    opciones.UserAgentApplicationId <- proveedor.AgenteUsuario
+  if provider.UserAgent <> "" then
+    options.UserAgentApplicationId <- provider.UserAgent
 
-  let cliente = OpenAIClient(ApiKeyCredential(clave), opciones)
+  let client = OpenAIClient(ApiKeyCredential(key), options)
 
-  if usaResponses then
-    cliente.GetResponsesClient().AsIChatClient(proveedor.Modelo)
+  if usesResponses then
+    client.GetResponsesClient().AsIChatClient(provider.Model)
   else
-    cliente.GetChatClient(proveedor.Modelo).AsIChatClient()
+    client.GetChatClient(provider.Model).AsIChatClient()
 
-let pedir
-  (cliente: IChatClient)
-  (sistema: string)
-  (usuario: string)
-  : Task<string> =
-  let mensajes = [|
-    ChatMessage(ChatRole.System, sistema)
-    ChatMessage(ChatRole.User, usuario)
+let ask (client: IChatClient) (system: string) (user: string) : Task<string> =
+  let messages = [|
+    ChatMessage(ChatRole.System, system)
+    ChatMessage(ChatRole.User, user)
   |]
 
-  // la transmision viaja fria con su token de cancelacion y devuelve el
-  // texto acumulado cuando cierra
-  let transmitir = cancellableTask {
-    let acumulado = Text.StringBuilder()
+  // the stream travels cold with its cancellation token and returns the
+  // accumulated text when it closes
+  let transmit = cancellableTask {
+    let accumulated = Text.StringBuilder()
 
-    for actualizacion in cliente.GetStreamingResponseAsync mensajes do
-      acumulado.Append actualizacion.Text |> ignore
+    for update in client.GetStreamingResponseAsync messages do
+      accumulated.Append update.Text |> ignore
 
-    return acumulado.ToString()
+    return accumulated.ToString()
   }
 
-  transmitir CancellationToken.None
+  transmit CancellationToken.None
 
-// las lineas de mesociclo son parametro de la solicitud: se agregan
-// deterministicamente, el modelo no las escribe
-let conMesociclo (rirPorSemana: (int * string) list) (plan: Plan) =
-  let lineas =
-    rirPorSemana
-    |> List.map(fun (semana, valor) ->
-      $"mesociclo | Semana {semana}: objetivo | RIR {valor}")
+// mesocycle lines are a request parameter: they are added
+// deterministically, the model never writes them
+let appendMesocycle (rirPerWeek: (int * string) list) (plan: Plan) =
+  let lines =
+    rirPerWeek
+    |> List.map(fun (week, value) ->
+      $"mesociclo | Semana {week}: objetivo | RIR {value}")
 
   {
     plan with
-        Extras = plan.Extras @ lineas
+        Extras = plan.Extras @ lines
   }
 
-let correr
-  (rirPorSemana: (int * string) list)
-  (revisar: Plan -> Fallo list)
-  (respuesta: string)
-  : Corrida =
-  match deJson respuesta with
-  | Error fallosDatos -> {
-      Respuesta = respuesta
-      Salida = respuesta
-      Veredicto =
-        Rechazado(
-          fallosDatos
-          |> List.map(fun detalle -> { Regla = "datos"; Detalle = detalle })
+let run
+  (rirPerWeek: (int * string) list)
+  (check: Plan -> Violation list)
+  (response: string)
+  : Run =
+  match fromJson response with
+  | Error dataFailures -> {
+      Response = response
+      Output = response
+      Verdict =
+        Rejected(
+          dataFailures
+          |> List.map(fun detail -> { Rule = "datos"; Detail = detail })
         )
     }
-  | Ok planBruto ->
-    let plan = conMesociclo rirPorSemana planBruto
-    let fallos = revisar plan
+  | Ok rawPlan ->
+    let plan = appendMesocycle rirPerWeek rawPlan
+    let violations = check plan
 
-    let veredicto =
-      match fallos with
-      | [] -> Valido plan
-      | _ -> Rechazado fallos
+    let verdict =
+      match violations with
+      | [] -> Valid plan
+      | _ -> Rejected violations
 
     {
-      Respuesta = respuesta
-      Salida = write plan
-      Veredicto = veredicto
+      Response = response
+      Output = write plan
+      Verdict = verdict
     }
 
-/// Genera un plan nuevo: pide los datos, los convierte, los revisa y
-/// escribe el formato.
-let generarNuevo
-  (cliente: IChatClient)
-  (solicitud: SolicitudNuevoPlan)
-  : Task<Corrida> = task {
-  let! respuesta = pedir cliente sistema (promptNuevo solicitud)
+/// Generates a new plan: asks for the data, converts it, checks it and
+/// writes the format.
+let generateNew (client: IChatClient) (request: NewPlanRequest) : Task<Run> =
+  task {
+    let! response = ask client system (newPlanPrompt request)
+
+    return
+      run
+        request.Brief.RirPerWeek
+        (checkParameters
+          request.Athlete
+          request.Weeks
+          request.Brief
+          request.Counts)
+        response
+  }
+
+/// Generates an adjustment: the same with the previous plan as reference.
+let generateAdjustment
+  (client: IChatClient)
+  (request: AdjustmentRequest)
+  : Task<Run> = task {
+  let! response = ask client system (adjustmentPrompt request)
 
   return
-    correr
-      solicitud.Pedido.RirPorSemana
-      (revisarParametros
-        solicitud.Atleta
-        solicitud.Semanas
-        solicitud.Pedido
-        solicitud.Conteos)
-      respuesta
+    run
+      request.Brief.RirPerWeek
+      (checkParameters
+        request.Athlete
+        request.Weeks
+        request.Brief
+        request.Counts)
+      response
 }
 
-/// Genera un ajuste: lo mismo con el plan anterior como referencia.
-let generarAjuste
-  (cliente: IChatClient)
-  (solicitud: SolicitudAjuste)
-  : Task<Corrida> = task {
-  let! respuesta = pedir cliente sistema (promptAjuste solicitud)
+// --- Mark consolidation ------------------------------------------------------
 
-  return
-    correr
-      solicitud.Pedido.RirPorSemana
-      (revisarParametros
-        solicitud.Atleta
-        solicitud.Semanas
-        solicitud.Pedido
-        solicitud.Conteos)
-      respuesta
-}
+// the model decorates numbers with sign and percentage (carga +5%): the
+// protocol already declares load as percentage, the adornment is dropped
+let cleanNumber(text: string) = text.Trim().TrimStart('+').TrimEnd('%')
 
-// --- Consolidacion de marcas -------------------------------------------------
+let deltaOf(text: string) : Delta option =
+  let parts = text.Trim().Split(' ', 2)
 
-// el modelo decora los numeros con signo y porcentaje (carga +5%): el
-// protocolo ya declara que carga es porcentual, el adorno se descarta
-let numeroLimpio(texto: string) =
-  texto.Trim().TrimStart('+').TrimEnd('%')
-
-let deltaDe(texto: string) : Delta option =
-  let partes = texto.Trim().Split(' ', 2)
-
-  match partes.[0].ToLowerInvariant(), partes |> Array.tryItem 1 with
-  | "variante", Some nombre -> Some(VariantePatron(nombre.Trim()))
-  | clase, Some numeroText ->
-    match numeroText |> numeroLimpio |> Int32.TryParse with
-    | true, numero ->
-      match clase with
-      | "rir" -> Some(Delta.Rir numero)
-      | "reps" -> Some(Repeticiones numero)
-      | "series" -> Some(Series numero)
-      | "carga" -> Some(Carga numero)
+  match parts.[0].ToLowerInvariant(), parts |> Array.tryItem 1 with
+  | "variante", Some name -> Some(PatternVariant(name.Trim()))
+  | kind, Some numberText ->
+    match numberText |> cleanNumber |> Int32.TryParse with
+    | true, number ->
+      match kind with
+      | "rir" -> Some(Delta.Rir number)
+      | "reps" -> Some(Reps number)
+      | "series" -> Some(Sets number)
+      | "carga" -> Some(Load number)
       | _ -> None
     | _ -> None
   | _ -> None
 
-let etiquetaDe(texto: string) =
-  match texto.Trim().ToLowerInvariant() with
-  | "leve" -> Some Leve
-  | "pesado" -> Some Pesado
-  | "dolor" -> Some Dolor
+let labelOf(text: string) =
+  match text.Trim().ToLowerInvariant() with
+  | "leve" -> Some Light
+  | "pesado" -> Some Heavy
+  | "dolor" -> Some Pain
   | "sin-equipo"
-  | "sin equipo" -> Some SinEquipo
+  | "sin equipo" -> Some NoEquipment
   | _ -> None
 
-let objetivoEs (texto: string) (objetivo: Objetivo) =
-  let normalizado = texto.Trim().ToLowerInvariant()
+let targetMatches (text: string) (target: Target) =
+  let normalized = text.Trim().ToLowerInvariant()
 
-  match objetivo with
-  | Ejercicio nombre ->
-    normalizado = nombre.ToLowerInvariant()
-    || normalizado.EndsWith(nombre.ToLowerInvariant())
-  | Dia id -> normalizado.Contains(id.ToLowerInvariant())
+  match target with
+  | Exercise name ->
+    normalized = name.ToLowerInvariant()
+    || normalized.EndsWith(name.ToLowerInvariant())
+  | Day id -> normalized.Contains(id.ToLowerInvariant())
 
-let memoriaDe (marcas: MarcaFeedback list) (linea: string) =
-  match linea.Split('|') |> Array.map(fun parte -> parte.Trim()) with
-  | [| objetivoText; etiquetaText; resumen; deltasText |] ->
-    marcas
-    |> List.tryFind(fun marca ->
-      objetivoEs objetivoText marca.Objetivo
-      && etiquetaDe etiquetaText = Some marca.Etiqueta)
-    |> Option.bind(fun marca ->
+let memoryOf (marks: FeedbackMark list) (line: string) =
+  match line.Split('|') |> Array.map(fun part -> part.Trim()) with
+  | [| targetText; labelText; summary; deltasText |] ->
+    marks
+    |> List.tryFind(fun mark ->
+      targetMatches targetText mark.Target
+      && labelOf labelText = Some mark.Label)
+    |> Option.bind(fun mark ->
       let deltas =
-        deltasText.Split(';') |> Array.choose deltaDe |> Array.toList
+        deltasText.Split(';') |> Array.choose deltaOf |> Array.toList
 
       if List.isEmpty deltas then
         None
       else
         Some {
-          Resumen = resumen
+          Summary = summary
           Deltas = deltas
-          Origen = Marca marca
-          Estado = Propuesta
+          Origin = Mark mark
+          Status = Proposed
         })
   | _ -> None
 
-/// El agente consolida las marcas en memorias propuestas. Las lineas
-/// que no siguen el protocolo se descartan.
-let consolidarMarcas
-  (cliente: IChatClient)
-  (marcas: MarcaFeedback list)
-  : Task<Memoria list> = task {
-  let! respuesta = pedir cliente sistemaConsolidar (promptConsolidar marcas)
+/// The agent consolidates the marks into proposed memories. Lines that
+/// do not follow the protocol are discarded.
+let consolidateMarks
+  (client: IChatClient)
+  (marks: FeedbackMark list)
+  : Task<Memory list> = task {
+  let! response = ask client consolidationSystem (consolidationPrompt marks)
 
   return
-    respuesta.Replace("\r\n", "\n").Split('\n')
-    |> Array.choose(fun linea -> memoriaDe marcas linea)
+    response.Replace("\r\n", "\n").Split('\n')
+    |> Array.choose(fun line -> memoryOf marks line)
     |> Array.toList
 }

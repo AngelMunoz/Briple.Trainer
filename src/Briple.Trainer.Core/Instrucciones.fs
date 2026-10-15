@@ -1,31 +1,31 @@
 module Briple.Trainer.Core.Instrucciones
 
-open Briple.Trainer.Core.Parametros
+open Briple.Trainer.Core.Parameters
 open Briple.Trainer.Core.Solicitudes
 
-type Prohibicion =
-  | CambiarConteos
-  | OpcionesFueraDeVariantes
-  | SalirseDelFormato
+type Prohibition =
+  | ChangeCounts
+  | OutsideVariants
+  | LeaveFormat
 
-type Instrucciones = {
-  Fijar: Parametro list
-  Pedir: Campo list
-  Prohibir: Prohibicion list
+type Instructions = {
+  Fix: Parameter list
+  Ask: Field list
+  Forbid: Prohibition list
 }
 
-let pedidosAlAgente: Campo list =
-  campos
-  |> List.filter(fun campo -> origenesDe campo |> List.contains DelAgente)
+let agentFields: Field list =
+  fields
+  |> List.filter(fun field -> originsFor field |> List.contains FromAgent)
 
-let delNuevo(solicitud: SolicitudNuevoPlan) : Instrucciones = {
-  Fijar = parametrosDeNuevo solicitud
-  Pedir = pedidosAlAgente
-  Prohibir = [ CambiarConteos; OpcionesFueraDeVariantes; SalirseDelFormato ]
+let forNew(request: NewPlanRequest) : Instructions = {
+  Fix = parametersForNew request
+  Ask = agentFields
+  Forbid = [ ChangeCounts; OutsideVariants; LeaveFormat ]
 }
 
-let delAjuste(solicitud: SolicitudAjuste) : Instrucciones = {
-  Fijar = parametrosDeAjuste solicitud
-  Pedir = pedidosAlAgente
-  Prohibir = [ CambiarConteos; OpcionesFueraDeVariantes; SalirseDelFormato ]
+let forAdjustment(request: AdjustmentRequest) : Instructions = {
+  Fix = parametersForAdjustment request
+  Ask = agentFields
+  Forbid = [ ChangeCounts; OutsideVariants; LeaveFormat ]
 }

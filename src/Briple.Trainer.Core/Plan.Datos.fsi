@@ -11,8 +11,8 @@ open Briple.Trainer.Core.Plan.Types
 /// Convierte el JSON del modelo en un Plan del dominio. Cada campo
 /// invalido acumula un fallo con su ruta; el dia debe tener nombre
 /// reconocido y el genero debe ser hombre o mujer.
-val deJson: json: string -> Result<Plan, string list>
+val fromJson: json: string -> Result<Plan, string list>
 
 /// Serializa un Plan como el JSON que el modelo recibe de referencia
 /// en el flujo de ajuste.
-val aJson: plan: Plan -> string
+val toJson: plan: Plan -> string

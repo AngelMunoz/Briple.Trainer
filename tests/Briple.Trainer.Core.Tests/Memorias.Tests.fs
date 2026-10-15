@@ -6,52 +6,46 @@ module Briple.Trainer.Core.Tests.Memorias.Tests
 
 open System
 open Expecto
-open Briple.Trainer.Core.Memorias
+open Briple.Trainer.Core.Memories
 
 let private marca etiqueta objetivo = {
-  Objetivo = objetivo
-  Etiqueta = etiqueta
-  Fecha = DateOnly(2026, 10, 13)
+  Target = objetivo
+  Label = etiqueta
+  Date = DateOnly(2026, 10, 13)
 }
 
 let tests =
   testList "Memorias" [
     testCase "una marca muy leve se consolida con delta paramétrico" (fun () ->
-      let memoria = consolidar(marca Leve (Ejercicio "Press de banca"))
+      let memoria = consolidate(marca Light (Exercise "Press de banca"))
 
-      Expect.equal memoria.Estado Propuesta "nace propuesta"
+      Expect.equal memoria.Status Proposed "nace propuesta"
 
       Expect.equal
         memoria.Deltas
-        [ Carga 5 ]
+        [ Load 5 ]
         "el ajuste automático sube la carga 5%"
 
-      Expect.stringContains
-        memoria.Resumen
-        "muy leve"
-        "el resumen narra el hecho"
+      Expect.equal memoria.Summary "" "el resumen no se fija en el dominio"
 
-      match memoria.Origen with
-      | Marca marca ->
-        Expect.equal
-          marca.Objetivo
-          (Ejercicio "Press de banca")
-          "trae su origen"
-      | Excepcion _ -> failtest "nacio de una marca")
+      match memoria.Origin with
+      | Mark marca ->
+        Expect.equal marca.Target (Exercise "Press de banca") "trae su origen"
+      | Exemption _ -> failtest "nacio de una marca")
 
     testCase "una marca pesado baja la carga" (fun () ->
-      let memoria = consolidar(marca Pesado (Dia "Lunes"))
+      let memoria = consolidate(marca Heavy (Day "Lunes"))
 
       Expect.equal
         memoria.Deltas
-        [ Carga -5 ]
+        [ Load -5 ]
         "el ajuste automático baja la carga"
 
-      Expect.stringContains memoria.Resumen "Lunes" "el resumen nombra el día")
+      Expect.equal memoria.Summary "" "el resumen no se fija en el dominio")
 
     testCase "dolor y sin equipo no tienen ajuste automático" (fun () ->
-      let conDolor = consolidar(marca Dolor (Ejercicio "Sentadilla"))
-      let sinEquipo = consolidar(marca SinEquipo (Ejercicio "Dominadas"))
+      let conDolor = consolidate(marca Pain (Exercise "Sentadilla"))
+      let sinEquipo = consolidate(marca NoEquipment (Exercise "Dominadas"))
 
       Expect.isEmpty conDolor.Deltas "dolor va sin ajuste automático"
 
@@ -59,48 +53,45 @@ let tests =
 
     testCase "confirmar fija los ajustes que el entrenador eligió" (fun () ->
       let memoria =
-        marca Leve (Ejercicio "Press de banca")
-        |> consolidar
-        |> confirmar [ Rir -1; Repeticiones 2 ]
+        marca Light (Exercise "Press de banca")
+        |> consolidate
+        |> confirm [ Rir -1; Reps 2 ]
 
-      Expect.equal memoria.Estado Confirmada "queda confirmada"
+      Expect.equal memoria.Status Confirmed "queda confirmada"
 
       Expect.equal
         memoria.Deltas
-        [ Rir -1; Repeticiones 2 ]
+        [ Rir -1; Reps 2 ]
         "los deltas son los elegidos")
 
     testCase "descartar saca la memoria del ciclo" (fun () ->
-      let memoria = marca Pesado (Ejercicio "Remo") |> consolidar |> descartar
+      let memoria = marca Heavy (Exercise "Remo") |> consolidate |> discard
 
-      Expect.equal memoria.Estado Descartada "queda descartada")
+      Expect.equal memoria.Status Discarded "queda descartada")
 
     testCase
       "una excepcion del entrenador nace confirmada con la tecnica"
       (fun () ->
         let memoria =
-          memoriaDeExcepcion {
-            Objetivo = Dia "Miércoles"
-            Tecnica = "Sentadilla con salto"
+          memoryOfExemption {
+            Target = Day "Miércoles"
+            Technique = "Sentadilla con salto"
           }
 
-        Expect.equal memoria.Estado Confirmada "no pasa por propuesta"
+        Expect.equal memoria.Status Confirmed "no pasa por propuesta"
 
         Expect.equal
           memoria.Deltas
-          [ VariantePatron "Sentadilla con salto" ]
+          [ PatternVariant "Sentadilla con salto" ]
           "la tecnica es la variante"
 
-        Expect.stringContains
-          memoria.Resumen
-          "el entrenador prescribió"
-          "el resumen narra la prescripcion"
+        Expect.equal memoria.Summary "" "el resumen no se fija en el dominio"
 
-        (match memoria.Origen with
-         | Excepcion excepcion ->
+        (match memoria.Origin with
+         | Exemption exemption ->
            Expect.equal
-             excepcion.Tecnica
+             exemption.Technique
              "Sentadilla con salto"
              "guarda la tecnica"
-         | Marca _ -> failtest "nacio de una excepcion"))
+         | Mark _ -> failtest "nacio de una excepcion"))
   ]

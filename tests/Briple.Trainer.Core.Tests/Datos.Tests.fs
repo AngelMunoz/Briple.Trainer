@@ -56,7 +56,7 @@ let jsonValido =
 let tests =
   testList "Datos" [
     testCase "el json valido se convierte al dominio" (fun () ->
-      match deJson jsonValido with
+      match fromJson jsonValido with
       | Ok plan ->
         Expect.equal plan.Title "Plan de prueba" "titulo"
         Expect.equal plan.Weeks 2 "semanas"
@@ -86,14 +86,14 @@ let tests =
     testCase "un json envuelto en data se desenvuelve" (fun () ->
       let envuelto = $"{{ \"data\": {JsonSerializer.Serialize jsonValido} }}"
 
-      match deJson envuelto with
+      match fromJson envuelto with
       | Ok plan -> Expect.equal plan.Title "Plan de prueba" "mismo plan"
       | Error fallos -> failtest $"se esperaba Ok: %A{fallos}")
 
     testCase "un genero desconocido acumula fallo" (fun () ->
       let json = jsonValido.Replace("\"hombre\"", "\"alien\"")
 
-      match deJson json with
+      match fromJson json with
       | Ok _ -> failtest "se esperaba Error"
       | Error fallos ->
         Expect.exists
@@ -104,7 +104,7 @@ let tests =
     testCase "un dia no reconocido acumula fallo con su ruta" (fun () ->
       let json = jsonValido.Replace("\"lunes\"", "\"samedi\"")
 
-      match deJson json with
+      match fromJson json with
       | Ok _ -> failtest "se esperaba Error"
       | Error fallos ->
         Expect.exists
@@ -116,7 +116,7 @@ let tests =
       let json =
         jsonValido.Replace("\"nombre\": \"Sentadilla\"", "\"nombre\": \" \"")
 
-      match deJson json with
+      match fromJson json with
       | Ok _ -> failtest "se esperaba Error"
       | Error fallos ->
         Expect.exists
@@ -126,7 +126,7 @@ let tests =
           "el fallo trae la ruta")
 
     testCase "un json roto da fallo ilegible" (fun () ->
-      match deJson "{ esto no es json" with
+      match fromJson "{ esto no es json" with
       | Ok _ -> failtest "se esperaba Error"
       | Error fallos ->
         Expect.exists
@@ -134,19 +134,24 @@ let tests =
           (fun fallo -> fallo.Contains "ilegible")
           "fallos ilegibles")
 
-    testCase "aJson y deJson round-trip del plan de un solo bloque" (fun () ->
-      match readFixture "plan_entrenamiento_4sem.txt" |> parsePlan with
-      | Error error -> failtest $"parse error: {error.Message}"
-      | Ok parsed ->
-        let soloHombre = {
-          parsed.Plan with
-              Blocks =
-                parsed.Plan.Blocks
-                |> List.filter(fun bloque -> bloque.Gender = Male)
-        }
+    testCase
+      "toJson y fromJson round-trip del plan de un solo bloque"
+      (fun () ->
+        match readFixture "plan_entrenamiento_4sem.txt" |> parsePlan with
+        | Error error -> failtest $"parse error: {error.Message}"
+        | Ok parsed ->
+          let soloHombre = {
+            parsed.Plan with
+                Blocks =
+                  parsed.Plan.Blocks
+                  |> List.filter(fun bloque -> bloque.Gender = Male)
+          }
 
-        match aJson soloHombre |> deJson with
-        | Ok convertido ->
-          Expect.equal convertido soloHombre "el plan sobrevive el round-trip"
-        | Error fallos -> failtest $"se esperaba Ok: %A{fallos}")
+          match toJson soloHombre |> fromJson with
+          | Ok convertido ->
+            Expect.equal
+              convertido
+              soloHombre
+              "el plan sobrevive el round-trip"
+          | Error fallos -> failtest $"se esperaba Ok: %A{fallos}")
   ]
