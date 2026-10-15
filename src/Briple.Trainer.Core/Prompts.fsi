@@ -5,12 +5,14 @@ module Briple.Trainer.Core.Prompts
 // (fields of its origin) and the forbidden part. The adjustment adds
 // the previous plan as reference.
 
+open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 
 /// System message of the generation flows: role, JSON response schema,
-/// prescription rules, evidence rules and variant rotation.
-val system: string
+/// prescription rules, evidence rules for the plan's goal and variant
+/// rotation.
+val system: goal: PlanGoal -> string
 
 /// System message of the mark consolidation.
 val consolidationSystem: string

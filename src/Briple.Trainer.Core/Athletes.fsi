@@ -7,13 +7,21 @@ module Briple.Trainer.Core.Athletes
 
 open Briple.Trainer.Core.Plan.Types
 
+/// High-level training goal of a plan.
+type PlanGoal =
+  | Hypertrophy
+  | WeightLoss
+  | CardioVascularHealth
+  | BasicBodyActivation
+  | Strength
+
 /// A trainee. `Variants` are the options they can train ("3dias",
 /// "5dias") for their own flexibility; they are not distinct athletes.
 type Athlete = {
   Name: string
   Gender: Gender
   Variants: string list
-  Goals: string list
+  Goals: PlanGoal list
   Focus: string list
 }
 

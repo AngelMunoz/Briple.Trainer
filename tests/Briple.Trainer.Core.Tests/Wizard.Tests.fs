@@ -32,6 +32,7 @@ let private proposal = mark |> consolidate
 let private confirmed = proposal |> confirm [ Load 5 ]
 
 let private brief = {
+  Goal = Hypertrophy
   Adjustments = []
   Focus = []
   RirPerWeek = [ (1, "3") ]

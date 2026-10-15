@@ -22,6 +22,7 @@ let private maleAthlete = {
 }
 
 let private brief = {
+  Goal = Hypertrophy
   Adjustments = []
   Focus = []
   RirPerWeek = []

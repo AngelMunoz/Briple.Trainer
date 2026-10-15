@@ -6,6 +6,7 @@ open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Parameters
 
 type Brief = {
+  Goal: PlanGoal
   Adjustments: (Target * Delta list) list
   Focus: string list
   RirPerWeek: (int * string) list

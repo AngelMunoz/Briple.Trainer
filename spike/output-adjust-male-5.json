@@ -1,0 +1,436 @@
+{
+  "title": "Plan de Entrenamiento en Circuito - 4 Semanas (3 y 5 Días)",
+  "weeks": 4,
+  "generated": "2026-10-14",
+  "origin": "Ajuste_Plan_Circuito_4_Semanas_2026-10-14",
+  "gender": "male",
+  "variants": [
+    {
+      "id": "3dias",
+      "title": "FULL BODY A / B / C · 3 DÍAS (LUNES · MIÉRCOLES · VIERNES)",
+      "weeks": [
+        {
+          "number": 1,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Full Body A",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Sentadilla con barra", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press de banca", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "Carga 5" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Remo con barra", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Press militar", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Curl femoral tumbado", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 3, "name": "Elevaciones laterales", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Full Body B",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Peso muerto rumano", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press inclinado con mancuernas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Jalón al pecho", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Zancadas búlgaras", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Curl de bíceps con barra", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 3, "name": "Extensión de tríceps en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Full Body C",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Prensa profunda", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press banca con mancuernas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Remo en polea baja", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Elevación de talones de pie", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Plancha / rueda abdominal", "reps": "30-45 s", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Full Body A",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Sentadilla en multipower", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press banca con mancuernas", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Remo en máquina con apoyo de pecho", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Press militar con mancuernas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Curl femoral sentado", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 3, "name": "Elevaciones laterales en polea", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Full Body B",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "PM rumano con mancuernas", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press inclinado con barra", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Dominadas asistidas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Zancadas caminando", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Curl inclinado en banco", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 3, "name": "Extensión sobre cabeza en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Full Body C",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Prensa con pies bajos", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press en máquina convergente", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Remo en polea sentado", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Elevación de talones sentado", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Elevaciones de piernas colgado", "reps": "10-15 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Full Body A",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "Sentadilla frontal", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Press en máquina convergente", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Remo con mancuerna a una mano", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 1, "name": "Press Arnold", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 2, "name": "Curl femoral en polea", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 3, "name": "Elevaciones laterales en máquina", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Full Body B",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "PM rumano en multipower", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Press inclinado en máquina", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Dominadas lastradas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 1, "name": "Step-up a cajón", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 2, "name": "Curl martillo", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 3, "name": "Press francés con barra Z", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Full Body C",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "Prensa con pausa abajo", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Press banca con barra", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Remo en máquina con apoyo de pecho", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 4, "name": "Talones en prensa", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 1, "name": "Press Pallof", "reps": "30-45 s por lado", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Full Body A",
+              "exercises": [
+                { "circuit": "A", "laps": "6", "order": 1, "name": "Hack en máquina", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 2, "name": "Press banca con pausa abajo", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 3, "name": "Remo gironda en polea", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 1, "name": "Press militar en máquina", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 2, "name": "Curl nórdico excéntrico", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 3, "name": "Elevación lateral sentada", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Full Body B",
+              "exercises": [
+                { "circuit": "A", "laps": "6", "order": 1, "name": "PM rumano con déficit", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 2, "name": "Press inclinado en multipower", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 3, "name": "Jalón unilateral", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 1, "name": "Prensa a una pierna", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 2, "name": "Curl en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 3, "name": "Fondos en máquina", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Full Body C",
+              "exercises": [
+                { "circuit": "A", "laps": "6", "order": 1, "name": "Sentadilla en multipower con pausa", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 2, "name": "Press plano en multipower", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 3, "name": "Remo en polea con cuerda", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 4, "name": "Talones en máquina (donkey)", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 1, "name": "Rueda abdominal", "reps": "8-12 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "5dias",
+      "title": "DÍAS MIXTOS, SIN SEGMENTAR TREN SUPERIOR/INFERIOR (LUNES A VIERNES)",
+      "weeks": [
+        {
+          "number": 1,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Sentadilla con barra", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press de banca", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "Carga 5" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Remo con barra", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Elevación de talones de pie", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Curl femoral tumbado", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Face pull", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "martes",
+              "title": "Mixto · accesorios",
+              "exercises": [
+                { "circuit": "A", "laps": "3", "order": 1, "name": "Press militar", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 2, "name": "Elevaciones laterales", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 3, "name": "Curl de bíceps con barra", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 4, "name": "Extensión de tríceps en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 5, "name": "Plancha / rueda abdominal", "reps": "30-45 s", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Peso muerto rumano", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Jalón al pecho", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Prensa profunda", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Press inclinado con mancuernas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Remo en polea baja", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Elevaciones de piernas colgado", "reps": "10-15 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "jueves",
+              "title": "Mixto · accesorios y core",
+              "exercises": [
+                { "circuit": "A", "laps": "3", "order": 1, "name": "Zancadas búlgaras", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 2, "name": "Pájaros con mancuernas", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 3, "name": "Plancha / rueda abdominal", "reps": "30-45 s", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 4, "name": "Elevación de talones sentado", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Mixto · empuje, tirón y brazos",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Press banca con mancuernas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Remo en polea baja", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Elevaciones laterales en polea", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Curl inclinado en banco", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Extensión sobre cabeza en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 2,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Sentadilla en multipower", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Press banca con mancuernas", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Remo en máquina con apoyo de pecho", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Elevación de talones sentado", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Curl femoral sentado", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Face pull con banda", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "martes",
+              "title": "Mixto · accesorios",
+              "exercises": [
+                { "circuit": "A", "laps": "3", "order": 1, "name": "Press militar con mancuernas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 2, "name": "Elevaciones laterales en máquina", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 3, "name": "Curl inclinado en banco", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 4, "name": "Extensión sobre cabeza en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 5, "name": "Rueda abdominal", "reps": "8-12 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "PM rumano con mancuernas", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Dominadas asistidas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Prensa con pies bajos", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Press inclinado con barra", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Remo en polea sentado", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Elevaciones de piernas colgado", "reps": "10-15 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "jueves",
+              "title": "Mixto · accesorios y core",
+              "exercises": [
+                { "circuit": "A", "laps": "3", "order": 1, "name": "Zancadas caminando", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 2, "name": "Cruzamientos invertidos en máquina", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 3, "name": "Press Pallof", "reps": "30-45 s por lado", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "3", "order": 4, "name": "Talones en prensa", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Mixto · empuje, tirón y brazos",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Press en máquina convergente", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Remo en polea sentado", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Elevaciones laterales en máquina", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 1, "name": "Curl martillo", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "3", "order": 2, "name": "Press francés con barra Z", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 3,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "Sentadilla frontal", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Press en máquina convergente", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Remo con mancuerna a una mano", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 4, "name": "Talones en prensa", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 1, "name": "Curl femoral en polea", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 2, "name": "Pájaros con mancuernas", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "martes",
+              "title": "Mixto · accesorios",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Press Arnold", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Elevación lateral sentada", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Curl en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Fondos en máquina", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 5, "name": "Plancha / rueda abdominal", "reps": "30-45 s", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "PM rumano en multipower", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Dominadas lastradas", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Prensa con pausa abajo", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 4, "name": "Press inclinado en máquina", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 1, "name": "Remo en máquina con apoyo de pecho", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 2, "name": "Rueda abdominal", "reps": "8-12 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "jueves",
+              "title": "Mixto · accesorios y core",
+              "exercises": [
+                { "circuit": "A", "laps": "4", "order": 1, "name": "Step-up a cajón", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 2, "name": "Face pull con banda", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 3, "name": "Plancha / rueda abdominal", "reps": "30-45 s", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "4", "order": 4, "name": "Elevación de talones de pie", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Mixto · empuje, tirón y brazos",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "Press banca con barra", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Remo en polea con cuerda", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Elevaciones laterales con mancuernas", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 1, "name": "Curl de bíceps con barra", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "4", "order": 2, "name": "Extensión de tríceps en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        },
+        {
+          "number": 4,
+          "days": [
+            {
+              "id": "lunes",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "6", "order": 1, "name": "Hack en máquina", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 2, "name": "Press banca con pausa abajo", "reps": "6-8", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 3, "name": "Remo gironda en polea", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 4, "name": "Talones en máquina (donkey)", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 1, "name": "Curl nórdico excéntrico", "reps": "10-15", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 2, "name": "Cruzamientos invertidos en máquina", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "martes",
+              "title": "Mixto · accesorios",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "Press militar en máquina", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Elevaciones laterales en polea", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Curl martillo", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 4, "name": "Press francés con barra Z", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 5, "name": "Rueda abdominal", "reps": "8-12 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "miercoles",
+              "title": "Mixto · básicos pesados",
+              "exercises": [
+                { "circuit": "A", "laps": "6", "order": 1, "name": "PM rumano con déficit", "reps": "8-10", "rir": "-", "rest": "3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 2, "name": "Jalón unilateral", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 3, "name": "Sentadilla en multipower con pausa", "reps": "10-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 4, "name": "Press inclinado en multipower", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 1, "name": "Remo en polea con cuerda", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 2, "name": "Elevaciones de piernas colgado", "reps": "10-15 reps por ronda", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "jueves",
+              "title": "Mixto · accesorios y core",
+              "exercises": [
+                { "circuit": "A", "laps": "5", "order": 1, "name": "Prensa a una pierna", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 2, "name": "Pájaros con mancuernas", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 3, "name": "Press Pallof", "reps": "30-45 s por lado", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "A", "laps": "5", "order": 4, "name": "Elevación de talones sentado", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            },
+            {
+              "id": "viernes",
+              "title": "Mixto · empuje, tirón y brazos",
+              "exercises": [
+                { "circuit": "A", "laps": "6", "order": 1, "name": "Press plano en multipower", "reps": "8-12", "rir": "-", "rest": "2-3 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 2, "name": "Remo en polea sentado", "reps": "10-12", "rir": "-", "rest": "2 min", "notes": "-" },
+                { "circuit": "A", "laps": "6", "order": 3, "name": "Elevaciones laterales en máquina", "reps": "12-20", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 1, "name": "Curl en polea", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" },
+                { "circuit": "B", "laps": "5", "order": 2, "name": "Fondos en máquina", "reps": "10-15", "rir": "-", "rest": "90 s", "notes": "-" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "extras": [
+    "Ajuste de dosis: 3 días = 68 ejercicios totales (17 por semana); 5 días = 104 ejercicios totales (26 por semana).",
+    "Progresión: doble progresión. Al alcanzar el tope de reps en todas las vueltas con buena técnica, subir 2.5 kg o 1 rep la semana siguiente.",
+    "Circuito: alternar patrones antagonistas (empuje+tirón, cuádriceps+femoral) para que un grupo recupere mientras el otro trabaja.",
+    "Descansos: entre ejercicios del circuito 60-90 s; entre circuitos 2-3 min.",
+    "RIR: gestionado automáticamente por semana; no se escribe en el plan.",
+    "Deload: si bajas de reps/peso en básicos 2 sesiones seguidas, dolor articular creciente o técnica degradada, aplicar semana de descarga con mitad de vueltas y RIR 4-5.",
+    "Recuperación: creatina 3-5 g/día, proteína 1.6-2.2 g/kg/día, sueño 7-9 h.",
+    "Press de banca: carga 5 (según indicación).",
+    "Sin columnas de registro: el seguimiento de pesos y reps se hace fuera del plan."
+  ]
+}

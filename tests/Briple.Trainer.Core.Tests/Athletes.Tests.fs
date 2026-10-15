@@ -51,7 +51,7 @@ let tests =
         Name = "Prueba"
         Gender = Female
         Variants = [ "4dias" ]
-        Goals = [ "fuerza" ]
+        Goals = [ Strength ]
         Focus = [ "glúteo" ]
       }
 

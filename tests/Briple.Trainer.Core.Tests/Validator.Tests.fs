@@ -29,6 +29,7 @@ let private man = {
 }
 
 let private brief = {
+  Goal = Hypertrophy
   Adjustments = []
   Focus = []
   RirPerWeek = [ (1, "3"); (2, "2-3"); (4, "1") ]

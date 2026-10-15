@@ -127,11 +127,39 @@ let prescriptionText =
 
 let evidenceText =
   """EVIDENCE-BASED TRAINING:
-- Every exercise must serve a clear purpose for this athlete, backed by current strength and conditioning evidence: specificity, progressive overload, volume landmarks, fatigue management.
+- Every exercise must serve a clear purpose for this athlete, backed by current strength and conditioning evidence: specificity, progressive overload, fatigue management.
 - Educated guesses are acceptable where evidence is thin. Uninformed choices are not.
 - Do not force high-skill or high-risk techniques the athlete has not earned. Prefer joint-friendly, coachable progressions with a good risk/benefit ratio for this athlete.
 - If you cannot state why an exercise helps this athlete, replace it with one you can justify.
 TRAINER EXCEPTIONS: the trainer is the health expert for this athlete and does not need to justify a prescription. When a trainer exception prescribes a technique, follow it. In that exercise's notas, record that it is trainer-prescribed and state the evidence-based reason why it is not generally suggested."""
+
+let goalEvidence goal =
+  match goal with
+  | Hypertrophy ->
+    """GOAL: HYPERTROPHY
+- Build muscle: 10-20 weekly sets per muscle group, most work in the 6-15 rep range, sets taken within 0-3 reps of failure.
+- Rotate exercise variants weekly while the movement pattern of each day stays fixed.
+- Progress volume and load across the weeks through the circuit laps and the rep ranges."""
+  | Strength ->
+    """GOAL: STRENGTH
+- Build maximal force: 3-6 reps at a high relative load on the main lifts, 3-5 min rests there, most sets 1-3 reps in reserve.
+- Keep technique crisp with heavy loads; treat frequent failure training as a tool, not a default.
+- Progress load across the weeks through the circuit laps and the rep ranges, keeping the movement patterns fixed."""
+  | WeightLoss ->
+    """GOAL: WEIGHT LOSS
+- Preserve muscle in a deficit: resistance training is the core of every session; do not replace it with cardio.
+- Raise energy expenditure with circuit density and short rests, keeping joint-friendly modalities and moderate impact.
+- Prescribe low-impact conditioning by time with an effort zone rather than by reps."""
+  | CardioVascularHealth ->
+    """GOAL: CARDIOVASCULAR HEALTH
+- Build an aerobic base: zone-2 continuous work plus occasional intervals, prescribed by time.
+- Use effort zones (rpe or heart-rate talk-test descriptions) instead of RIR on conditioning work.
+- Keep the resistance training as support for joint and muscle health, joint-friendly and progressive."""
+  | BasicBodyActivation ->
+    """GOAL: BASIC BODY ACTIVATION
+- Reactivate movement patterns: light loads, strict technique, high effort reserves (3+ reps in reserve or a comfortable zone).
+- Keep sessions short, emphasize core control and joint mobility, and never program failure training.
+- Progress gently across the weeks through the circuit laps before touching the rep ranges."""
 
 // variant rotation avoids monotony: the pattern of each day holds and
 // the variant changes week to week
@@ -141,23 +169,34 @@ let variabilityText =
 - The exercise variant changes every week: rotate equipment, grip or angle, so an exercise name never repeats in the same day of the following week.
 - Progress the work across the weeks through the circuit rounds and rep ranges, not by repeating identical exercises."""
 
+let goalName goal =
+  match goal with
+  | Hypertrophy -> "hypertrophy"
+  | Strength -> "strength"
+  | WeightLoss -> "weight loss"
+  | CardioVascularHealth -> "cardiovascular health"
+  | BasicBodyActivation -> "basic body activation"
+
 let athleteText(athlete: Athlete) =
   let gender = Gender.toProtocol athlete.Gender
 
-  let goals = join ", " athlete.Goals
+  let goals = athlete.Goals |> List.map goalName |> join ", "
   let focus = join ", " athlete.Focus
 
   $"Athlete: {athlete.Name} ({gender}). Goals: {goals}. Focus: {focus}."
 
 /// System message for the generation flows: role, schema, prescription
-/// rules, evidence rules, variant rotation and output discipline.
-let system =
+/// rules, evidence rules for the plan's goal, variant rotation and
+/// output discipline.
+let system(goal: PlanGoal) =
   "You are a strength and conditioning coach who writes training plans.\n\n"
   + schemaText
   + "\n\n"
   + prescriptionText
   + "\n\n"
   + evidenceText
+  + "\n\n"
+  + goalEvidence goal
   + "\n\n"
   + variabilityText
   + "\n\nRespond with the JSON only: no markdown, no extra text."

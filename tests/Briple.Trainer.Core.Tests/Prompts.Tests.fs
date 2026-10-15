@@ -23,11 +23,12 @@ let private man = {
   Name = "Pepe"
   Gender = Male
   Variants = [ "3dias"; "5dias" ]
-  Goals = [ "fuerza" ]
+  Goals = [ Strength ]
   Focus = [ "gluteo" ]
 }
 
 let private brief = {
+  Goal = Hypertrophy
   Adjustments = []
   Focus = []
   RirPerWeek = [ (1, "3"); (2, "2-3"); (4, "1") ]
@@ -67,34 +68,61 @@ let tests =
         Expect.stringContains prompt "FORBIDDEN" "the prohibitions travel"
 
         Expect.stringContains
-          system
+          (system Hypertrophy)
           "RESPONSE SCHEMA"
           "the system carries the json schema"
 
         Expect.stringContains
-          system
+          (system Hypertrophy)
           "\"exercises\": ["
           "the schema declares the exercises"
 
         Expect.stringContains
-          system
+          (system Hypertrophy)
           "EVIDENCE-BASED TRAINING"
           "the system demands evidence"
 
         Expect.stringContains
-          system
+          (system Hypertrophy)
           "VARIANT ROTATION"
           "the system demands variant rotation"
 
         Expect.stringContains
-          system
+          (system Hypertrophy)
           "an exercise name never repeats in the same day of the following week"
           "the rotation is between consecutive weeks"
 
         Expect.stringContains
-          system
+          (system Hypertrophy)
           "Respond with the JSON only"
           "the output instruction goes in the system")
+
+    testCase "the goal selects the evidence block" (fun () ->
+      Expect.stringContains
+        (system Hypertrophy)
+        "GOAL: HYPERTROPHY"
+        "hypertrophy block"
+
+      Expect.stringContains
+        (system WeightLoss)
+        "GOAL: WEIGHT LOSS"
+        "weight loss block"
+
+      Expect.stringContains
+        (system CardioVascularHealth)
+        "GOAL: CARDIOVASCULAR HEALTH"
+        "cardio block"
+
+      Expect.stringContains
+        (system BasicBodyActivation)
+        "GOAL: BASIC BODY ACTIVATION"
+        "activation block"
+
+      Expect.stringContains (system Strength) "GOAL: STRENGTH" "strength block"
+
+      Expect.isFalse
+        ((system WeightLoss).Contains "GOAL: HYPERTROPHY")
+        "goals do not mix")
 
     testCase
       "the adjustment prompt carries the counts and the previous plan"
@@ -170,7 +198,7 @@ let tests =
           "it demands the indicative in the notes"
 
         Expect.stringContains
-          system
+          (system Hypertrophy)
           "TRAINER EXCEPTIONS: the trainer is the health expert"
           "the system yields to the prescription")
 

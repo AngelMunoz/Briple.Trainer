@@ -149,7 +149,8 @@ let run
 /// writes the format.
 let generateNew (client: IChatClient) (request: NewPlanRequest) : Task<Run> =
   task {
-    let! response = ask client system (newPlanPrompt request)
+    let! response =
+      ask client (system request.Brief.Goal) (newPlanPrompt request)
 
     return
       run
@@ -167,7 +168,8 @@ let generateAdjustment
   (client: IChatClient)
   (request: AdjustmentRequest)
   : Task<Run> = task {
-  let! response = ask client system (adjustmentPrompt request)
+  let! response =
+    ask client (system request.Brief.Goal) (adjustmentPrompt request)
 
   return
     run

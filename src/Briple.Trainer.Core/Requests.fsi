@@ -10,9 +10,10 @@ open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Parameters
 
-/// The trainer's brief: loose adjustments, focus, RIR per week and the
-/// variants to generate (a subset of the athlete's).
+/// The trainer's brief: the plan's goal, loose adjustments, focus, RIR
+/// per week and the variants to generate (a subset of the athlete's).
 type Brief = {
+  Goal: PlanGoal
   Adjustments: (Target * Delta list) list
   Focus: string list
   RirPerWeek: (int * string) list

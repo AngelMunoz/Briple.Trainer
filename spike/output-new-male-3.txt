@@ -1,0 +1,282 @@
+#start plan v1
+#meta titulo Fuerza y acondicionamiento — Bloque de 4 semanas (opciones de 3 y 5 días)
+#meta semanas 4
+#meta generado 2026-10-14
+#meta origen Plan elaborado para un atleta hombre sin limitaciones declaradas, con objetivo de fuerza y masa muscular; 4 semanas de progresión con RIR descendente y rotación semanal de variantes.
+#start genero hombre
+#start opcion 3dias
+#meta titulo Opción 3 días — Cuerpo completo
+#start semana 1
+#start dia lunes
+#meta titulo Lunes — Cuerpo completo A: empuje dominante
+#ej A|3|1|Press de banca|6-8|3|3 min|Carga fijada en 5 (5% de tu carga habitual registrada en la app). Escápulas retraídas, pies firmes y barra al esternón con control.
+#ej A|3|2|Sentadilla trasera con barra|6-8|3|3 min|-
+#ej A|3|3|Press militar de pie con barra|6-8|3|2-3 min|Aprieta glúteos y abdomen para no arquear la zona lumbar.
+#ej B|2|4|Remo con barra a 45°|8-10|3|2-3 min|Tronco a unos 45°; sin tirones de cadera.
+#ej B|2|5|Peso muerto rumano con barra|8-10|3|2-3 min|Bisagra de cadera con la barra pegada a las piernas.
+#ej B|2|6|Plancha frontal|30-45 s|rpe 6-7|60 s|Cadera neutra y glúteos activos.
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Cuerpo completo B: tirón y cadera
+#ej A|3|1|Jalón al pecho con agarre prono|8-10|3|2 min|-
+#ej A|3|2|Peso muerto convencional con barra|5-6|3|3 min|Barra pegada al cuerpo y espalda neutra.
+#ej A|3|3|Press inclinado con mancuernas|8-10|3|2-3 min|Banco a 30°; sin chocar las mancuernas arriba.
+#ej B|2|4|Zancadas caminando con mancuernas|8-10|3|2 min|Por lado.
+#ej B|2|5|Face pull en polea|12-15|3|60-90 s|Codos a la altura de los hombros.
+#ej B|2|6|Pallof press con banda|10-12|3|60 s|Por lado; sin rotar el tronco.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Cuerpo completo C: pierna y accesorios
+#ej A|3|1|Prensa de piernas en máquina|10-12|3|2-3 min|-
+#ej A|3|2|Curl femoral tumbado en máquina|12-15|3|90 s|-
+#ej A|3|3|Remo en polea baja con agarre neutro|10-12|3|2 min|-
+#ej B|2|4|Jalón al pecho con agarre supino|10-12|3|2 min|-
+#ej B|2|5|Curl con barra EZ|10-12|3|60-90 s|Sin balanceo del tronco.
+#ej B|2|6|Extensión de tríceps en polea con cuerda|12-15|3|60 s|-
+#end dia
+#end semana
+#start semana 2
+#start dia lunes
+#meta titulo Lunes — Cuerpo completo A: empuje dominante
+#ej A|3|1|Press de banca con mancuernas|8-10|2-3|3 min|Codos a 45° del tronco.
+#ej A|3|2|Sentadilla goblet con mancuerna|8-10|2-3|2-3 min|Tronco vertical; codos dentro de las rodillas.
+#ej A|3|3|Press de hombros sentado con mancuernas|8-10|2-3|2 min|Espalda apoyada en el respaldo.
+#ej B|2|4|Remo con mancuerna a una mano|10-12|2-3|2 min|Por lado; apoya mano y rodilla en el banco.
+#ej B|2|5|Peso muerto rumano con mancuernas|10-12|2-3|2 min|Bisagra de cadera; rodillas ligeramente flexionadas.
+#ej B|2|6|Bicho muerto|8-10|2-3|60 s|Por lado; lumbar pegada al suelo.
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Cuerpo completo B: tirón y cadera
+#ej A|3|1|Dominadas asistidas con banda|6-8|2-3|2-3 min|La banda asiste; sin balanceo.
+#ej A|3|2|Peso muerto con barra hexagonal|6-8|2-3|3 min|Empuje con las piernas y cadera neutra.
+#ej A|3|3|Press inclinado en máquina|10-12|2-3|2 min|-
+#ej B|2|4|Sentadilla búlgara con mancuernas|8-10|2-3|2 min|Por lado; pie trasero elevado.
+#ej B|2|5|Pájaros con mancuernas|12-15|2-3|60-90 s|Sin impulso; pausa arriba de 1 s.
+#ej B|2|6|Paseo del granjero a una mano|30-40 s|rpe 6-7|60 s|Por lado; hombros nivelados y sin inclinar el tronco.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Cuerpo completo C: pierna y accesorios
+#ej A|3|1|Sentadilla hack en máquina|10-12|2-3|2-3 min|-
+#ej A|3|2|Hiperextensión en banco a 45°|10-12|2-3|90 s|Sin hiperextender la zona lumbar al final.
+#ej A|3|3|Remo unilateral en polea alta|10-12|2-3|2 min|Por lado.
+#ej B|2|4|Dominadas asistidas en máquina|6-8|2-3|2 min|-
+#ej B|2|5|Curl con mancuernas alterno|10-12|2-3|60-90 s|Supina la muñeca al subir.
+#ej B|2|6|Press francés con barra EZ|10-12|2-3|60-90 s|Codos fijos; bajada controlada.
+#end dia
+#end semana
+#start semana 3
+#start dia lunes
+#meta titulo Lunes — Cuerpo completo A: empuje dominante
+#ej A|4|1|Press de banca inclinado con barra|6-8|2|3 min|Banco a 30°; toca la parte alta del pecho.
+#ej A|4|2|Sentadilla frontal con barra|6-8|2|3 min|Codos altos y tronco vertical.
+#ej A|4|3|Press Arnold con mancuernas|8-10|2|2 min|Rotación fluida; sin arquear la lumbar.
+#ej B|3|4|Remo en máquina con apoyo de pecho|8-10|2|2 min|-
+#ej B|3|5|Curl femoral sentado en máquina|10-12|2|90 s|-
+#ej B|3|6|Rueda abdominal|8-10|2|60 s|Sin arquear la lumbar; usa el rango que controles.
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Cuerpo completo B: tirón y cadera
+#ej A|4|1|Jalón al pecho con agarre neutro|8-10|2|2 min|-
+#ej A|4|2|Peso muerto desde bloques con barra|5-6|2|3 min|Bloques a la altura de la rodilla; empuja con las piernas.
+#ej A|4|3|Press inclinado con barra|6-8|2|2-3 min|-
+#ej B|3|4|Subida al cajón con mancuernas|8-10|2|90 s|Por lado; caja a la altura de la rodilla.
+#ej B|3|5|Pájaro en máquina|12-15|2|60-90 s|Pecho apoyado; sin balanceo.
+#ej B|3|6|Pallof press en polea|10-12|2|60 s|Por lado; presión constante sobre la polea.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Cuerpo completo C: pierna y accesorios
+#ej A|4|1|Sentadilla en máquina Smith|6-8|2|2-3 min|-
+#ej A|4|2|Curl nórdico asistido con banda|4-6|2|2 min|Excéntrica de 3 s; la banda asiste la subida.
+#ej A|4|3|Remo en barra T|8-10|2|2 min|Tronco firme; sin rebote.
+#ej B|3|4|Jalón unilateral en polea alta|10-12|2|90 s|Por lado.
+#ej B|3|5|Curl martillo con mancuernas|10-12|2|60-90 s|Agarre neutro; codos quietos.
+#ej B|3|6|Extensión de tríceps sobre la cabeza en polea|12-15|2|60 s|-
+#end dia
+#end semana
+#start semana 4
+#start dia lunes
+#meta titulo Lunes — Cuerpo completo A: empuje dominante
+#ej A|4|1|Press de banca con agarre cerrado|4-6|1|3 min|Agarre a la anchura de los hombros; codos cerca del tronco.
+#ej A|4|2|Sentadilla con barra a caja|4-6|1|3 min|Caja a la altura del paralelo; pausa breve y controlada.
+#ej A|4|3|Press militar sentado con barra|6-8|1|2-3 min|Usa jaula con topes si entrenas cerca del fallo.
+#ej B|3|4|Remo invertido en barra baja|8-10|1|2 min|Ajusta el ángulo del cuerpo para regular la dificultad.
+#ej B|3|5|Peso muerto a una pierna con mancuerna|8-10|1|2 min|Por lado; cadera estable y sin rotar.
+#ej B|3|6|Elevación de rodillas en paralelas|10-12|1|60 s|Sin balanceo; sube con el abdomen.
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Cuerpo completo B: tirón y cadera
+#ej A|4|1|Dominadas negativas con salto|3-5|1|2-3 min|Salta para subir y baja en 4-5 s.
+#ej A|4|2|Buenos días con barra|8-10|1|3 min|Empieza ligero; técnica estricta y espalda neutra.
+#ej A|4|3|Fondos en anillas|6-8|1|2 min|Si no controlas el rango, usa banda de asistencia.
+#ej B|3|4|Zancada inversa con mancuernas|8-10|1|2 min|Por lado.
+#ej B|3|5|Face pull con banda|15-20|1|60 s|Aprieta 1 s al final del recorrido.
+#ej B|3|6|Pallof press arrodillado con banda|10-12|1|60 s|Por lado; sin rotar el tronco.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Cuerpo completo C: pierna y accesorios
+#ej A|4|1|Sentadilla con barra pausada en el fondo|4-6|1|3 min|2 s de pausa abajo; usa jaula con topes.
+#ej A|4|2|Peso muerto rumano con barra hexagonal|8-10|1|2 min|-
+#ej A|4|3|Remo landmine a una mano|8-10|1|2 min|Por lado; tronco firme.
+#ej B|3|4|Dominadas con banda fina|4-6|1|2-3 min|La banda solo quita algo de peso corporal.
+#ej B|3|5|Curl en banco inclinado con mancuernas|8-10|1|60-90 s|Brazos detrás de la línea del tronco.
+#ej B|3|6|Fondos en banco para tríceps|10-12|1|60-90 s|Hombros lejos de las orejas; baja hasta 90° de codo.
+#end dia
+#end semana
+#end opcion
+#start opcion 5dias
+#meta titulo Opción 5 días — Torso/pierna con día de accesorios
+#start semana 1
+#start dia lunes
+#meta titulo Lunes — Torso: empuje
+#ej A|3|1|Press de banca|6-8|3|3 min|Carga fijada en 5 (5% de tu carga habitual registrada en la app). Escápulas retraídas y barra al esternón con control.
+#ej A|3|2|Press militar de pie con barra|6-8|3|2-3 min|Aprieta glúteos y abdomen para no arquear la zona lumbar.
+#ej B|2|3|Press inclinado con mancuernas|8-10|3|2-3 min|Banco a 30°.
+#ej B|2|4|Extensión de tríceps en polea con cuerda|12-15|3|60 s|-
+#end dia
+#start dia martes
+#meta titulo Martes — Pierna: dominante de rodilla
+#ej A|3|1|Sentadilla trasera con barra|6-8|3|3 min|-
+#ej A|3|2|Zancadas caminando con mancuernas|8-10|3|2 min|Por lado.
+#ej A|3|3|Curl femoral tumbado en máquina|12-15|3|90 s|-
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Torso: tirón
+#ej A|3|1|Jalón al pecho con agarre prono|8-10|3|2 min|-
+#ej A|3|2|Remo con barra a 45°|8-10|3|2-3 min|Sin tirones de cadera.
+#ej B|2|3|Face pull en polea|12-15|3|60-90 s|Codos a la altura de los hombros.
+#ej B|2|4|Curl con barra EZ|10-12|3|60-90 s|Sin balanceo del tronco.
+#end dia
+#start dia jueves
+#meta titulo Jueves — Pierna: dominante de cadera y core
+#ej A|3|1|Peso muerto rumano con barra|6-8|3|3 min|Bisagra de cadera; barra pegada a las piernas.
+#ej A|3|2|Hip thrust con barra|8-10|3|2 min|Aprieta glúteos arriba y mantén la costilla abajo.
+#ej A|3|3|Plancha frontal|30-45 s|rpe 6-7|60 s|Cadera neutra y glúteos activos.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Hombro, core y accesorios
+#ej A|3|1|Jalón al pecho con agarre supino|10-12|3|2 min|-
+#ej B|2|2|Elevaciones laterales con mancuernas|12-15|3|60 s|Sube con los codos, no con las manos.
+#ej B|2|3|Pallof press con banda|10-12|3|60 s|Por lado; sin rotar el tronco.
+#ej B|2|4|Elevación de gemelos de pie en máquina|12-15|3|60 s|Pausa de 1 s arriba y estiramiento abajo.
+#end dia
+#end semana
+#start semana 2
+#start dia lunes
+#meta titulo Lunes — Torso: empuje
+#ej A|3|1|Press de banca con mancuernas|8-10|2-3|3 min|Codos a 45° del tronco.
+#ej A|3|2|Press de hombros sentado con mancuernas|8-10|2-3|2 min|Espalda apoyada en el respaldo.
+#ej B|2|3|Press inclinado en máquina|10-12|2-3|2 min|-
+#ej B|2|4|Press francés con barra EZ|10-12|2-3|60-90 s|Codos fijos; bajada controlada.
+#end dia
+#start dia martes
+#meta titulo Martes — Pierna: dominante de rodilla
+#ej A|3|1|Sentadilla goblet con mancuerna|8-10|2-3|2-3 min|Tronco vertical; codos dentro de las rodillas.
+#ej A|3|2|Sentadilla búlgara con mancuernas|8-10|2-3|2 min|Por lado; pie trasero elevado.
+#ej A|3|3|Extensión de cuádriceps en máquina|12-15|2-3|90 s|-
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Torso: tirón
+#ej A|3|1|Dominadas asistidas con banda|6-8|2-3|2-3 min|La banda asiste; sin balanceo.
+#ej A|3|2|Remo con mancuerna a una mano|8-10|2-3|2 min|Por lado; apoya mano y rodilla en el banco.
+#ej B|2|3|Pájaros con mancuernas|12-15|2-3|60-90 s|Sin impulso; pausa arriba de 1 s.
+#ej B|2|4|Curl con mancuernas alterno|10-12|2-3|60-90 s|Supina la muñeca al subir.
+#end dia
+#start dia jueves
+#meta titulo Jueves — Pierna: dominante de cadera y core
+#ej A|3|1|Peso muerto rumano con mancuernas|8-10|2-3|2-3 min|Bisagra de cadera; rodillas ligeramente flexionadas.
+#ej A|3|2|Hip thrust a una pierna|10-12|2-3|90 s|Por lado; pelvis nivelada.
+#ej A|3|3|Rueda abdominal|8-10|2-3|60 s|Sin arquear la lumbar.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Hombro, core y accesorios
+#ej A|3|1|Dominadas asistidas en máquina|6-8|2-3|2 min|-
+#ej B|2|2|Elevaciones laterales en polea|12-15|2-3|60 s|Por lado; tensión constante.
+#ej B|2|3|Paseo del granjero a una mano|30-40 s|rpe 6-7|60 s|Por lado; hombros nivelados y sin inclinar el tronco.
+#ej B|2|4|Elevación de gemelos sentado|15-20|2-3|60 s|Pausa de 1 s arriba.
+#end dia
+#end semana
+#start semana 3
+#start dia lunes
+#meta titulo Lunes — Torso: empuje
+#ej A|4|1|Press de banca inclinado con barra|6-8|2|3 min|Banco a 30°; toca la parte alta del pecho.
+#ej A|4|2|Press Arnold con mancuernas|8-10|2|2 min|Rotación fluida; sin arquear la lumbar.
+#ej B|3|3|Press inclinado con barra|6-8|2|2-3 min|-
+#ej B|3|4|Extensión de tríceps sobre la cabeza en polea|12-15|2|60 s|-
+#end dia
+#start dia martes
+#meta titulo Martes — Pierna: dominante de rodilla
+#ej A|4|1|Sentadilla frontal con barra|6-8|2|3 min|Codos altos y tronco vertical.
+#ej A|4|2|Subida al cajón con mancuernas|8-10|2|90 s|Por lado; caja a la altura de la rodilla.
+#ej A|4|3|Curl femoral sentado en máquina|12-15|2|90 s|-
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Torso: tirón
+#ej A|4|1|Jalón al pecho con agarre neutro|8-10|2|2 min|-
+#ej A|4|2|Remo en máquina con apoyo de pecho|8-10|2|2 min|-
+#ej B|3|3|Pájaro en máquina|12-15|2|60-90 s|Pecho apoyado; sin balanceo.
+#ej B|3|4|Curl martillo con mancuernas|10-12|2|60-90 s|Agarre neutro; codos quietos.
+#end dia
+#start dia jueves
+#meta titulo Jueves — Pierna: dominante de cadera y core
+#ej A|4|1|Peso muerto con barra hexagonal|6-8|2|3 min|Empuja con las piernas y mantén la cadera neutra.
+#ej A|4|2|Empuje de cadera en máquina|10-12|2|2 min|Aprieta glúteos arriba; costilla abajo.
+#ej A|4|3|Elevación de rodillas colgado|10-12|2|60 s|Sin balanceo; sube con el abdomen.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Hombro, core y accesorios
+#ej A|4|1|Jalón unilateral en polea alta|10-12|2|90 s|Por lado.
+#ej B|3|2|Elevaciones laterales con banda|15-20|2|60 s|Sube con los codos, no con las manos.
+#ej B|3|3|Pallof press en polea|10-12|2|60 s|Por lado; presión constante sobre la polea.
+#ej B|3|4|Elevación de gemelos a una pierna con mancuerna|12-15|2|60 s|Por lado; apóyate para mantener el equilibrio.
+#end dia
+#end semana
+#start semana 4
+#start dia lunes
+#meta titulo Lunes — Torso: empuje
+#ej A|4|1|Press de banca con agarre cerrado|4-6|1|3 min|Agarre a la anchura de los hombros; usa topes si entrenas cerca del fallo.
+#ej A|4|2|Press militar sentado con barra|6-8|1|2-3 min|Usa jaula con topes si entrenas cerca del fallo.
+#ej B|3|3|Fondos en paralelas con lastre|6-8|1|2 min|Hombros lejos de las orejas; baja hasta 90° de codo.
+#ej B|3|4|Fondos en banco para tríceps|10-12|1|60-90 s|Sin encoger los hombros.
+#end dia
+#start dia martes
+#meta titulo Martes — Pierna: dominante de rodilla
+#ej A|4|1|Sentadilla con barra a caja|4-6|1|3 min|Caja a la altura del paralelo; pausa breve y controlada.
+#ej A|4|2|Zancada inversa con mancuernas|8-10|1|2 min|Por lado.
+#ej A|4|3|Curl nórdico asistido con banda|4-6|1|2 min|Excéntrica de 3 s; la banda asiste la subida.
+#end dia
+#start dia miercoles
+#meta titulo Miércoles — Torso: tirón
+#ej A|4|1|Dominadas negativas con salto|3-5|1|2-3 min|Salta para subir y baja en 4-5 s.
+#ej A|4|2|Remo invertido en barra baja|8-10|1|2 min|Ajusta el ángulo del cuerpo para regular la dificultad.
+#ej B|3|3|Face pull con banda|15-20|1|60 s|Aprieta 1 s al final del recorrido.
+#ej B|3|4|Curl en banco inclinado con mancuernas|8-10|1|60-90 s|Brazos detrás de la línea del tronco.
+#end dia
+#start dia jueves
+#meta titulo Jueves — Pierna: dominante de cadera y core
+#ej A|4|1|Peso muerto convencional con barra|4-6|1|3 min|Barra pegada al cuerpo; espalda neutra y topes en la jaula.
+#ej A|4|2|Peso muerto a una pierna con mancuerna|8-10|1|2 min|Por lado; cadera estable y sin rotar.
+#ej A|4|3|Plancha frontal con lastre|30-45 s|rpe 8|60 s|Cadera neutra; si la lumbar cae, retira el lastre.
+#end dia
+#start dia viernes
+#meta titulo Viernes — Hombro, core y accesorios
+#ej A|4|1|Dominadas con banda fina|4-6|1|2-3 min|La banda solo quita algo de peso corporal.
+#ej B|3|2|Elevaciones laterales en máquina|12-15|1|60 s|Sin balanceo del tronco.
+#ej B|3|3|Pallof press arrodillado con banda|10-12|1|60 s|Por lado; sin rotar el tronco.
+#ej B|3|4|Elevación de gemelos en prensa|12-15|1|60 s|Rango completo; pausa de 1 s arriba.
+#end dia
+#end semana
+#end opcion
+#end genero
+#x Antes de cada sesión: 8-10 min de calentamiento general, movilidad específica del primer patrón y 2-3 series de aproximación en el primer ejercicio de cada circuito.
+#x Registra cada serie en la app: las cargas de la semana siguiente se calculan a partir de cómo cierras la última repetición de cada ejercicio.
+#x Si una sesión se alarga, recorta primero el circuito de accesorios: el trabajo principal es el que sostiene la progresión.
+#x Cuando dudes entre subir peso o completar las repeticiones prescritas, prioriza completar con técnica limpia; la carga sube después.
+#x Detén la serie si la técnica se degrada claramente: la referencia de esfuerzo es una guía, no una obligación.
+#x En los ejercicios de un solo lado, empieza por el lado débil y ajusta el otro lado a las repeticiones de ese lado.
+#x Duerme 7-9 h y mantén una ingesta proteica de 1,6-2,2 g por kg de peso corporal para sostener la recuperación.
+#x Si aparecen molestias articulares, vuelve a la variante del ejercicio de la semana anterior y reduce una vuelta del circuito hasta que remitan.
+#x mesociclo | Semana 1: objetivo | RIR 3
+#x mesociclo | Semana 2: objetivo | RIR 2-3
+#x mesociclo | Semana 3: objetivo | RIR 2
+#x mesociclo | Semana 4: objetivo | RIR 1
+#end plan

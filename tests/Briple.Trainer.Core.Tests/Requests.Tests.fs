@@ -28,6 +28,7 @@ let private confirmedMemory =
   |> confirm [ Load 5 ]
 
 let private manBrief = {
+  Goal = Hypertrophy
   Adjustments = []
   Focus = []
   RirPerWeek = [ (1, "3"); (2, "2-3"); (3, "2"); (4, "1") ]

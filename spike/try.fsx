@@ -131,6 +131,7 @@ let man = athletesOfPlan month1.Plan |> List.find(fun a -> a.Gender = Male)
 let woman = athletesOfPlan month1.Plan |> List.find(fun a -> a.Gender = Female)
 
 let manBrief = {
+  Goal = Hypertrophy
   Adjustments = []
   Focus = []
   RirPerWeek = [ (1, "3"); (2, "2-3"); (3, "2"); (4, "1") ]
@@ -262,7 +263,7 @@ let report label i (run: Run) =
 let generationMode isAdjustment times (profile: Profile) =
   let label = if isAdjustment then "adjust" else "new"
 
-  save "prompt-system.txt" system
+  save "prompt-system.txt" (system Hypertrophy)
 
   let run() =
     if isAdjustment then
@@ -345,7 +346,7 @@ let exceptionMode() =
 
   let request = newRequestOf profile [ exemptionMemory ]
 
-  save "prompt-system.txt" system
+  save "prompt-system.txt" (system Hypertrophy)
   save "prompt-exception.txt" (newPlanPrompt request)
 
   let run =
@@ -413,7 +414,7 @@ let promptMode target =
     if target = "consolidate" then
       consolidationSystem
     else
-      system
+      system Hypertrophy
 
   save "prompt-system.txt" systemText
   save name user
