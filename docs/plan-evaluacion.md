@@ -122,7 +122,7 @@ Pasos fijos antes de generar:
 
 ### F4.5 — Prescripción tipada y objetivos (antes de F5)
 
-- Formato `.briple` y claves JSON intactos: `reps` y `rir` siguen verbatim como fuente de verdad. Core agrega la capa parseada (`Prescription`): dosis como unión (`Reps` | `Timed`) y esfuerzo como unión opcional (`Effort option`: `Rir` | `Rpe` | `Zone`; `None` es "-").
+- Formato `.briple` y claves JSON intactos: `reps` y `rir` siguen verbatim como fuente de verdad. Core agrega la capa parseada (`Prescription`): dosis como unión (`Reps` | `Timed`) y esfuerzo como unión opcional (`Effort voption`: `Rir` | `Rpe` | `Zone`; `ValueNone` es "-").
 - Regla `prescription` del validador, siempre tolerante: no rechaza salidas; los avisos viajan con el veredicto para que la UI marque filas a revisar. Los planes origen traen estos patrones ("8-12 reps por ronda", "30-45 s por lado", `rir "-"` en 56 filas del mes 2) y el ajuste los hereda.
 - Instrucciones al modelo: reps puro (rango o duración, sin calificadores; "por lado" va a notas); `rir` nunca "-" en trabajo por repeticiones; equivalente rpe/zona en trabajo por tiempo; el nombre es un solo ejercicio (alternativas en notas); `load N` es porcentaje de la carga habitual, declarado en el system para que no se interprete como kg.
 - Objetivos: `PlanGoal` (Hypertrophy, WeightLoss, CardioVascularHealth, BasicBodyActivation, Strength) en el atleta y en el brief; el system del prompt pasa a función del objetivo, con bloque de evidencia por objetivo.
