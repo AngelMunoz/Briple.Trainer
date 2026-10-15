@@ -61,8 +61,94 @@ let tests =
       let request = newRequest man [] 4 brief [ ("3dias", 72); ("5dias", 72) ]
 
       match validateNew request (manOutput()) with
-      | Valid plan -> Expect.equal plan.Weeks 4 "the verdict carries the plan"
+      | Valid(plan, _) ->
+        Expect.equal plan.Weeks 4 "the verdict carries the plan"
       | Rejected violations -> failtest $"expected Valid: %A{violations}")
+
+    testCase
+      "the fixture output validates with inherited prescription advisories"
+      (fun () ->
+        let request =
+          newRequest man [] 4 brief [ ("3dias", 72); ("5dias", 72) ]
+
+        match validateNew request (manOutput()) with
+        | Valid(_, advisories) ->
+          Expect.isNonEmpty advisories "the source plan's patterns advise"
+
+          Expect.exists
+            advisories
+            (fun violation -> violation.Detail.Contains "Plancha")
+            "the inherited compound name advises"
+        | Rejected violations -> failtest $"expected Valid: %A{violations}")
+
+    testCase
+      "checkPrescription flags qualifiers, missing effort and compound names"
+      (fun () ->
+        let plan: Plan = {
+          Version = 1
+          Title = "t"
+          Weeks = 1
+          Generated = ""
+          Origin = ""
+          Blocks = [
+            {
+              Gender = Male
+              Variants = [
+                {
+                  Id = "1dia"
+                  Title = None
+                  Weeks = [
+                    {
+                      Number = 1
+                      Days = [
+                        {
+                          Id = "Lunes"
+                          Title = None
+                          Notes = []
+                          Exercises = [
+                            {
+                              Circuit = "A"
+                              Laps = "2"
+                              Order = 1
+                              Name = "Rueda abdominal"
+                              Reps = "8-12 reps por ronda"
+                              Rir = "-"
+                              Rest = "90 s"
+                              Notes = "-"
+                            }
+                            {
+                              Circuit = "A"
+                              Laps = "2"
+                              Order = 2
+                              Name = "Plancha / rueda"
+                              Reps = "30-45 s"
+                              Rir = "1-2"
+                              Rest = "90 s"
+                              Notes = "-"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+          Extras = []
+        }
+
+        let advisories = checkPrescription plan
+
+        Expect.hasLength
+          advisories
+          3
+          "qualifier, missing effort, compound name"
+
+        Expect.isTrue
+          (advisories
+           |> List.forall(fun violation -> violation.Rule = "prescription"))
+          "every advisory carries the prescription rule")
 
     testCase "an output with two blocks is rejected by gender" (fun () ->
       let request = newRequest man [] 4 brief []

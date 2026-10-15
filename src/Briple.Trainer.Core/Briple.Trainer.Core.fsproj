@@ -15,6 +15,8 @@
     <Compile Include="Parser.fs" />
     <Compile Include="Projection.fsi" />
     <Compile Include="Projection.fs" />
+    <Compile Include="Prescription.fsi" />
+    <Compile Include="Prescription.fs" />
     <Compile Include="Athletes.fsi" />
     <Compile Include="Athletes.fs" />
     <Compile Include="Memories.fsi" />

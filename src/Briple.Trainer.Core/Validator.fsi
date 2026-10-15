@@ -11,9 +11,10 @@ open Briple.Trainer.Core.Requests
 /// One violated rule, with the human-readable detail.
 type Violation = { Rule: string; Detail: string }
 
-/// The verdict on an agent output.
+/// The verdict on an agent output. Prescription advisories travel with
+/// a valid verdict and never reject it.
 type Verdict =
-  | Valid of plan: Plan
+  | Valid of plan: Plan * advisories: Violation list
   | Rejected of Violation list
 
 /// Checks a plan of the domain against the parameters of the request:
@@ -25,6 +26,13 @@ val checkParameters:
   counts: (string * int) list ->
   plan: Plan ->
     Violation list
+
+/// Reviews the prescription of every exercise row: one exercise per
+/// name, a pure dose, and an effort target consistent with the dose.
+/// Advisory only: the violations never reject the verdict, because real
+/// source plans carry these patterns and the adjustment flow inherits
+/// them.
+val checkPrescription: plan: Plan -> Violation list
 
 /// Validates the output of a new plan: clean format, one block of the
 /// athlete's gender, their variants, the weeks, the counts and the

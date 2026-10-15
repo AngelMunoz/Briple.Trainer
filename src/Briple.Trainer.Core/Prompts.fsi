@@ -9,7 +9,7 @@ open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 
 /// System message of the generation flows: role, JSON response schema,
-/// fixed rules and variant rotation.
+/// prescription rules, evidence rules and variant rotation.
 val system: string
 
 /// System message of the mark consolidation.

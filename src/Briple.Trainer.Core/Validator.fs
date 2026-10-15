@@ -3,13 +3,14 @@ module Briple.Trainer.Core.Validator
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Projection
+open Briple.Trainer.Core.Prescription
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Requests
 
 type Violation = { Rule: string; Detail: string }
 
 type Verdict =
-  | Valid of plan: Plan
+  | Valid of plan: Plan * advisories: Violation list
   | Rejected of Violation list
 
 let violation rule detail = { Rule = rule; Detail = detail }
@@ -94,6 +95,53 @@ let checkParameters
 
   List.ofSeq violations
 
+/// Reviews the prescription of every exercise row: one exercise per
+/// name, a pure dose, and an effort target consistent with the dose.
+/// Advisory only: the violations never reject the verdict, because real
+/// source plans carry these patterns and the adjustment flow inherits
+/// them.
+let checkPrescription(plan: Plan) : Violation list =
+  let advisories = ResizeArray<Violation>()
+
+  for block in plan.Blocks do
+    for variant in block.Variants do
+      for week in variant.Weeks do
+        for day in week.Days do
+          for exercise in day.Exercises do
+            if exercise.Name.Contains "/" then
+              advisories.Add(
+                violation
+                  "prescription"
+                  $"the name holds more than one exercise: '{exercise.Name}' (alternatives go in notes)"
+              )
+
+            match tryParseDose exercise.Reps with
+            | Error detail -> advisories.Add(violation "prescription" detail)
+            | Ok dose ->
+              match tryParseEffort exercise.Rir with
+              | Error detail -> advisories.Add(violation "prescription" detail)
+              | Ok ValueNone ->
+                match dose with
+                | Reps _ ->
+                  advisories.Add(
+                    violation
+                      "prescription"
+                      $"rep-based exercise without an effort target: '{exercise.Name}'"
+                  )
+                | Timed _ -> ()
+              | Ok(ValueSome(Rir _)) ->
+                match dose with
+                | Timed _ ->
+                  advisories.Add(
+                    violation
+                      "prescription"
+                      $"timed exercise with an RIR target instead of rpe or zone: '{exercise.Name}'"
+                  )
+                | Reps _ -> ()
+              | Ok(ValueSome _) -> ()
+
+  List.ofSeq advisories
+
 let validateCommon athlete weeks brief counts (output: string) =
   match parsePlan output with
   | Error error ->
@@ -108,7 +156,7 @@ let validateCommon athlete weeks brief counts (output: string) =
       checkParameters athlete weeks brief counts parsed.Plan
 
     match formatViolations @ parameterViolations with
-    | [] -> Valid parsed.Plan
+    | [] -> Valid(parsed.Plan, checkPrescription parsed.Plan)
     | violations -> Rejected violations
 
 /// Validates the output of a new plan: clean format, one block of the

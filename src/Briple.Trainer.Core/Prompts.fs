@@ -118,6 +118,13 @@ The notes field uses "-" when it does not apply.
 Do not write mesociclo RIR lines in extras: they are added automatically.
 Write all content (titles, exercise names, reps, rest, notes, extras) in Spanish."""
 
+let prescriptionText =
+  """PRESCRIPTION RULES:
+- reps is either a pure numeric range ("6-8") or a pure duration ("30-45 s", "20 min"). Never append words to it: rounds come from the circuit laps, and per-side work ("por lado") goes in notes.
+- rir is a RIR range for rep-based exercises ("1-2", "2"); never "-". For timed exercises write the effort equivalent instead: "rpe 6-7" or a zone ("zona 2").
+- The exercise name is exactly one exercise; alternatives or progressions go in that exercise's notes.
+- LOAD DELTAS: load N means N percent of the athlete's habitual load for that exercise. The app tracks loads; reflect a load delta only in that exercise's notas when it adds clarity."""
+
 let evidenceText =
   """EVIDENCE-BASED TRAINING:
 - Every exercise must serve a clear purpose for this athlete, backed by current strength and conditioning evidence: specificity, progressive overload, volume landmarks, fatigue management.
@@ -142,11 +149,13 @@ let athleteText(athlete: Athlete) =
 
   $"Athlete: {athlete.Name} ({gender}). Goals: {goals}. Focus: {focus}."
 
-/// System message for the generation flows: role, schema, evidence
-/// rules, variant rotation and output discipline.
+/// System message for the generation flows: role, schema, prescription
+/// rules, evidence rules, variant rotation and output discipline.
 let system =
   "You are a strength and conditioning coach who writes training plans.\n\n"
   + schemaText
+  + "\n\n"
+  + prescriptionText
   + "\n\n"
   + evidenceText
   + "\n\n"

@@ -136,7 +136,7 @@ let run
 
     let verdict =
       match violations with
-      | [] -> Valid plan
+      | [] -> Valid(plan, checkPrescription plan)
       | _ -> Rejected violations
 
     {
