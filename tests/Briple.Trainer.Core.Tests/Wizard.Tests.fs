@@ -15,7 +15,7 @@ open Briple.Trainer.Core.Tests.TestSupport
 
 let private atleta = {
   Nombre = "hombre"
-  Genero = Hombre
+  Genero = Male
   Variantes = [ "3dias"; "5dias" ]
   Metas = []
   Enfasis = []
@@ -77,7 +77,7 @@ let tests =
         "la salida del paso 2 entró al 5"
 
       Expect.equal
-        candidato.Semanas
+        candidato.Weeks
         4
         "la salida del paso 5 entra al 6 con sus warnings"
 

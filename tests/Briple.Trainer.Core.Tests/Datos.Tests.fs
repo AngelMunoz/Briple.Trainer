@@ -58,27 +58,27 @@ let tests =
     testCase "el json valido se convierte al dominio" (fun () ->
       match deJson jsonValido with
       | Ok plan ->
-        Expect.equal plan.Titulo "Plan de prueba" "titulo"
-        Expect.equal plan.Semanas 2 "semanas"
-        Expect.equal plan.Bloques.Length 1 "un bloque"
+        Expect.equal plan.Title "Plan de prueba" "titulo"
+        Expect.equal plan.Weeks 2 "semanas"
+        Expect.equal plan.Blocks.Length 1 "un bloque"
 
-        let bloque = List.head plan.Bloques
+        let bloque = List.head plan.Blocks
 
-        Expect.equal bloque.Genero Hombre "genero convertido"
+        Expect.equal bloque.Gender Male "genero convertido"
 
-        let opcion = List.head bloque.Opciones
+        let opcion = List.head bloque.Variants
 
         Expect.equal opcion.Id "3dias" "opcion"
 
-        let semana = List.head opcion.Semanas
-        let dia = List.head semana.Dias
+        let semana = List.head opcion.Weeks
+        let dia = List.head semana.Days
 
         Expect.equal dia.Id "lunes" "dia en minusculas"
 
-        let ejercicio = List.head dia.Ejercicios
+        let ejercicio = List.head dia.Exercises
 
-        Expect.equal ejercicio.Nombre "Sentadilla" "ejercicio"
-        Expect.equal ejercicio.Orden 1 "orden entero"
+        Expect.equal ejercicio.Name "Sentadilla" "ejercicio"
+        Expect.equal ejercicio.Order 1 "orden entero"
 
         Expect.equal plan.Extras [ "guia | calienta 10 min" ] "extras"
       | Error fallos -> failtest $"se esperaba Ok: %A{fallos}")
@@ -87,7 +87,7 @@ let tests =
       let envuelto = $"{{ \"data\": {JsonSerializer.Serialize jsonValido} }}"
 
       match deJson envuelto with
-      | Ok plan -> Expect.equal plan.Titulo "Plan de prueba" "mismo plan"
+      | Ok plan -> Expect.equal plan.Title "Plan de prueba" "mismo plan"
       | Error fallos -> failtest $"se esperaba Ok: %A{fallos}")
 
     testCase "un genero desconocido acumula fallo" (fun () ->
@@ -140,9 +140,9 @@ let tests =
       | Ok parsed ->
         let soloHombre = {
           parsed.Plan with
-              Bloques =
-                parsed.Plan.Bloques
-                |> List.filter(fun bloque -> bloque.Genero = Hombre)
+              Blocks =
+                parsed.Plan.Blocks
+                |> List.filter(fun bloque -> bloque.Gender = Male)
         }
 
         match aJson soloHombre |> deJson with

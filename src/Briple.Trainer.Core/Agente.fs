@@ -145,7 +145,7 @@ let correr
 
     {
       Respuesta = respuesta
-      Salida = escribir plan
+      Salida = write plan
       Veredicto = veredicto
     }
 

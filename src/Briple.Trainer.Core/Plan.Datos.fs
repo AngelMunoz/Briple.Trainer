@@ -214,7 +214,7 @@ let convertir(dato: PlanDato) : Result<Plan, string list> =
   let fallos = ResizeArray<string>()
 
   let genero =
-    match dato.genero |> Option.bind Genero.tryParse with
+    match dato.genero |> Option.bind Gender.tryFileToken with
     | Some genero -> Some genero
     | None ->
       let recibido = Option.defaultValue "" dato.genero
@@ -278,43 +278,43 @@ let convertir(dato: PlanDato) : Result<Plan, string list> =
                 dia.ejercicios
                 |> Option.defaultValue []
                 |> List.map(fun ejercicio -> {
-                  Circuito = campo ejercicio.circuito
-                  Vueltas = campo ejercicio.vueltas
-                  Orden = Option.defaultValue 0 ejercicio.orden
-                  Nombre = campo ejercicio.nombre
+                  Circuit = campo ejercicio.circuito
+                  Laps = campo ejercicio.vueltas
+                  Order = Option.defaultValue 0 ejercicio.orden
+                  Name = campo ejercicio.nombre
                   Reps = campo ejercicio.reps
                   Rir = campo ejercicio.rir
-                  Descanso = campo ejercicio.descanso
-                  Notas = campo ejercicio.notas
+                  Rest = campo ejercicio.descanso
+                  Notes = campo ejercicio.notas
                 })
 
               {
                 Id = idDia
-                Titulo = dia.titulo
-                Notas = []
-                Ejercicios = ejercicios
+                Title = dia.titulo
+                Notes = []
+                Exercises = ejercicios
               })
 
           {
-            Numero = Option.defaultValue 0 semana.numero
-            Dias = dias
+            Number = Option.defaultValue 0 semana.numero
+            Days = dias
           })
 
       {
         Id = (if id = "-" then "" else id)
-        Titulo = opcion.titulo
-        Semanas = semanas
+        Title = opcion.titulo
+        Weeks = semanas
       })
 
   match genero with
   | Some genero when fallos.Count = 0 ->
     Ok {
       Version = 1
-      Titulo = titulo
-      Semanas = semanas
-      Generado = campo dato.generado
-      Origen = campo dato.origen
-      Bloques = [ { Genero = genero; Opciones = opciones } ]
+      Title = titulo
+      Weeks = semanas
+      Generated = campo dato.generado
+      Origin = campo dato.origen
+      Blocks = [ { Gender = genero; Variants = opciones } ]
       Extras =
         dato.extras
         |> Option.defaultValue []
@@ -336,39 +336,39 @@ let deJson(json: string) : Result<Plan, string list> =
 /// Serializa un Plan como el JSON que el modelo recibe de referencia
 /// en el flujo de ajuste.
 let aJson(plan: Plan) : string =
-  let bloque = List.head plan.Bloques
+  let bloque = List.head plan.Blocks
 
   let dato = {|
-    titulo = plan.Titulo
-    semanas = plan.Semanas
-    generado = plan.Generado
-    origen = plan.Origen
-    genero = Genero.toString bloque.Genero
+    titulo = plan.Title
+    semanas = plan.Weeks
+    generado = plan.Generated
+    origen = plan.Origin
+    genero = Gender.toFileToken bloque.Gender
     opciones =
-      bloque.Opciones
+      bloque.Variants
       |> List.map(fun opcion -> {|
         id = opcion.Id
-        titulo = opcion.Titulo
+        titulo = opcion.Title
         semanas =
-          opcion.Semanas
+          opcion.Weeks
           |> List.map(fun semana -> {|
-            numero = semana.Numero
+            numero = semana.Number
             dias =
-              semana.Dias
+              semana.Days
               |> List.map(fun dia -> {|
                 id = dia.Id
-                titulo = dia.Titulo
+                titulo = dia.Title
                 ejercicios =
-                  dia.Ejercicios
+                  dia.Exercises
                   |> List.map(fun ejercicio -> {|
-                    circuito = ejercicio.Circuito
-                    vueltas = ejercicio.Vueltas
-                    orden = ejercicio.Orden
-                    nombre = ejercicio.Nombre
+                    circuito = ejercicio.Circuit
+                    vueltas = ejercicio.Laps
+                    orden = ejercicio.Order
+                    nombre = ejercicio.Name
                     reps = ejercicio.Reps
                     rir = ejercicio.Rir
-                    descanso = ejercicio.Descanso
-                    notas = ejercicio.Notas
+                    descanso = ejercicio.Rest
+                    notas = ejercicio.Notes
                   |})
               |})
           |})

@@ -1,11 +1,11 @@
 module Briple.Trainer.Core.Plan.Escritor
 
-// Render del modelo al formato de texto del archivo: el inverso del
-// parser. Las notas de dia no tienen linea en el formato y no se
-// emiten; todo lo demas viaja verbatim.
+// Render of the model to the file text format: the inverse of the
+// parser. Day notes have no line in the format and are not emitted;
+// everything else travels verbatim.
 
 open Briple.Trainer.Core.Plan.Types
 
-/// Escribe el plan completo como texto del formato, un bloque por
-/// linea con indentacion fija.
-val escribir: plan: Plan -> string
+/// Writes the full plan as format text, one block per line with fixed
+/// indentation.
+val write: plan: Plan -> string

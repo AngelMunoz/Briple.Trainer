@@ -15,8 +15,8 @@ let private dosAtletasDe plan =
 
   Expect.equal atletas.Length 2 "un bloque por atleta"
 
-  (List.find (fun a -> a.Genero = Hombre) atletas,
-   List.find (fun a -> a.Genero = Mujer) atletas)
+  (List.find (fun a -> a.Genero = Male) atletas,
+   List.find (fun a -> a.Genero = Female) atletas)
 
 let tests =
   testList "Atletas" [
@@ -54,7 +54,7 @@ let tests =
       (fun () ->
         let tercero = {
           Nombre = "Prueba"
-          Genero = Mujer
+          Genero = Female
           Variantes = [ "4dias" ]
           Metas = [ "fuerza" ]
           Enfasis = [ "glúteo" ]
@@ -65,5 +65,5 @@ let tests =
           [ "4dias" ]
           "variantes nuevas sin tocar tipos"
 
-        Expect.equal tercero.Genero Mujer "el perfil es del propio atleta")
+        Expect.equal tercero.Genero Female "el perfil es del propio atleta")
   ]

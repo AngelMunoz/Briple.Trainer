@@ -25,24 +25,24 @@ let revisarParametros
   : Fallo list =
   let fallos = ResizeArray<Fallo>()
 
-  match plan.Bloques with
-  | [ bloque ] when bloque.Genero = atleta.Genero -> ()
+  match plan.Blocks with
+  | [ bloque ] when bloque.Gender = atleta.Genero -> ()
   | _ ->
     fallos.Add(
       fallo
         "genero"
-        $"se esperaba solo el bloque {Genero.toString atleta.Genero}, hay {plan.Bloques.Length} bloques"
+        $"se esperaba solo el bloque {Gender.toFileToken atleta.Genero}, hay {plan.Blocks.Length} bloques"
     )
 
-  if plan.Semanas <> semanas then
+  if plan.Weeks <> semanas then
     fallos.Add(
-      fallo "semanas" $"se esperaban {semanas}, el plan declara {plan.Semanas}"
+      fallo "semanas" $"se esperaban {semanas}, el plan declara {plan.Weeks}"
     )
 
   let opciones =
-    plan.Bloques
-    |> List.filter(fun bloque -> bloque.Genero = atleta.Genero)
-    |> List.collect(fun bloque -> bloque.Opciones)
+    plan.Blocks
+    |> List.filter(fun bloque -> bloque.Gender = atleta.Genero)
+    |> List.collect(fun bloque -> bloque.Variants)
 
   let esperadas = List.sort pedido.Variantes
   let reales = opciones |> List.map(fun opcion -> opcion.Id) |> List.sort
@@ -53,7 +53,7 @@ let revisarParametros
     )
 
   for opcion in opciones do
-    let numeros = opcion.Semanas |> List.map(fun semana -> semana.Numero)
+    let numeros = opcion.Weeks |> List.map(fun semana -> semana.Number)
 
     if numeros <> [ 1..semanas ] then
       fallos.Add(
@@ -77,7 +77,7 @@ let revisarParametros
       fallos.Add(fallo "conteo" $"la opcion {opcion} no existe en la salida")
 
   for semana, objetivo in pedido.RirPorSemana do
-    match tryMesocicloRir plan semana with
+    match tryMesocycleRir plan semana with
     | Some actual when actual = objetivo -> ()
     | Some actual ->
       fallos.Add(

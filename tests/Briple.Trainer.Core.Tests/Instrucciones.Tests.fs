@@ -15,7 +15,7 @@ open Briple.Trainer.Core.Instrucciones
 
 let private atletaHombre = {
   Nombre = "hombre"
-  Genero = Hombre
+  Genero = Male
   Variantes = [ "3dias"; "5dias" ]
   Metas = []
   Enfasis = []
@@ -53,11 +53,11 @@ let tests =
       (fun () ->
         let candidato: Plan = {
           Version = 1
-          Titulo = "anterior"
-          Semanas = 4
-          Generado = ""
-          Origen = ""
-          Bloques = []
+          Title = "anterior"
+          Weeks = 4
+          Generated = ""
+          Origin = ""
+          Blocks = []
           Extras = []
         }
 

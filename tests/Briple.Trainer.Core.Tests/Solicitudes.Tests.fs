@@ -43,10 +43,10 @@ let tests =
         let mes2 = parsearFixture "plan_mes2_4sem.txt"
 
         let hombre =
-          atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Hombre)
+          atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Male)
 
         let mujer =
-          atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Mujer)
+          atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Female)
 
         let conteosHombre = conteosDelPlan hombre mes2.Plan
         let conteosMujer = conteosDelPlan mujer mes2.Plan
@@ -107,7 +107,7 @@ let tests =
         let mes1 = parsearFixture "plan_entrenamiento_4sem.txt"
 
         let hombre =
-          atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Hombre)
+          atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Male)
 
         let mismosConteos = conteosDelPlan hombre mes1.Plan
 
@@ -123,7 +123,7 @@ let tests =
       let mes1 = parsearFixture "plan_entrenamiento_4sem.txt"
 
       let hombre =
-        atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Hombre)
+        atletasDelPlan mes1.Plan |> List.find(fun a -> a.Genero = Male)
 
       let pedido = {
         pedidoHombre with

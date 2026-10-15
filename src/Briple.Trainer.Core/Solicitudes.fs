@@ -30,15 +30,15 @@ type SolicitudAjuste = {
 }
 
 let conteosDelPlan (atleta: Atleta) (plan: Plan) : (string * int) list =
-  plan.Bloques
-  |> List.tryFind(fun bloque -> bloque.Genero = atleta.Genero)
+  plan.Blocks
+  |> List.tryFind(fun bloque -> bloque.Gender = atleta.Genero)
   |> Option.map(fun bloque ->
-    bloque.Opciones
+    bloque.Variants
     |> List.map(fun opcion ->
       opcion.Id,
-      opcion.Semanas
+      opcion.Weeks
       |> List.sumBy(fun semana ->
-        semana.Dias |> List.sumBy(fun dia -> dia.Ejercicios.Length))))
+        semana.Days |> List.sumBy(fun dia -> dia.Exercises.Length))))
   |> Option.defaultValue []
 
 let solicitudNuevo atleta memorias semanas pedido conteos = {

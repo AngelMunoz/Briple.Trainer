@@ -20,7 +20,7 @@ let private parsear nombre =
 
 let private hombre = {
   Nombre = "Pepe"
-  Genero = Hombre
+  Genero = Male
   Variantes = [ "3dias"; "5dias" ]
   Metas = [ "fuerza" ]
   Enfasis = [ "gluteo" ]

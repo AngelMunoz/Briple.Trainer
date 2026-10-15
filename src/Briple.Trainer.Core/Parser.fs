@@ -66,21 +66,21 @@ let pejRow = parser {
   do! pstring "#ej" >>. spaces1
   let! circuit = pfield
   do! skipChar '|'
-  let! vueltas = pfield
+  let! laps = pfield
   do! skipChar '|'
-  let! orden = pfield
+  let! order = pfield
   do! skipChar '|'
-  let! nombre = pfield
+  let! name = pfield
   do! skipChar '|'
   let! reps = pfield
   do! skipChar '|'
   let! rir = pfield
   do! skipChar '|'
-  let! descanso = pfield
+  let! rest = pfield
   do! skipChar '|'
-  let! notas = pfield
+  let! notes = pfield
   do! eof
-  return [ circuit; vueltas; orden; nombre; reps; rir; descanso; notas ]
+  return [ circuit; laps; order; name; reps; rir; rest; notes ]
 }
 
 let pextraLine =
@@ -202,20 +202,20 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
         | _ -> ()
 
   // The block assembler is a linear pipeline: each level only recurses into
-  // itself or calls the level below it (dia <- semana <- opcion <- bloque
+  // itself or calls the level below it (day <- week <- variant <- block
   // <- planBody <- header), so no mutual recursion is needed.
-  let rec parseDia(dia: Dia) : Result<Dia, ParseError> =
+  let rec parseDay(day: Day) : Result<Day, ParseError> =
     match advance() with
-    | None -> Error(unterminated $"dia {dia.Id}")
+    | None -> Error(unterminated $"dia {day.Id}")
     | Some line ->
       match classify line.Text with
       | EndLine "dia" ->
-        if List.isEmpty dia.Ejercicios then
-          warn line.Number EmptyDia $"day '{dia.Id}' has no #ej rows"
+        if List.isEmpty day.Exercises then
+          warn line.Number EmptyDay $"day '{day.Id}' has no #ej rows"
 
-        Ok dia
+        Ok day
       | EndLine kind ->
-        errAt line $"#end {kind} does not match #start dia {dia.Id}"
+        errAt line $"#end {kind} does not match #start dia {day.Id}"
       | StartLine(kind, arg) ->
         warn
           line.Number
@@ -223,90 +223,90 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           $"skipping unknown block '#start {kind} {arg}' inside dia"
 
         skipBalanced()
-        parseDia dia
+        parseDay day
       | MetaLine(key, value) ->
         if key = "titulo" then
-          parseDia { dia with Titulo = Some value }
+          parseDay { day with Title = Some value }
         else
           warn line.Number UnknownMetaKey $"unknown meta key '{key}' inside dia"
-          parseDia dia
+          parseDay day
       | EjLine fields ->
         match fields with
-        | [ circuit; vueltas; ordenText; nombre; reps; rir; descanso; notas ] ->
-          let ordenOk, orden = Int32.TryParse ordenText
+        | [ circuit; laps; orderText; name; reps; rir; rest; notes ] ->
+          let orderOk, order = Int32.TryParse orderText
 
-          if nombre.Trim().Length = 0 || not ordenOk then
+          if name.Trim().Length = 0 || not orderOk then
             warn
               line.Number
               BadEjField
               "invalid #ej row (empty name or non-integer order)"
 
-            parseDia dia
+            parseDay day
           else
-            let ejercicio = {
-              Circuito = circuit.Trim()
-              Vueltas = vueltas.Trim()
-              Orden = orden
-              Nombre = nombre.Trim()
+            let exercise = {
+              Circuit = circuit.Trim()
+              Laps = laps.Trim()
+              Order = order
+              Name = name.Trim()
               Reps = reps.Trim()
               Rir = rir.Trim()
-              Descanso = descanso.Trim()
-              Notas = notas.Trim()
+              Rest = rest.Trim()
+              Notes = notes.Trim()
             }
 
-            parseDia {
-              dia with
-                  Ejercicios = dia.Ejercicios @ [ ejercicio ]
+            parseDay {
+              day with
+                  Exercises = day.Exercises @ [ exercise ]
             }
         | _ ->
           warn line.Number BadEjField "invalid #ej row (wrong field count)"
-          parseDia dia
+          parseDay day
       | BadEj ->
         warn line.Number BadEjField "malformed #ej row"
-        parseDia dia
+        parseDay day
       | ExtraLine _ ->
         warn
           line.Number
           UnknownLine
           "extras (#x) are only allowed at plan level"
 
-        parseDia dia
+        parseDay day
       | Unknown ->
         warn line.Number UnknownLine "unrecognized line"
-        parseDia dia
-      | Blank -> parseDia dia
+        parseDay day
+      | Blank -> parseDay day
 
-  let rec parseSemana(semana: Semana) : Result<Semana, ParseError> =
+  let rec parseWeek(week: Week) : Result<Week, ParseError> =
     match advance() with
-    | None -> Error(unterminated $"semana {semana.Numero}")
+    | None -> Error(unterminated $"semana {week.Number}")
     | Some line ->
       match classify line.Text with
-      | EndLine "semana" -> Ok semana
+      | EndLine "semana" -> Ok week
       | EndLine kind ->
-        errAt line $"#end {kind} does not match #start semana {semana.Numero}"
+        errAt line $"#end {kind} does not match #start semana {week.Number}"
       | StartLine("dia", id) ->
-        let dia = {
+        let day = {
           Id = id
-          Titulo = None
-          Notas = []
-          Ejercicios = []
+          Title = None
+          Notes = []
+          Exercises = []
         }
 
-        if semana.Dias |> List.exists(fun existing -> existing.Id = id) then
+        if week.Days |> List.exists(fun existing -> existing.Id = id) then
           warn
             line.Number
             DuplicateEntry
-            $"duplicate day '{id}' in semana {semana.Numero}"
+            $"duplicate day '{id}' in semana {week.Number}"
 
         if tryDayOfWeek id |> Option.isNone then
           warn line.Number UnknownDayName $"day name '{id}' is not recognized"
 
-        parseDia dia
+        parseDay day
         |> Result.map(fun parsed -> {
-          semana with
-              Dias = semana.Dias @ [ parsed ]
+          week with
+              Days = week.Days @ [ parsed ]
         })
-        |> Result.bind parseSemana
+        |> Result.bind parseWeek
       | StartLine(kind, arg) ->
         warn
           line.Number
@@ -314,52 +314,52 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           $"skipping unknown block '#start {kind} {arg}' inside semana"
 
         skipBalanced()
-        parseSemana semana
+        parseWeek week
       | MetaLine(key, _) ->
         warn
           line.Number
           UnknownMetaKey
           $"meta '{key}' not allowed inside semana"
 
-        parseSemana semana
+        parseWeek week
       | EjLine _
       | BadEj ->
         warn line.Number UnknownLine "#ej row outside a dia"
-        parseSemana semana
+        parseWeek week
       | ExtraLine _
       | Unknown ->
         warn line.Number UnknownLine "unrecognized line"
-        parseSemana semana
-      | Blank -> parseSemana semana
+        parseWeek week
+      | Blank -> parseWeek week
 
-  let rec parseOpcion(opcion: Opcion) : Result<Opcion, ParseError> =
+  let rec parseVariant(variant: Variant) : Result<Variant, ParseError> =
     match advance() with
-    | None -> Error(unterminated $"opcion {opcion.Id}")
+    | None -> Error(unterminated $"opcion {variant.Id}")
     | Some line ->
       match classify line.Text with
-      | EndLine "opcion" -> Ok opcion
+      | EndLine "opcion" -> Ok variant
       | EndLine kind ->
-        errAt line $"#end {kind} does not match #start opcion {opcion.Id}"
-      | StartLine("semana", numeroText) ->
-        match Int32.TryParse numeroText with
-        | true, numero ->
+        errAt line $"#end {kind} does not match #start opcion {variant.Id}"
+      | StartLine("semana", numberText) ->
+        match Int32.TryParse numberText with
+        | true, number ->
           if
-            opcion.Semanas
-            |> List.exists(fun existing -> existing.Numero = numero)
+            variant.Weeks
+            |> List.exists(fun existing -> existing.Number = number)
           then
             warn
               line.Number
               DuplicateEntry
-              $"duplicate semana {numero} in opcion {opcion.Id}"
+              $"duplicate semana {number} in opcion {variant.Id}"
 
-          parseSemana { Numero = numero; Dias = [] }
+          parseWeek { Number = number; Days = [] }
           |> Result.map(fun parsed -> {
-            opcion with
-                Semanas = opcion.Semanas @ [ parsed ]
+            variant with
+                Weeks = variant.Weeks @ [ parsed ]
           })
-          |> Result.bind parseOpcion
+          |> Result.bind parseVariant
         | _ ->
-          errAt line $"#start semana requires an integer, got '{numeroText}'"
+          errAt line $"#start semana requires an integer, got '{numberText}'"
       | StartLine(kind, arg) ->
         warn
           line.Number
@@ -367,46 +367,46 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           $"skipping unknown block '#start {kind} {arg}' inside opcion"
 
         skipBalanced()
-        parseOpcion opcion
+        parseVariant variant
       | MetaLine("titulo", value) ->
-        parseOpcion { opcion with Titulo = Some value }
+        parseVariant { variant with Title = Some value }
       | MetaLine(key, _) ->
         warn
           line.Number
           UnknownMetaKey
           $"unknown meta key '{key}' inside opcion"
 
-        parseOpcion opcion
+        parseVariant variant
       | EjLine _
       | BadEj ->
         warn line.Number UnknownLine "#ej row outside a dia"
-        parseOpcion opcion
+        parseVariant variant
       | ExtraLine _
       | Unknown ->
         warn line.Number UnknownLine "unrecognized line"
-        parseOpcion opcion
-      | Blank -> parseOpcion opcion
+        parseVariant variant
+      | Blank -> parseVariant variant
 
-  let rec parseBloque(bloque: Bloque) : Result<Bloque, ParseError> =
+  let rec parseBlock(block: Block) : Result<Block, ParseError> =
     match advance() with
-    | None -> Error(unterminated $"genero {Genero.toString bloque.Genero}")
+    | None -> Error(unterminated $"genero {Gender.toFileToken block.Gender}")
     | Some line ->
       match classify line.Text with
-      | EndLine "genero" -> Ok bloque
+      | EndLine "genero" -> Ok block
       | EndLine kind ->
         errAt
           line
-          $"#end {kind} does not match #start genero {Genero.toString bloque.Genero}"
+          $"#end {kind} does not match #start genero {Gender.toFileToken block.Gender}"
       | StartLine("opcion", id) ->
-        if bloque.Opciones |> List.exists(fun existing -> existing.Id = id) then
+        if block.Variants |> List.exists(fun existing -> existing.Id = id) then
           warn line.Number DuplicateEntry $"duplicate opcion '{id}'"
 
-        parseOpcion { Id = id; Titulo = None; Semanas = [] }
+        parseVariant { Id = id; Title = None; Weeks = [] }
         |> Result.map(fun parsed -> {
-          bloque with
-              Opciones = bloque.Opciones @ [ parsed ]
+          block with
+              Variants = block.Variants @ [ parsed ]
         })
-        |> Result.bind parseBloque
+        |> Result.bind parseBlock
       | StartLine(kind, arg) ->
         warn
           line.Number
@@ -414,23 +414,23 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           $"skipping unknown block '#start {kind} {arg}' inside genero"
 
         skipBalanced()
-        parseBloque bloque
+        parseBlock block
       | MetaLine(key, _) ->
         warn
           line.Number
           UnknownMetaKey
           $"unknown meta key '{key}' inside genero"
 
-        parseBloque bloque
+        parseBlock block
       | EjLine _
       | BadEj ->
         warn line.Number UnknownLine "#ej row outside a dia"
-        parseBloque bloque
+        parseBlock block
       | ExtraLine _
       | Unknown ->
         warn line.Number UnknownLine "unrecognized line"
-        parseBloque bloque
-      | Blank -> parseBloque bloque
+        parseBlock block
+      | Blank -> parseBlock block
 
   let rec parsePlanBody
     (plan: Plan)
@@ -440,27 +440,27 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
     | Some line ->
       match classify line.Text with
       | EndLine "plan" ->
-        if plan.Titulo = "" then
+        if plan.Title = "" then
           warn line.Number MissingMeta "missing #meta titulo"
 
-        if plan.Semanas = 0 then
+        if plan.Weeks = 0 then
           warn line.Number MissingMeta "missing #meta semanas"
 
         Ok(plan, List.ofSeq warnings)
       | EndLine kind -> errAt line $"#end {kind} does not match #start plan"
       | StartLine("genero", name) ->
-        (match Genero.tryParse name with
-         | Some genero ->
+        (match Gender.tryFileToken name with
+         | Some gender ->
            if
-             plan.Bloques
-             |> List.exists(fun existing -> existing.Genero = genero)
+             plan.Blocks
+             |> List.exists(fun existing -> existing.Gender = gender)
            then
              warn line.Number DuplicateEntry $"duplicate genero '{name}'"
 
-           parseBloque { Genero = genero; Opciones = [] }
+           parseBlock { Gender = gender; Variants = [] }
            |> Result.map(fun parsed -> {
              plan with
-                 Bloques = plan.Bloques @ [ parsed ]
+                 Blocks = plan.Blocks @ [ parsed ]
            })
            |> Result.bind parsePlanBody
          | None ->
@@ -479,10 +479,10 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
 
         skipBalanced()
         parsePlanBody plan
-      | MetaLine("titulo", value) -> parsePlanBody { plan with Titulo = value }
+      | MetaLine("titulo", value) -> parsePlanBody { plan with Title = value }
       | MetaLine("semanas", value) ->
         match Int32.TryParse value with
-        | true, semanas -> parsePlanBody { plan with Semanas = semanas }
+        | true, weeks -> parsePlanBody { plan with Weeks = weeks }
         | _ ->
           warn
             line.Number
@@ -491,8 +491,8 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
 
           parsePlanBody plan
       | MetaLine("generado", value) ->
-        parsePlanBody { plan with Generado = value }
-      | MetaLine("origen", value) -> parsePlanBody { plan with Origen = value }
+        parsePlanBody { plan with Generated = value }
+      | MetaLine("origen", value) -> parsePlanBody { plan with Origin = value }
       | MetaLine(key, _) ->
         warn line.Number UnknownMetaKey $"unknown meta key '{key}'"
         parsePlanBody plan
@@ -534,11 +534,11 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
 
           let plan = {
             Version = version
-            Titulo = ""
-            Semanas = 0
-            Generado = ""
-            Origen = ""
-            Bloques = []
+            Title = ""
+            Weeks = 0
+            Generated = ""
+            Origin = ""
+            Blocks = []
             Extras = []
           }
 

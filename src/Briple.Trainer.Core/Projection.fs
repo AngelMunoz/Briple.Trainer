@@ -4,10 +4,10 @@ module Briple.Trainer.Core.Plan.Projection
 // screen renders from these functions.
 //
 // Plan week N is the 7-day window [anchor + 7(N-1), anchor + 7(N-1) + 6]; a
-// negative week offset is before the anchor. trySemana is bounded by the
-// opcion's own Semanas list while planWeek is bounded by the plan's Semanas
-// meta, so a shorter opcion renders rest days for weeks the plan still
-// counts. An unmapped Dia.Id never matches a weekday (the parser warned at
+// negative week offset is before the anchor. tryWeek is bounded by the
+// variant's own Weeks list while planWeek is bounded by the plan's Semanas
+// meta, so a shorter variant renders rest days for weeks the plan still
+// counts. An unmapped Day.Id never matches a weekday (the parser warned at
 // parse time): those dates are rest.
 
 open System
@@ -41,32 +41,36 @@ let mondayOf(date: DateOnly) : DateOnly =
 let weekOffset (anchor: DateOnly) (date: DateOnly) : int =
   int(Math.Floor(float(daysBetween anchor date) / 7.0))
 
-let tryOpcion (plan: Plan) (genero: Genero) (opcionId: string) : Opcion option =
-  plan.Bloques
-  |> List.tryFind(fun bloque -> bloque.Genero = genero)
-  |> Option.bind(fun bloque ->
-    bloque.Opciones |> List.tryFind(fun opcion -> opcion.Id = opcionId))
+let tryVariant
+  (plan: Plan)
+  (gender: Gender)
+  (variantId: string)
+  : Variant option =
+  plan.Blocks
+  |> List.tryFind(fun block -> block.Gender = gender)
+  |> Option.bind(fun block ->
+    block.Variants |> List.tryFind(fun variant -> variant.Id = variantId))
 
-/// The dia for a date inside the plan range; None before, after, or on rest.
+/// The day for a date inside the plan range; None before, after, or on rest.
 let trySession
   (plan: Plan)
-  (genero: Genero)
-  (opcionId: string)
+  (gender: Gender)
+  (variantId: string)
   (anchor: DateOnly)
   (date: DateOnly)
-  : Dia option =
+  : Day option =
   let offset = weekOffset anchor date
 
   if offset < 0 then
     None
   else
-    tryOpcion plan genero opcionId
-    |> Option.bind(fun opcion ->
-      if offset < opcion.Semanas.Length then
-        let semana = opcion.Semanas.[offset]
+    tryVariant plan gender variantId
+    |> Option.bind(fun variant ->
+      if offset < variant.Weeks.Length then
+        let week = variant.Weeks.[offset]
         let dow = weekdayOf date
 
-        semana.Dias |> List.tryFind(fun dia -> tryDayOfWeek dia.Id = Some dow)
+        week.Days |> List.tryFind(fun day -> tryDayOfWeek day.Id = Some dow)
       else
         None)
 
@@ -74,54 +78,54 @@ let trySession
 let planWeek (plan: Plan) (anchor: DateOnly) (date: DateOnly) : int option =
   let offset = weekOffset anchor date
 
-  if offset >= 0 && offset < plan.Semanas then
+  if offset >= 0 && offset < plan.Weeks then
     Some(offset + 1)
   else
     None
 
-/// The semana for a date; None when the opcion has no week there.
-let trySemana
+/// The week for a date; None when the variant has no week there.
+let tryWeek
   (plan: Plan)
-  (genero: Genero)
-  (opcionId: string)
+  (gender: Gender)
+  (variantId: string)
   (anchor: DateOnly)
   (date: DateOnly)
-  : Semana option =
+  : Week option =
   let offset = weekOffset anchor date
 
   if offset < 0 then
     None
   else
-    tryOpcion plan genero opcionId
-    |> Option.bind(fun opcion ->
-      if offset < opcion.Semanas.Length then
-        Some opcion.Semanas.[offset]
+    tryVariant plan gender variantId
+    |> Option.bind(fun variant ->
+      if offset < variant.Weeks.Length then
+        Some variant.Weeks.[offset]
       else
         None)
 
 /// True when the variant has a session on the date.
 let trainsOn
   (plan: Plan)
-  (genero: Genero)
-  (opcionId: string)
+  (gender: Gender)
+  (variantId: string)
   (anchor: DateOnly)
   (date: DateOnly)
   : bool =
-  trySession plan genero opcionId anchor date |> Option.isSome
+  trySession plan gender variantId anchor date |> Option.isSome
 
 /// Next session at or after the date; for the rest-day line.
 let nextSession
   (plan: Plan)
-  (genero: Genero)
-  (opcionId: string)
+  (gender: Gender)
+  (variantId: string)
   (anchor: DateOnly)
   (date: DateOnly)
-  : (DateOnly * Dia) option =
+  : (DateOnly * Day) option =
   let weeks =
     max
-      plan.Semanas
-      (tryOpcion plan genero opcionId
-       |> Option.map(fun opcion -> opcion.Semanas.Length)
+      plan.Weeks
+      (tryVariant plan gender variantId
+       |> Option.map(fun variant -> variant.Weeks.Length)
        |> Option.defaultValue 0)
 
   let limit = weeks * 7 + 7
@@ -130,8 +134,8 @@ let nextSession
     if daysBetween date candidate > limit then
       None
     else
-      match trySession plan genero opcionId anchor candidate with
-      | Some dia -> Some(candidate, dia)
+      match trySession plan gender variantId anchor candidate with
+      | Some day -> Some(candidate, day)
       | None -> step(addDays candidate 1)
 
   step date
@@ -139,7 +143,7 @@ let nextSession
 /// RIR target text for a 1-based plan week ("2-3"); None when absent or
 /// malformed. Mesociclo line shape: `mesociclo | Semana N: <text> | RIR <a-b>`
 /// (the stored Extras text starts at the key; a trailing note segment is fine).
-let tryMesocicloRir (plan: Plan) (week: int) : string option =
+let tryMesocycleRir (plan: Plan) (week: int) : string option =
   let prefix = $"Semana {week}:"
 
   plan.Extras
@@ -168,13 +172,13 @@ let tryMesocicloRir (plan: Plan) (week: int) : string option =
 /// "trains today" check, so 6/7-day variants and weekend sessions resolve.
 let defaultAnchor
   (plan: Plan)
-  (genero: Genero)
-  (opcionId: string)
+  (gender: Gender)
+  (variantId: string)
   (today: DateOnly)
   : DateOnly =
   let monday = mondayOf today
 
-  if trainsOn plan genero opcionId monday today then
+  if trainsOn plan gender variantId monday today then
     monday
   else
     addDays monday 7
@@ -182,26 +186,26 @@ let defaultAnchor
 /// First free date after the plan's run: the anchor plus the plan's full
 /// week count. planChipState reads it as the first Completed day.
 let planFinish (plan: Plan) (anchor: DateOnly) : DateOnly =
-  addDays anchor (7 * plan.Semanas)
+  addDays anchor (7 * plan.Weeks)
 
 /// Everything the staged anchor weighs: the plan, the variant it opens on,
 /// the day of the decision, and the first free dates of the stored plans.
 type AnchorDecision = {
   Plan: Plan
-  View: Genero * string
+  View: Gender * string
   Today: DateOnly
   Finishes: DateOnly list
 }
 
 // Ordering goes through daysBetween, never DateOnly comparison.
 let chainedAnchor(decision: AnchorDecision) : DateOnly =
-  let genero, opcionId = decision.View
+  let gender, variantId = decision.View
 
   decision.Finishes
   |> List.fold
     (fun latest finish ->
       if daysBetween latest finish > 0 then finish else latest)
-    (defaultAnchor decision.Plan genero opcionId decision.Today)
+    (defaultAnchor decision.Plan gender variantId decision.Today)
 
 // --- Week rows and the plan chip --------------------------------------------
 
@@ -210,14 +214,14 @@ let chainedAnchor(decision: AnchorDecision) : DateOnly =
 type WeekRow = {
   Date: DateOnly
   IsToday: bool
-  Session: Dia option
+  Session: Day option
 }
 
 /// The seven dates of the week of `selected`, Monday first.
 let weekRows
   (plan: Plan)
-  (genero: Genero)
-  (opcionId: string)
+  (gender: Gender)
+  (variantId: string)
   (anchor: DateOnly)
   (today: DateOnly)
   (selected: DateOnly)
@@ -231,7 +235,7 @@ let weekRows
       {
         Date = date
         IsToday = sameDate date today
-        Session = trySession plan genero opcionId anchor date
+        Session = trySession plan gender variantId anchor date
       }
   ]
 
@@ -244,7 +248,7 @@ type PlanChip =
 
 let planChipState (plan: Plan) (anchor: DateOnly) (date: DateOnly) : PlanChip =
   match planWeek plan anchor date with
-  | Some week -> Inside(week, plan.Semanas)
+  | Some week -> Inside(week, plan.Weeks)
   | None ->
     if daysBetween anchor date < 0 then
       StartsOn anchor

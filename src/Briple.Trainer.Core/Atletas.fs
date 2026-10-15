@@ -4,18 +4,18 @@ open Briple.Trainer.Core.Plan.Types
 
 type Atleta = {
   Nombre: string
-  Genero: Genero
+  Genero: Gender
   Variantes: string list
   Metas: string list
   Enfasis: string list
 }
 
 let atletasDelPlan(plan: Plan) : Atleta list =
-  plan.Bloques
+  plan.Blocks
   |> List.map(fun bloque -> {
-    Nombre = Genero.toString bloque.Genero
-    Genero = bloque.Genero
-    Variantes = bloque.Opciones |> List.map(fun opcion -> opcion.Id)
+    Nombre = Gender.toFileToken bloque.Gender
+    Genero = bloque.Gender
+    Variantes = bloque.Variants |> List.map(fun opcion -> opcion.Id)
     Metas = []
     Enfasis = []
   })

@@ -15,7 +15,7 @@ let tests =
         match readFixture nombre |> parsePlan with
         | Error error -> failtest $"parse error at line {error.Line}"
         | Ok primero ->
-          match escribir primero.Plan |> parsePlan with
+          match write primero.Plan |> parsePlan with
           | Error error ->
             failtest $"re-parse error at line {error.Line}: {error.Message}"
           | Ok segundo ->

@@ -12,7 +12,7 @@ open Briple.Trainer.Core.Plan.Types
 /// distintos.
 type Atleta = {
   Nombre: string
-  Genero: Genero
+  Genero: Gender
   Variantes: string list
   Metas: string list
   Enfasis: string list

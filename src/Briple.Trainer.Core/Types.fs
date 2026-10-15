@@ -1,65 +1,79 @@
 module Briple.Trainer.Core.Plan.Types
 
-// Domain model of the training plan format, mirroring the file one-to-one
-// Reps/Rir/Descanso/Notas
-// are stored verbatim from the file; "-" means "not present" for the UI.
+// Domain model of the training plan format, mirroring the file one-to-one.
+// Reps/Rir/Rest/Notes are stored verbatim from the file; "-" means "not
+// present" for the UI.
 
-type Ejercicio = {
-  Circuito: string
-  Vueltas: string
-  Orden: int
-  Nombre: string
+type Exercise = {
+  Circuit: string
+  Laps: string
+  Order: int
+  Name: string
   Reps: string
   Rir: string
-  Descanso: string
-  Notas: string
+  Rest: string
+  Notes: string
 }
 
-type Dia = {
+type Day = {
   Id: string
-  Titulo: string option
-  Notas: string list
-  Ejercicios: Ejercicio list
+  Title: string option
+  Notes: string list
+  Exercises: Exercise list
 }
 
-type Semana = { Numero: int; Dias: Dia list }
+type Week = { Number: int; Days: Day list }
 
-type Opcion = {
+type Variant = {
   Id: string
-  Titulo: string option
-  Semanas: Semana list
+  Title: string option
+  Weeks: Week list
 }
 
-type Genero =
-  | Hombre
-  | Mujer
+type Gender =
+  | Male
+  | Female
 
-type Bloque = {
-  Genero: Genero
-  Opciones: Opcion list
+type Block = {
+  Gender: Gender
+  Variants: Variant list
 }
 
 type Plan = {
   Version: int
-  Titulo: string
-  Semanas: int
-  Generado: string
-  Origen: string
-  Bloques: Bloque list
+  Title: string
+  Weeks: int
+  Generated: string
+  Origin: string
+  Blocks: Block list
   Extras: string list
 }
 
-module Genero =
+module Gender =
 
-  let toString(genero: Genero) =
-    match genero with
-    | Hombre -> "hombre"
-    | Mujer -> "mujer"
+  /// File-format tokens of the .briple block header; the format is fixed
+  /// and stays Spanish.
+  let toFileToken(gender: Gender) =
+    match gender with
+    | Male -> "hombre"
+    | Female -> "mujer"
 
-  let tryParse(value: string) =
+  let tryFileToken(value: string) =
     match value.Trim().ToLowerInvariant() with
-    | "hombre" -> Some Hombre
-    | "mujer" -> Some Mujer
+    | "hombre" -> Some Male
+    | "mujer" -> Some Female
+    | _ -> None
+
+  /// Protocol names of the agent JSON contract.
+  let toProtocol(gender: Gender) =
+    match gender with
+    | Male -> "male"
+    | Female -> "female"
+
+  let tryProtocol(value: string) =
+    match value.Trim().ToLowerInvariant() with
+    | "male" -> Some Male
+    | "female" -> Some Female
     | _ -> None
 
 type WarningKind =
@@ -69,7 +83,7 @@ type WarningKind =
   | UnknownLine
   | BadEjField
   | DuplicateEntry
-  | EmptyDia
+  | EmptyDay
   | UnsupportedVersion
   | MissingMeta
 

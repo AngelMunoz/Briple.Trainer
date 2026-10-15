@@ -22,7 +22,7 @@ let private parsear nombre =
 
 let private hombre = {
   Nombre = "hombre"
-  Genero = Hombre
+  Genero = Male
   Variantes = [ "3dias"; "5dias" ]
   Metas = []
   Enfasis = []
@@ -41,10 +41,10 @@ let private salidaHombre() =
 
   let soloHombre = {
     mes1.Plan with
-        Bloques = mes1.Plan.Bloques |> List.filter(fun b -> b.Genero = Hombre)
+        Blocks = mes1.Plan.Blocks |> List.filter(fun b -> b.Gender = Male)
   }
 
-  escribir soloHombre
+  write soloHombre
 
 let private esperarRegla regla veredicto =
   match veredicto with
@@ -62,7 +62,7 @@ let tests =
         solicitudNuevo hombre [] 4 pedido [ ("3dias", 72); ("5dias", 72) ]
 
       match validarNuevo solicitud (salidaHombre()) with
-      | Valido plan -> Expect.equal plan.Semanas 4 "el veredicto trae el plan"
+      | Valido plan -> Expect.equal plan.Weeks 4 "el veredicto trae el plan"
       | Rechazado fallos -> failtest $"se esperaba Valido: %A{fallos}")
 
     testCase "una salida con dos bloques se rechaza por genero" (fun () ->
@@ -70,7 +70,7 @@ let tests =
       let mes1 = parsear "plan_entrenamiento_4sem.txt"
 
       // el archivo completo trae el bloque de la mujer tambien
-      esperarRegla "genero" (validarNuevo solicitud (escribir mes1.Plan)))
+      esperarRegla "genero" (validarNuevo solicitud (write mes1.Plan)))
 
     testCase "las semanas distintas a las pedidas se rechazan" (fun () ->
       let solicitud = solicitudNuevo hombre [] 5 pedido []

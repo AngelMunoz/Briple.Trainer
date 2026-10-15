@@ -16,44 +16,44 @@ let anchor = DateOnly(2026, 9, 7) // Monday
 // --- Synthetic plan builders -----------------------------------------------
 
 let ej nombre = {
-  Circuito = "A"
-  Vueltas = "4"
-  Orden = 1
-  Nombre = nombre
+  Circuit = "A"
+  Laps = "4"
+  Order = 1
+  Name = nombre
   Reps = "8-10"
   Rir = "2"
-  Descanso = "90 s"
-  Notas = "-"
+  Rest = "90 s"
+  Notes = "-"
 }
 
 let dia id titulo dias = {
   Id = id
-  Titulo = titulo
-  Notas = []
-  Ejercicios = dias
+  Title = titulo
+  Notes = []
+  Exercises = dias
 }
 
-let semana numero dias = { Numero = numero; Dias = dias }
+let semana numero dias = { Number = numero; Days = dias }
 
 let opcion id semanas = {
   Id = id
-  Titulo = None
-  Semanas = semanas
+  Title = None
+  Weeks = semanas
 }
 
-let bloque genero opciones = { Genero = genero; Opciones = opciones }
+let bloque genero opciones = { Gender = genero; Variants = opciones }
 
 let plan semanas generos = {
   Version = 1
-  Titulo = "test plan"
-  Semanas = semanas
-  Generado = ""
-  Origen = ""
-  Bloques = generos
+  Title = "test plan"
+  Weeks = semanas
+  Generated = ""
+  Origin = ""
+  Blocks = generos
   Extras = []
 }
 
-// Hombre / 3dias: Lun · Mié · Vie (Full Body A/B/C), one week, for anchor tests
+// Male / 3dias: Lun · Mié · Vie (Full Body A/B/C), one week, for anchor tests
 let threeDayWeek weekNumber =
   semana weekNumber [
     dia "Lunes" (Some "Full Body A") [ ej "sentadilla" ]
@@ -62,7 +62,7 @@ let threeDayWeek weekNumber =
   ]
 
 let threeDayPlan =
-  plan 4 [ bloque Hombre [ opcion "3dias" [ threeDayWeek 1; threeDayWeek 2 ] ] ]
+  plan 4 [ bloque Male [ opcion "3dias" [ threeDayWeek 1; threeDayWeek 2 ] ] ]
 
 let tests =
   testList "Projection" [
@@ -82,19 +82,19 @@ let tests =
             (Some 2)
             "week of 09-14"
 
-          match trySession p Hombre "3dias" anchor (DateOnly(2026, 9, 16)) with
+          match trySession p Male "3dias" anchor (DateOnly(2026, 9, 16)) with
           | None -> failtest "expected a session on 09-16"
           | Some dia ->
-            Expect.equal dia.Titulo (Some "Full Body B") "09-16 session"
+            Expect.equal dia.Title (Some "Full Body B") "09-16 session"
 
           // Before and after the plan
           Expect.equal
-            (trySession p Hombre "3dias" anchor (DateOnly(2026, 9, 6)))
+            (trySession p Male "3dias" anchor (DateOnly(2026, 9, 6)))
             None
             "before anchor"
 
           Expect.equal
-            (trySession p Hombre "3dias" anchor (DateOnly(2026, 10, 5)))
+            (trySession p Male "3dias" anchor (DateOnly(2026, 10, 5)))
             None
             "after week 4"
 
@@ -105,34 +105,32 @@ let tests =
 
           // 3 días trains Mon / Wed / Fri
           Expect.isTrue
-            (trainsOn p Hombre "3dias" anchor (DateOnly(2026, 9, 14)))
+            (trainsOn p Male "3dias" anchor (DateOnly(2026, 9, 14)))
             "trains Monday"
 
           Expect.isFalse
-            (trainsOn p Hombre "3dias" anchor (DateOnly(2026, 9, 15)))
+            (trainsOn p Male "3dias" anchor (DateOnly(2026, 9, 15)))
             "rest Tuesday"
 
           Expect.isTrue
-            (trainsOn p Hombre "3dias" anchor (DateOnly(2026, 9, 18)))
+            (trainsOn p Male "3dias" anchor (DateOnly(2026, 9, 18)))
             "trains Friday"
 
           // Rest-day line: next session from Saturday 09-12
-          match
-            nextSession p Hombre "3dias" anchor (DateOnly(2026, 9, 12))
-          with
+          match nextSession p Male "3dias" anchor (DateOnly(2026, 9, 12)) with
           | None -> failtest "expected a next session after Saturday"
           | Some(nextDate, dia) ->
             Expect.isTrue
               (sameDate nextDate (DateOnly(2026, 9, 14)))
               "next session is Monday 09-14"
 
-            Expect.equal dia.Titulo (Some "Full Body A") "next session title"
+            Expect.equal dia.Title (Some "Full Body A") "next session title"
 
           // Mesociclo RIR targets from the #x extras
-          Expect.equal (tryMesocicloRir p 1) (Some "3") "mesociclo week 1"
-          Expect.equal (tryMesocicloRir p 2) (Some "2-3") "mesociclo week 2"
-          Expect.equal (tryMesocicloRir p 4) (Some "1") "mesociclo week 4"
-          Expect.equal (tryMesocicloRir p 5) None "week 5 has no RIR segment")
+          Expect.equal (tryMesocycleRir p 1) (Some "3") "mesociclo week 1"
+          Expect.equal (tryMesocycleRir p 2) (Some "2-3") "mesociclo week 2"
+          Expect.equal (tryMesocycleRir p 4) (Some "1") "mesociclo week 4"
+          Expect.equal (tryMesocycleRir p 5) None "week 5 has no RIR segment")
 
     testCase "custom (non-Monday) anchor shifts every window" (fun () ->
       let wednesday = DateOnly(2026, 9, 9) // anchor mid-week
@@ -150,16 +148,11 @@ let tests =
 
       // 09-14 (Monday) resolves through week 1's Lunes dia
       match
-        trySession
-          threeDayPlan
-          Hombre
-          "3dias"
-          wednesday
-          (DateOnly(2026, 9, 14))
+        trySession threeDayPlan Male "3dias" wednesday (DateOnly(2026, 9, 14))
       with
       | None -> failtest "expected a session on 09-14"
       | Some dia ->
-        Expect.equal dia.Titulo (Some "Full Body A") "09-14 session via week 1")
+        Expect.equal dia.Title (Some "Full Body A") "09-14 session via week 1")
 
     testCase
       "defaultAnchor: this Monday when the variant trains today, else next Monday"
@@ -167,21 +160,21 @@ let tests =
         // Wednesday 09-09: the 3-day variant trains today, so this week's Monday
         Expect.isTrue
           (sameDate
-            (defaultAnchor threeDayPlan Hombre "3dias" (DateOnly(2026, 9, 9)))
+            (defaultAnchor threeDayPlan Male "3dias" (DateOnly(2026, 9, 9)))
             (DateOnly(2026, 9, 7)))
           "trains today -> this Monday"
 
         // Tuesday 09-08: no session today, so next week's Monday
         Expect.isTrue
           (sameDate
-            (defaultAnchor threeDayPlan Hombre "3dias" (DateOnly(2026, 9, 8)))
+            (defaultAnchor threeDayPlan Male "3dias" (DateOnly(2026, 9, 8)))
             (DateOnly(2026, 9, 14)))
           "rest today -> next Monday"
 
         // Monday itself counts as "this week's Monday"
         Expect.isTrue
           (sameDate
-            (defaultAnchor threeDayPlan Hombre "3dias" (DateOnly(2026, 9, 7)))
+            (defaultAnchor threeDayPlan Male "3dias" (DateOnly(2026, 9, 7)))
             (DateOnly(2026, 9, 7)))
           "today is Monday")
 
@@ -211,7 +204,7 @@ let tests =
         let decide finishes =
           chainedAnchor {
             Plan = threeDayPlan
-            View = (Hombre, "3dias")
+            View = (Male, "3dias")
             Today = DateOnly(2026, 9, 9)
             Finishes = finishes
           }
@@ -232,12 +225,12 @@ let tests =
       "chainedAnchor: empty finishes keep the heuristic; past finishes never backdate"
       (fun () ->
         let heuristic =
-          defaultAnchor threeDayPlan Hombre "3dias" (DateOnly(2026, 9, 9))
+          defaultAnchor threeDayPlan Male "3dias" (DateOnly(2026, 9, 9))
 
         let decide finishes =
           chainedAnchor {
             Plan = threeDayPlan
-            View = (Hombre, "3dias")
+            View = (Male, "3dias")
             Today = DateOnly(2026, 9, 9)
             Finishes = finishes
           }
@@ -259,28 +252,28 @@ let tests =
         ]
 
       let saturdayPlan =
-        plan 2 [ bloque Hombre [ opcion "1dia" [ weirdWeeks; weirdWeeks ] ] ]
+        plan 2 [ bloque Male [ opcion "1dia" [ weirdWeeks; weirdWeeks ] ] ]
 
       // Saturday 09-12: "Samedi" is unmapped, so the date is rest
       Expect.equal
-        (trySession saturdayPlan Hombre "1dia" anchor (DateOnly(2026, 9, 12)))
+        (trySession saturdayPlan Male "1dia" anchor (DateOnly(2026, 9, 12)))
         None
         "unmapped day skipped"
 
       // nextSession from Saturday skips Samedi and lands on Monday 09-14
       match
-        nextSession saturdayPlan Hombre "1dia" anchor (DateOnly(2026, 9, 12))
+        nextSession saturdayPlan Male "1dia" anchor (DateOnly(2026, 9, 12))
       with
       | None -> failtest "expected to find Monday's session"
       | Some(_, dia) ->
-        Expect.equal dia.Titulo (Some "Normal") "skips unmapped day")
+        Expect.equal dia.Title (Some "Normal") "skips unmapped day")
 
     testCase
       "short opcion: weeks beyond its Semanas render rest, planWeek still counts"
       (fun () ->
         let shortPlan =
           plan 4 [
-            bloque Hombre [ opcion "3dias" [ threeDayWeek 1; threeDayWeek 2 ] ]
+            bloque Male [ opcion "3dias" [ threeDayWeek 1; threeDayWeek 2 ] ]
           ]
 
         // Week 3 (09-21..09-27): the opcion has no week there
@@ -290,21 +283,21 @@ let tests =
           "plan still counts week 3"
 
         Expect.equal
-          (trySemana shortPlan Hombre "3dias" anchor (DateOnly(2026, 9, 21)))
+          (tryWeek shortPlan Male "3dias" anchor (DateOnly(2026, 9, 21)))
           None
           "opcion has no week 3"
 
         Expect.equal
-          (trySession shortPlan Hombre "3dias" anchor (DateOnly(2026, 9, 21)))
+          (trySession shortPlan Male "3dias" anchor (DateOnly(2026, 9, 21)))
           None
           "rest in week 3"
 
         // Inside the opcion's own range it resolves normally
         match
-          trySemana shortPlan Hombre "3dias" anchor (DateOnly(2026, 9, 14))
+          tryWeek shortPlan Male "3dias" anchor (DateOnly(2026, 9, 14))
         with
         | None -> failtest "expected week 2 of the opcion"
-        | Some semana -> Expect.equal semana.Numero 2 "week 2 of the opcion")
+        | Some semana -> Expect.equal semana.Number 2 "week 2 of the opcion")
 
     testCase "malformed mesociclo extras yield None" (fun () ->
       let p = {
@@ -317,10 +310,10 @@ let tests =
             ]
       }
 
-      Expect.equal (tryMesocicloRir p 1) None "no RIR segment"
-      Expect.equal (tryMesocicloRir p 2) None "empty RIR token"
-      Expect.equal (tryMesocicloRir p 3) None "no Semana 3 header"
-      Expect.equal (tryMesocicloRir p 4) None "no mesociclo for week 4")
+      Expect.equal (tryMesocycleRir p 1) None "no RIR segment"
+      Expect.equal (tryMesocycleRir p 2) None "empty RIR token"
+      Expect.equal (tryMesocycleRir p 3) None "no Semana 3 header"
+      Expect.equal (tryMesocycleRir p 4) None "no mesociclo for week 4")
 
     testCase
       "weekRows: seven rows, three sessions, four rest, today bar"
@@ -333,7 +326,7 @@ let tests =
           let rows =
             weekRows
               parsed.Plan
-              Hombre
+              Male
               "3dias"
               anchor
               (DateOnly(2026, 9, 16))
@@ -357,7 +350,7 @@ let tests =
           match sessionRows.[0].Session with
           | None -> failtest "Monday row carries a dia"
           | Some dia ->
-            Expect.equal dia.Titulo (Some "Full Body A") "Monday title")
+            Expect.equal dia.Title (Some "Full Body A") "Monday title")
 
     testCase "planChipState: before, inside, after" (fun () ->
       let text = readFixture "plan_entrenamiento_4sem.txt"

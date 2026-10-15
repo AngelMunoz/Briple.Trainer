@@ -135,8 +135,8 @@ let variabilidadTexto =
 let atletaTexto(atleta: Atleta) =
   let genero =
     match atleta.Genero with
-    | Hombre -> "male"
-    | Mujer -> "female"
+    | Male -> "male"
+    | Female -> "female"
 
   let metas = separar ", " atleta.Metas
   let enfasis = separar ", " atleta.Enfasis

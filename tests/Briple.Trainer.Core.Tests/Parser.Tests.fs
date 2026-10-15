@@ -15,20 +15,20 @@ let hasWarning (kind: WarningKind) (line: int) (warnings: ParseWarning list) =
   warnings
   |> List.exists(fun warning -> warning.Kind = kind && warning.Line = line)
 
-let bloque (plan: Plan) (genero: Genero) =
-  plan.Bloques |> List.find(fun b -> b.Genero = genero)
+let bloque (plan: Plan) (genero: Gender) =
+  plan.Blocks |> List.find(fun b -> b.Gender = genero)
 
-let opcion (bloque: Bloque) (id: string) =
-  bloque.Opciones |> List.find(fun o -> o.Id = id)
+let opcion (bloque: Block) (id: string) =
+  bloque.Variants |> List.find(fun o -> o.Id = id)
 
 let totalEjercicios(plan: Plan) =
-  plan.Bloques
+  plan.Blocks
   |> List.sumBy(fun bloque ->
-    bloque.Opciones
+    bloque.Variants
     |> List.sumBy(fun opcion ->
-      opcion.Semanas
+      opcion.Weeks
       |> List.sumBy(fun semana ->
-        semana.Dias |> List.sumBy(fun d -> d.Ejercicios.Length))))
+        semana.Days |> List.sumBy(fun d -> d.Exercises.Length))))
 
 let assertSamplePlan(text: string) =
   match parse text with
@@ -45,71 +45,71 @@ let assertSamplePlan(text: string) =
     Expect.equal plan.Version 1 "version"
 
     Expect.equal
-      plan.Titulo
+      plan.Title
       "Plan de Entrenamiento en Circuito - 4 Semanas"
       "titulo"
 
-    Expect.equal plan.Semanas 4 "semanas"
-    Expect.equal plan.Generado "2026-09-19" "generado"
+    Expect.equal plan.Weeks 4 "semanas"
+    Expect.equal plan.Generated "2026-09-19" "generado"
 
     Expect.equal
-      plan.Origen
+      plan.Origin
       "Plan_Entrenamiento_Circuito_4_Semanas (2).xlsx"
       "origen"
 
-    Expect.equal plan.Bloques.Length 2 "generos in file"
+    Expect.equal plan.Blocks.Length 2 "generos in file"
 
-    let hombre = bloque plan Hombre
-    let mujer = bloque plan Mujer
+    let hombre = bloque plan Male
+    let mujer = bloque plan Female
 
     Expect.equal
-      (hombre.Opciones |> List.map(fun o -> o.Id))
+      (hombre.Variants |> List.map(fun o -> o.Id))
       [ "3dias"; "5dias" ]
       "hombre opciones"
 
     Expect.equal
-      (mujer.Opciones |> List.map(fun o -> o.Id))
+      (mujer.Variants |> List.map(fun o -> o.Id))
       [ "5dias" ]
       "mujer opciones"
 
     let tresDias = opcion hombre "3dias"
 
     Expect.equal
-      tresDias.Titulo
+      tresDias.Title
       (Some "FULL BODY A / B / C (LUNES · MIÉRCOLES · VIERNES)")
       "opcion titulo"
 
     Expect.equal
-      (tresDias.Semanas |> List.map(fun s -> s.Numero))
+      (tresDias.Weeks |> List.map(fun s -> s.Number))
       [ 1; 2; 3; 4 ]
       "3dias semanas"
 
-    let semana1 = List.head tresDias.Semanas
+    let semana1 = List.head tresDias.Weeks
 
     Expect.equal
-      (semana1.Dias |> List.map(fun d -> d.Id))
+      (semana1.Days |> List.map(fun d -> d.Id))
       [ "Lunes"; "Miércoles"; "Viernes" ]
       "3dias dias in semana 1"
 
-    let lunes = List.head semana1.Dias
-    Expect.equal lunes.Titulo (Some "Full Body A") "dia titulo"
-    Expect.equal lunes.Ejercicios.Length 6 "lunes ejercicio count"
+    let lunes = List.head semana1.Days
+    Expect.equal lunes.Title (Some "Full Body A") "dia titulo"
+    Expect.equal lunes.Exercises.Length 6 "lunes ejercicio count"
 
-    let first = List.head lunes.Ejercicios
-    Expect.equal first.Circuito "A" "circuit"
-    Expect.equal first.Vueltas "4" "vueltas (verbatim string)"
-    Expect.equal first.Orden 1 "orden"
-    Expect.equal first.Nombre "Sentadilla con barra" "nombre"
+    let first = List.head lunes.Exercises
+    Expect.equal first.Circuit "A" "circuit"
+    Expect.equal first.Laps "4" "vueltas (verbatim string)"
+    Expect.equal first.Order 1 "orden"
+    Expect.equal first.Name "Sentadilla con barra" "nombre"
     Expect.equal first.Reps "6-8" "reps verbatim"
     Expect.equal first.Rir "1-2" "rir verbatim"
-    Expect.equal first.Descanso "3 min" "descanso verbatim"
-    Expect.equal first.Notas "-" "notas verbatim"
+    Expect.equal first.Rest "3 min" "descanso verbatim"
+    Expect.equal first.Notes "-" "notas verbatim"
 
-    let viernes = semana1.Dias |> List.find(fun d -> d.Id = "Viernes")
+    let viernes = semana1.Days |> List.find(fun d -> d.Id = "Viernes")
 
     let plancha =
-      viernes.Ejercicios
-      |> List.find(fun e -> e.Nombre = "Plancha / rueda abdominal")
+      viernes.Exercises
+      |> List.find(fun e -> e.Name = "Plancha / rueda abdominal")
 
     Expect.equal plancha.Reps "30-45 s" "time-based reps verbatim"
     Expect.equal plancha.Rir "-" "absent rir stays '-'"
@@ -117,13 +117,13 @@ let assertSamplePlan(text: string) =
     let cincoDias = opcion hombre "5dias"
 
     Expect.isTrue
-      (cincoDias.Semanas |> List.forall(fun s -> s.Dias.Length = 5))
+      (cincoDias.Weeks |> List.forall(fun s -> s.Days.Length = 5))
       "5dias trains five days per week"
 
-    let mujerSemanas = List.head mujer.Opciones
+    let mujerSemanas = List.head mujer.Variants
 
     Expect.isTrue
-      (mujerSemanas.Semanas |> List.forall(fun s -> s.Dias.Length = 5))
+      (mujerSemanas.Weeks |> List.forall(fun s -> s.Days.Length = 5))
       "mujer plan trains five days per week"
 
     Expect.equal plan.Extras.Length 32 "extras count"
@@ -162,24 +162,24 @@ let tests =
         Expect.equal plan.Version 1 "version"
 
         Expect.equal
-          plan.Titulo
+          plan.Title
           "Plan de Entrenamiento - Mes 2 en Circuito (4 Semanas)"
           "titulo"
 
-        Expect.equal plan.Semanas 4 "semanas"
-        Expect.equal plan.Generado "2026-10-05" "generado"
-        Expect.equal plan.Bloques.Length 2 "generos in file"
+        Expect.equal plan.Weeks 4 "semanas"
+        Expect.equal plan.Generated "2026-10-05" "generado"
+        Expect.equal plan.Blocks.Length 2 "generos in file"
 
-        let hombre = bloque plan Hombre
-        let mujer = bloque plan Mujer
+        let hombre = bloque plan Male
+        let mujer = bloque plan Female
 
         Expect.equal
-          (hombre.Opciones |> List.map(fun o -> o.Id))
+          (hombre.Variants |> List.map(fun o -> o.Id))
           [ "3dias"; "5dias" ]
           "hombre opciones"
 
         Expect.equal
-          (mujer.Opciones |> List.map(fun o -> o.Id))
+          (mujer.Variants |> List.map(fun o -> o.Id))
           [ "5dias" ]
           "mujer opciones"
 
@@ -217,7 +217,7 @@ let tests =
           "bad row reported at its line"
 
         Expect.isTrue
-          (hasWarning EmptyDia 9 parsed.Warnings)
+          (hasWarning EmptyDay 9 parsed.Warnings)
           "the day ends up empty"
       | Error error ->
         failtest $"expected warnings, got error: {error.Message}")
@@ -257,7 +257,7 @@ let tests =
           "unmapped day name reported"
 
         Expect.equal
-          parsed.Plan.Bloques.[0].Opciones.[0].Semanas.[0].Dias.Length
+          parsed.Plan.Blocks.[0].Variants.[0].Weeks.[0].Days.Length
           1
           "day kept in the model"
       | Error error ->
@@ -276,7 +276,7 @@ let tests =
           "skip warning at line 4"
 
         Expect.equal
-          parsed.Plan.Bloques.Length
+          parsed.Plan.Blocks.Length
           0
           "no genero parsed from the unknown block"
       | Error error ->
@@ -315,8 +315,8 @@ let tests =
           2
           "titulo and semanas both reported"
 
-        Expect.equal parsed.Plan.Titulo "" "titulo defaulted"
-        Expect.equal parsed.Plan.Semanas 0 "semanas defaulted"
+        Expect.equal parsed.Plan.Title "" "titulo defaulted"
+        Expect.equal parsed.Plan.Weeks 0 "semanas defaulted"
       | Error error ->
         failtest $"expected warnings, got error: {error.Message}")
 
@@ -326,7 +326,7 @@ let tests =
       with
       | Ok parsed ->
         Expect.equal parsed.Warnings [] $"no warnings, got %A{parsed.Warnings}"
-        Expect.equal parsed.Plan.Bloques.Length 0 "no bloques"
+        Expect.equal parsed.Plan.Blocks.Length 0 "no bloques"
       | Error error ->
         failtest $"expected a clean parse, got error: {error.Message}")
   ]

@@ -51,7 +51,7 @@ let tests =
     testCase "los ajustes del atleta salen del perfil" (fun () ->
       let atleta = {
         Nombre = "Pepe"
-        Genero = Hombre
+        Genero = Male
         Variantes = [ "3dias"; "5dias" ]
         Metas = []
         Enfasis = []
