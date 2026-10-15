@@ -125,6 +125,7 @@ Pasos fijos antes de generar:
 - Tema Metro estricto propio: SimpleTheme de base más diccionario de estilos planos. CornerRadius 0, un acento, tipografía Segoe UI, app bar inferior, pivots con Navs. Tokens e idiomas visuales se portan de Briple (`Theme.fs`, acentos Metro de Metrino.Ripple). `E:\metrino` es la fuente del lenguaje de diseño para la web: tokens y especificaciones visuales salen de ahí.
 - Avalonia: lista de atletas, wizard de generación, revisión con edición de campos, vistas tipo Briple (grupos por circuito, badge de semana, guía), export `.briple`.
 - Persistencia SQLite (Donald): atletas, memorias, planes (Raw verbatim), solicitudes.
+- i18n desde el primer día: todo texto de UI vive en resx de .NET (`Strings.es.resx` por omisión, más idiomas después). La Core no emite prosa localizable: el validador devuelve regla más datos y el consumidor arma el mensaje con recursos.
 - Gate: alta de atleta, generación con wizard, confirmación de memorias y export `.briple` que la PWA importa sin errores.
 - Esfuerzo: 3-4 sesiones.
 
@@ -150,6 +151,7 @@ Pasos fijos antes de generar:
 10. **UI**: sin SukiUI. Tema Metro estricto propio sobre Avalonia: SimpleTheme de base y estilos planos (CornerRadius 0, un acento, Segoe UI). Tokens e idiomas portados de Briple y de `E:\metrino`, la fuente del lenguaje de diseño Metro para la web. NXUI se mantiene para autoría de UI en código.
 11. **El agente devuelve datos, no formato**: el modelo responde JSON con el contenido del plan; la Core lo decodifica (JDeck), lo valida contra los parámetros y `Escritor` genera el texto del formato de forma determinista. El modelo nunca escribe `#start`/`#ej`; las líneas de mesociclo con RIR se agregan desde la solicitud.
 12. **Evidencia y excepciones**: los prompts exigen entrenamiento informado por evidencia (instrucciones en inglés, contenido del plan en español). Las excepciones del entrenador —técnicas de alto riesgo prescritas a propósito— viajan como memorias que nacen confirmadas; el entrenador no justifica y las notas del ejercicio registran que es prescripción del entrenador y la razón basada en evidencia por la que no se sugiere normalmente.
+13. **Idioma del código e i18n**: el código fuente (identificadores, módulos, comentarios, nombres de test) va en inglés; los nombres de módulos en español se renombran (`Atletas`→`Athletes`, `Solicitudes`→`Requests`, etc.). La Core emite datos estructurados (regla más valores, nunca prosa); la localización de UI vive en resx del consumidor desde F5.
 
 ## Fuera de alcance
 
