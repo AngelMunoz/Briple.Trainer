@@ -4,9 +4,11 @@ module Briple.Trainer.Core.Agente
 #nowarn "57"
 
 open System
+open IcedTasks
 open System.ClientModel
 open System.ClientModel.Primitives
 open System.Net.Http
+open System.Text
 open System.Threading
 open System.Threading.Tasks
 open Microsoft.Extensions.AI
@@ -85,16 +87,24 @@ let pedir
   (cliente: IChatClient)
   (sistema: string)
   (usuario: string)
-  : Task<string> = task {
+  : Task<string> =
   let mensajes = [|
     ChatMessage(ChatRole.System, sistema)
     ChatMessage(ChatRole.User, usuario)
   |]
 
-  let! respuesta = cliente.GetResponseAsync(mensajes)
+  // la transmision viaja fria con su token de cancelacion y devuelve el
+  // texto acumulado cuando cierra
+  let transmitir = cancellableTask {
+    let acumulado = Text.StringBuilder()
 
-  return respuesta.Text
-}
+    for actualizacion in cliente.GetStreamingResponseAsync mensajes do
+      acumulado.Append actualizacion.Text |> ignore
+
+    return acumulado.ToString()
+  }
+
+  transmitir CancellationToken.None
 
 // las lineas de mesociclo son parametro de la solicitud: se agregan
 // deterministicamente, el modelo no las escribe

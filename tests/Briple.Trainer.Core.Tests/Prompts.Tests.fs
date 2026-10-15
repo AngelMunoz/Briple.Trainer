@@ -82,6 +82,16 @@ let tests =
 
         Expect.stringContains
           sistema
+          "VARIANT ROTATION"
+          "el sistema exige rotacion de variantes"
+
+        Expect.stringContains
+          sistema
+          "an exercise name never repeats in the same day of the following week"
+          "la rotacion es entre semanas consecutivas"
+
+        Expect.stringContains
+          sistema
           "Respond with the JSON only"
           "la instruccion de salida va en el sistema")
 

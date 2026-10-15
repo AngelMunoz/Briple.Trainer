@@ -1,7 +1,8 @@
 module Briple.Trainer.Core.Agente
 
 // La orquestacion del agente sobre Microsoft.Extensions.AI con
-// proveedores BYOK OpenAI-compatible. El modelo responde datos en
+// proveedores BYOK OpenAI-compatible. Las respuestas se transmiten por
+// trozos dentro de un cancellableTask. El modelo responde datos en
 // JSON; el plan del dominio se convierte con Plan.Datos, se revisa
 // contra los parametros de la solicitud y el formato lo escribe
 // Escritor de forma determinista. Las salidas rechazadas se

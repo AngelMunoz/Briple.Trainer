@@ -9,7 +9,7 @@ open Briple.Trainer.Core.Memorias
 open Briple.Trainer.Core.Solicitudes
 
 /// Mensaje de sistema de los flujos de generacion: rol, esquema de
-/// respuesta JSON y reglas fijas.
+/// respuesta JSON, reglas fijas y rotacion de variantes.
 val sistema: string
 
 /// Mensaje de sistema de la consolidacion de marcas.

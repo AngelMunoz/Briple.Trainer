@@ -3,7 +3,7 @@
 Briple.Trainer is a desktop app for personal trainers: F# on .NET 10 with
 Avalonia, split into a Core library that owns the training-plan format and the
 agent-assisted plan generation, and a desktop consumer. No backend; BYOK
-providers (GLM, DeepSeek, Meta Muse), all OpenAI-compatible.
+providers (DeepSeek, Meta Muse), all OpenAI-compatible.
 
 ## Imperatives
 

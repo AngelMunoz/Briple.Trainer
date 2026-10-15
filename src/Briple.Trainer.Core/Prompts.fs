@@ -124,6 +124,14 @@ let evidenciaTexto =
 - If you cannot state why an exercise helps this athlete, replace it with one you can justify.
 TRAINER EXCEPTIONS: the trainer is the health expert for this athlete and does not need to justify a prescription. When a trainer exception prescribes a technique, follow it. In that exercise's notas, record that it is trainer-prescribed and state the evidence-based reason why it is not generally suggested."""
 
+// la rotacion de variantes evita la monotonia: el patron de cada dia se
+// mantiene y la variante cambia semana a semana
+let variabilidadTexto =
+  """VARIANT ROTATION:
+- Within each option, every training day keeps the same movement patterns across the weeks.
+- The exercise variant changes every week: rotate equipment, grip or angle, so an exercise name never repeats in the same day of the following week.
+- Progress the work across the weeks through the circuit rounds and rep ranges, not by repeating identical exercises."""
+
 let atletaTexto(atleta: Atleta) =
   let genero =
     match atleta.Genero with
@@ -136,12 +144,14 @@ let atletaTexto(atleta: Atleta) =
   $"Athlete: {atleta.Nombre} ({genero}). Goals: {metas}. Focus: {enfasis}."
 
 /// System message for the generation flows: role, schema, evidence
-/// rules and output discipline.
+/// rules, variant rotation and output discipline.
 let sistema =
   "You are a strength and conditioning coach who writes training plans.\n\n"
   + esquemaTexto
   + "\n\n"
   + evidenciaTexto
+  + "\n\n"
+  + variabilidadTexto
   + "\n\nRespond with the JSON only: no markdown, no extra text."
 
 /// System message for feedback consolidation.

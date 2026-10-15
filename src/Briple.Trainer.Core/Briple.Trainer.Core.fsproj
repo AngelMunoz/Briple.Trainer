@@ -46,7 +46,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Agente: BYOK OpenAI-compatible (GLM, DeepSeek, Meta Muse) -->
+    <!-- Agente: BYOK OpenAI-compatible (DeepSeek, Meta Muse) -->
+    <PackageReference Include="IcedTasks" />
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="OpenAI" />

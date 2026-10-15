@@ -13,7 +13,7 @@
 //   excepcion [prov]              plan nuevo con la excepcion del entrenador
 //   prompt [nuevo|ajuste|consolidar|excepcion]   muestra el prompt sin llamar
 //
-// Proveedores: glm (por defecto, coding plan de z.ai), deepseek, opencode.
+// Proveedores: deepseek (por defecto), opencode.
 // Perfiles: hombre (3dias+5dias, por defecto), mujer (5dias).
 // BRIPLE_MODELO sobreescribe el modelo de cualquier proveedor.
 // Cada corrida usa una sesion nueva del proveedor y guarda su salida en
@@ -68,8 +68,8 @@ let nombreProveedor =
   match argumentos with
   | m :: _ :: p :: _ when not(List.contains m modosSinVeces) -> p
   | m :: p :: _ when List.contains m modosSinVeces ->
-    if Int32.TryParse p |> fst then "glm" else p
-  | _ -> "glm"
+    if Int32.TryParse p |> fst then "deepseek" else p
+  | _ -> "deepseek"
 
 let nombrePerfil =
   let modosConPerfil = [ "ab"; "consolidar"; "consolidar-crudo"; "excepcion" ]
@@ -94,13 +94,6 @@ let proveedor nombre =
   let sesion = Guid.NewGuid().ToString("N")
 
   match nombre with
-  | "deepseek" -> {
-      Nombre = "deepseek"
-      Endpoint = Uri "https://api.deepseek.com"
-      Modelo = modeloPorOmision |> Option.defaultValue "deepseek-flash"
-      AgenteUsuario = ""
-      Encabezados = []
-    }
   | "opencode" -> {
       Nombre = "opencode"
       Endpoint = Uri "https://opencode.ai/inference/go/v1/responses"
@@ -110,9 +103,10 @@ let proveedor nombre =
       Encabezados = [ ("x-opencode-session", sesion) ]
     }
   | _ -> {
-      Nombre = "glm"
-      Endpoint = Uri "https://api.z.ai/api/coding/paas/v4"
-      Modelo = modeloPorOmision |> Option.defaultValue "glm-5.3-flash"
+      // responses: esfuerzo estandar en reasoning.effort (default high)
+      Nombre = "deepseek"
+      Endpoint = Uri "https://api.deepseek.com/responses"
+      Modelo = modeloPorOmision |> Option.defaultValue "deepseek-flash"
       AgenteUsuario = ""
       Encabezados = []
     }
@@ -243,8 +237,8 @@ let clave() =
 
 let proveedorElegido = proveedor nombreProveedor
 
-// sesion nueva por corrida: el caching del proveedor no devuelve la
-// misma respuesta en las mediciones
+// sesion nueva por corrida: el cache del proveedor no devuelve siempre
+// la misma respuesta entre corridas repetidas
 let conSesionNueva(proveedor: Proveedor) =
   let renovar(nombre, valor) =
     if nombre = "x-opencode-session" then
@@ -447,7 +441,7 @@ let ayuda() =
   printfn
     "modos: nuevo N [prov] [perfil] | ajuste N [prov] [perfil] | ab [prov] [perfil] | consolidar [prov] | consolidar-crudo [prov] | excepcion [prov] | prompt [nuevo|ajuste|consolidar|excepcion]"
 
-  printfn "proveedores: glm (default, coding plan z.ai), deepseek, opencode"
+  printfn "proveedores: deepseek (default), opencode"
 
   printfn "perfiles: hombre (default), mujer"
 

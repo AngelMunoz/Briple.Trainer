@@ -29,7 +29,34 @@ type ClienteFalso(respuesta: string) =
         _opciones: ChatOptions,
         _cancelacion: Threading.CancellationToken
       ) : Collections.Generic.IAsyncEnumerable<ChatResponseUpdate> =
-      failwith "el cliente falso no transmite"
+      // una sola actualizacion con todo el texto: el consumidor no nota
+      // la diferencia contra una transmision por trozos
+      {
+        new Collections.Generic.IAsyncEnumerable<ChatResponseUpdate> with
+          member _.GetAsyncEnumerator
+            (_ct: Threading.CancellationToken)
+            : Collections.Generic.IAsyncEnumerator<ChatResponseUpdate> =
+            let mutable servido = false
+
+            let mutable actual = Unchecked.defaultof<ChatResponseUpdate>
+
+            {
+              new Collections.Generic.IAsyncEnumerator<ChatResponseUpdate> with
+                member _.Current = actual
+
+                member _.MoveNextAsync() : Threading.Tasks.ValueTask<bool> =
+                  if servido then
+                    Threading.Tasks.ValueTask<bool>(false)
+                  else
+                    servido <- true
+                    actual <- ChatResponseUpdate(ChatRole.Assistant, respuesta)
+
+                    Threading.Tasks.ValueTask<bool>(true)
+
+                member _.DisposeAsync() : Threading.Tasks.ValueTask =
+                  Threading.Tasks.ValueTask.CompletedTask
+            }
+      }
 
     member _.GetService(_tipo: Type, _clave: obj) : obj =
       Unchecked.defaultof<obj>
