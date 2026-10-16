@@ -488,3 +488,11 @@ spike/prompt-*.txt
 
 # local databases (migrondi dev connection points next to the project)
 *.db
+
+# planes, reportes y notas de trabajo: viven local, no en el repositorio
+docs/plan-*.md
+docs/reporte-*.md
+docs/notas-*.md
+
+# estado local de la herramienta de agente
+.zcode/
