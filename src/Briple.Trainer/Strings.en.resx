@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -18,8 +18,17 @@
   <data name="nav.athletes" xml:space="preserve">
     <value>Atletas</value>
   </data>
-  <data name="nav.language" xml:space="preserve">
-    <value>Español</value>
+  <data name="nav.settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="common.back" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="common.cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="error.friendly" xml:space="preserve">
+    <value>{0} failed: {1}</value>
   </data>
   <data name="athletes.title" xml:space="preserve">
     <value>Athletes</value>
@@ -249,6 +258,21 @@
   <data name="wizard.discard" xml:space="preserve">
     <value>Discard</value>
   </data>
+  <data name="wizard.discardTitle" xml:space="preserve">
+    <value>Discard the plan?</value>
+  </data>
+  <data name="wizard.discardBody" xml:space="preserve">
+    <value>The generated plan is lost. Getting it back means generating again (1-2 minutes).</value>
+  </data>
+  <data name="wizard.retry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="wizard.exit" xml:space="preserve">
+    <value>Exit without generating</value>
+  </data>
+  <data name="wizard.cancelGeneration" xml:space="preserve">
+    <value>Cancel generation</value>
+  </data>
   <data name="review.title" xml:space="preserve">
     <value>Plan review</value>
   </data>
@@ -260,12 +284,6 @@
   </data>
   <data name="review.saved" xml:space="preserve">
     <value>Changes saved</value>
-  </data>
-  <data name="review.saveFailed" xml:space="preserve">
-    <value>Could not save: {0}</value>
-  </data>
-  <data name="review.exportFailed" xml:space="preserve">
-    <value>Could not export: {0}</value>
   </data>
   <data name="review.exported" xml:space="preserve">
     <value>Exported to {0}</value>
@@ -326,6 +344,39 @@
   </data>
   <data name="settings.missing" xml:space="preserve">
     <value>The settings.json file with the provider key (BYOK) is missing.</value>
+  </data>
+  <data name="settings.language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="settings.lang.es" xml:space="preserve">
+    <value>Spanish</value>
+  </data>
+  <data name="settings.lang.en" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="settings.theme" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="settings.theme.system" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="settings.theme.light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="settings.theme.dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="settings.provider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="settings.connected" xml:space="preserve">
+    <value>Connected to DeepSeek.</value>
+  </data>
+  <data name="settings.connect" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="settings.missingToken" xml:space="preserve">
+    <value>No token: plan generation needs the provider connected.</value>
   </data>
   <data name="login.title" xml:space="preserve">
     <value>Connect DeepSeek</value>

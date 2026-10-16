@@ -53,10 +53,14 @@
     <Compile Include="Secrets.fs" />
     <Compile Include="Env.fsi" />
     <Compile Include="Env.fs" />
+    <Compile Include="Navigation.fsi" />
+    <Compile Include="Navigation.fs" />
+    <Compile Include="Toasts.fsi" />
+    <Compile Include="Toasts.fs" />
+    <Compile Include="Dialogs.fsi" />
+    <Compile Include="Dialogs.fs" />
     <Compile Include="Components\Fields.fsi" />
     <Compile Include="Components\Fields.fs" />
-    <Compile Include="Components\AppBar.fsi" />
-    <Compile Include="Components\AppBar.fs" />
     <Compile Include="Components\AthleteList.fsi" />
     <Compile Include="Components\AthleteList.fs" />
     <Compile Include="Components\NewAthleteForm.fsi" />
@@ -77,6 +81,8 @@
     <Compile Include="Views\Login.fs" />
     <Compile Include="Views\Review.fsi" />
     <Compile Include="Views\Review.fs" />
+    <Compile Include="Views\Settings.fsi" />
+    <Compile Include="Views\Settings.fs" />
     <Compile Include="Views\Routes.fsi" />
     <Compile Include="Views\Routes.fs" />
     <Compile Include="Program.fs" />

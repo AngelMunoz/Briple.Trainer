@@ -24,6 +24,12 @@ module Language =
   /// The other language.
   val inline toggle: Language -> Language
 
+  /// Reads a settings token ("es"/"en"); anything unknown reads as Es.
+  val ofToken: text: string -> Language
+
+  /// Writes the settings token of a language.
+  val toToken: language: Language -> string
+
 /// The text of a key under a culture; a missing key renders as the key
 /// itself so an untranslated entry is visible instead of silent.
 val get: culture: CultureInfo * key: string -> string
@@ -39,7 +45,16 @@ module Keys =
   val navAthletes: string = "nav.athletes"
 
   [<Literal>]
-  val navLanguage: string = "nav.language"
+  val navSettings: string = "nav.settings"
+
+  [<Literal>]
+  val commonBack: string = "common.back"
+
+  [<Literal>]
+  val commonCancel: string = "common.cancel"
+
+  [<Literal>]
+  val errorFriendly: string = "error.friendly"
 
   [<Literal>]
   val athletesTitle: string = "athletes.title"
@@ -270,6 +285,21 @@ module Keys =
   val wizardDiscard: string = "wizard.discard"
 
   [<Literal>]
+  val wizardDiscardTitle: string = "wizard.discardTitle"
+
+  [<Literal>]
+  val wizardDiscardBody: string = "wizard.discardBody"
+
+  [<Literal>]
+  val wizardRetry: string = "wizard.retry"
+
+  [<Literal>]
+  val wizardExit: string = "wizard.exit"
+
+  [<Literal>]
+  val wizardCancelGeneration: string = "wizard.cancelGeneration"
+
+  [<Literal>]
   val reviewTitle: string = "review.title"
 
   [<Literal>]
@@ -280,12 +310,6 @@ module Keys =
 
   [<Literal>]
   val reviewSaved: string = "review.saved"
-
-  [<Literal>]
-  val reviewSaveFailed: string = "review.saveFailed"
-
-  [<Literal>]
-  val reviewExportFailed: string = "review.exportFailed"
 
   [<Literal>]
   val reviewExported: string = "review.exported"
@@ -346,6 +370,39 @@ module Keys =
 
   [<Literal>]
   val settingsMissing: string = "settings.missing"
+
+  [<Literal>]
+  val settingsLanguage: string = "settings.language"
+
+  [<Literal>]
+  val settingsLangEs: string = "settings.lang.es"
+
+  [<Literal>]
+  val settingsLangEn: string = "settings.lang.en"
+
+  [<Literal>]
+  val settingsTheme: string = "settings.theme"
+
+  [<Literal>]
+  val settingsThemeSystem: string = "settings.theme.system"
+
+  [<Literal>]
+  val settingsThemeLight: string = "settings.theme.light"
+
+  [<Literal>]
+  val settingsThemeDark: string = "settings.theme.dark"
+
+  [<Literal>]
+  val settingsProvider: string = "settings.provider"
+
+  [<Literal>]
+  val settingsConnected: string = "settings.connected"
+
+  [<Literal>]
+  val settingsConnect: string = "settings.connect"
+
+  [<Literal>]
+  val settingsMissingToken: string = "settings.missingToken"
 
   [<Literal>]
   val loginTitle: string = "login.title"
@@ -444,3 +501,7 @@ module Keys =
 
   [<Literal>]
   val advisoryTimedWithRir: string = "advisory.timedWithRir"
+
+/// One user-facing failure line: the action that failed and the cause,
+/// clipped to a readable length.
+val friendly: culture: CultureInfo * action: string * reason: string -> string

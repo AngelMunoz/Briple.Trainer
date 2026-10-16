@@ -8,17 +8,39 @@ open NXUI.Extensions
 
 open Briple.Trainer.Theme
 
-let inline title(text: string) : Control =
+/// The page contract: title, page commands and body, read inside a
+/// measure so prose and forms keep a readable width.
+[<Struct>]
+type PageChrome = {
+  Title: string
+  Commands: Control list
+  Body: Control
+  Measure: float
+}
+
+/// The page title level: 28 SemiBold.
+let inline pageTitle(text: string) : Control =
   TextBlock()
     .Text(text)
     .FontFamily(font)
-    .FontSize(22.0)
-    .FontWeight(FontWeight.Bold)
-    .Margin(0.0, 0.0, 0.0, 12.0)
+    .FontSize(28.0)
+    .FontWeight(FontWeight.SemiBold)
+    .Margin(0.0, 0.0, 0.0, 8.0)
 
+/// The section header level: 20 SemiBold.
+let inline sectionTitle(text: string) : Control =
+  TextBlock()
+    .Text(text)
+    .FontFamily(font)
+    .FontSize(20.0)
+    .FontWeight(FontWeight.SemiBold)
+    .Margin(0.0, 16.0, 0.0, 8.0)
+
+/// A secondary-text caption: 12, muted.
 let inline label(text: string) : Control =
   TextBlock().Text(text).FontFamily(font).FontSize(12.0).Foreground(muted)
 
+/// One labeled field: label above, input below.
 let inline field
   (labelText: string, [<InlineIfLambda>] input: unit -> Control)
   : Control =
@@ -30,16 +52,33 @@ let inline button
   Button()
     .Content(text)
     .FontFamily(font)
-    .CornerRadius(0.0)
-    .Padding(12.0, 6.0)
+    .Padding(16.0, 8.0)
     .OnClickHandler(fun _ _ -> onClick())
 
+/// The primary action button: the accent fill.
 let inline primaryButton
   (text: string, [<InlineIfLambda>] onClick: unit -> unit)
   : Button =
   let flat = button(text, onClick)
 
-  flat.Background(accent).Foreground(Brushes.White)
+  flat.Classes.Add("accent")
+
+  flat
+
+/// A tertiary text action.
+let inline hyperlinkButton
+  (text: string, [<InlineIfLambda>] onClick: unit -> unit)
+  : Control =
+  HyperlinkButton()
+    .Content(text)
+    .FontFamily(font)
+    .OnClickHandler(fun _ _ -> onClick())
+
+/// One command for the page's CommandBar.
+let inline command
+  (text: string, [<InlineIfLambda>] onClick: unit -> unit)
+  : CommandBarButton =
+  CommandBarButton(Label = text).OnClickHandler(fun _ _ -> onClick())
 
 let inline chipButton
   (text: string, [<InlineIfLambda>] onClick: unit -> unit, isOn: bool)
@@ -143,8 +182,7 @@ let inline entry
   ) : TextBox =
   TextBox()
     .FontFamily(font)
-    .CornerRadius(0.0)
-    .Padding(8.0, 4.0)
+    .Padding(8.0, 6.0)
     .Text(text)
     .PlaceholderText(placeholder)
     .OnText(fun _ observed ->
@@ -186,10 +224,51 @@ let inline checkRow
 
   check.DetachedFromVisualTree.Add(fun _ -> tap.Dispose())
 
-  check.OnClickHandler(fun _ _ -> onToggle()) :> Control
+  check.OnClickHandler(fun _ _ -> onToggle())
 
-let inline page(titleText: string, content: Control) : Control =
+/// The CommandBar of a page: the commands land as primaries, dynamic
+/// overflow takes the rest when the window runs narrow.
+let inline commandBar(commands: Control list) : Control =
+  let bar =
+    CommandBar()
+      .IsDynamicOverflowEnabled(true)
+      .HorizontalAlignment(HorizontalAlignment.Left)
+
+  commands
+  |> List.iter(fun command ->
+    match command with
+    | :? CommandBarButton as button ->
+      bar.PrimaryCommands.Add(button :> ICommandBarElement)
+    | _ -> ())
+
+  bar
+
+/// The full page: the CommandBar under the title, the body below, all
+/// inside the measure.
+let inline fluentPage(chrome: PageChrome) : Control =
+  let header =
+    match chrome.Commands with
+    | [] -> pageTitle chrome.Title
+    | commands ->
+      StackPanel()
+        .Spacing(12.0)
+        .Children(pageTitle chrome.Title, commandBar commands)
+
   ScrollViewer()
     .Content(
-      StackPanel().Margin(24.0).Spacing(8.0).Children(title titleText, content)
+      StackPanel()
+        .Margin(24.0)
+        .Spacing(12.0)
+        .MaxWidth(chrome.Measure)
+        .HorizontalAlignment(HorizontalAlignment.Left)
+        .Children(header, chrome.Body)
     )
+
+/// A body-only page: the page contract without commands.
+let inline page(titleText: string, content: Control) : Control =
+  fluentPage {
+    Title = titleText
+    Commands = []
+    Body = content
+    Measure = 760.0
+  }

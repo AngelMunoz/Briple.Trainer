@@ -96,8 +96,9 @@ let hasText(root: Control, text: string) : bool =
     | :? TextBlock as textBlock -> textBlock.Text = text
     | _ -> false)
 
-/// Finds the first button whose content equals the text or whose content
-/// subtree carries it (rows with rich content).
+/// Finds the first button whose content equals the text, whose label
+/// does (CommandBarButton), or whose content subtree carries it (rows
+/// with rich content).
 let buttonWithText(root: Control, text: string) : Button option =
   let buttons =
     root.GetVisualDescendants()
@@ -110,12 +111,17 @@ let buttonWithText(root: Control, text: string) : Button option =
   |> Seq.tryPick(fun button ->
     let direct = string button.Content = text
 
+    let labelled =
+      match button with
+      | :? CommandBarButton as command -> command.Label = text
+      | _ -> false
+
     let nested =
       match button.Content with
       | :? Control as content -> hasText(content, text)
       | _ -> false
 
-    if direct || nested then Some button else None)
+    if direct || labelled || nested then Some button else None)
 
 /// Clicks through the routed event, the way MigrondiUI's tests do.
 let click(button: Button) : unit =

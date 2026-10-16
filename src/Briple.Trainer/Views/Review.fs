@@ -42,11 +42,10 @@ type ReviewPageProps = {
 // --- page pieces as module functions ---
 
 let inline invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
-  StackPanel()
-    .Margin(24.0)
-    .Spacing(8.0)
-    .Children(
-      title(get(props.Culture, Keys.reviewTitle)),
+  fluentPage {
+    Title = get(props.Culture, Keys.reviewTitle)
+    Commands = []
+    Body =
       TextBlock()
         .Text(
           getf(
@@ -57,7 +56,8 @@ let inline invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
         )
         .Foreground(errorBrush)
         .FontFamily(font)
-    )
+    Measure = 760.0
+  }
 
 /// The raw text to persist: the latest edit when there is one, the stored
 /// Raw otherwise.
@@ -66,13 +66,13 @@ let inline rawOf(latest: Plan option, entity: PlanEntity) : string =
   |> Option.map Briple.Trainer.Core.Plan.Writer.write
   |> Option.defaultValue entity.Raw
 
-let inline saveButton
+let inline saveCommand
   (
     props: ReviewPageProps,
     latest: BehaviorSubject<Plan option>,
     status: BehaviorSubject<string>
-  ) : Control =
-  primaryButton(
+  ) : CommandBarButton =
+  command(
     get(props.Culture, Keys.reviewSave),
     fun () ->
       latest.Value
@@ -85,22 +85,34 @@ let inline saveButton
           | Error e ->
             Log.Error(e, "plan update failed")
 
-            status.OnNext(
-              getf(props.Culture, Keys.reviewSaveFailed, [ e.Message :> obj ])
-            )
+            let action = get(props.Culture, Keys.reviewSave)
+            let wording = friendly(props.Culture, action, e.Message)
+
+            status.OnNext wording
+
+            Briple.Trainer.Toasts.show(action, wording, true)
         }
         |> Async.StartImmediate)
   )
 
-let inline exportButton
+let inline exportCommand
   (
     props: ReviewPageProps,
     latest: BehaviorSubject<Plan option>,
     status: BehaviorSubject<string>
-  ) : Control voption =
+  ) : CommandBarButton voption =
   props.Host
   |> ValueOption.map(fun host ->
     let t key = get(props.Culture, key)
+
+    let report(action: string, error: exn) =
+      Log.Error(error, "{Actiono} failed", action)
+
+      let wording = friendly(props.Culture, action, error.Message)
+
+      status.OnNext wording
+
+      Briple.Trainer.Toasts.show(action, wording, true)
 
     let pick() =
       asyncEx {
@@ -127,28 +139,15 @@ let inline exportButton
               status.OnNext(
                 getf(props.Culture, Keys.reviewExported, [ path :> obj ])
               )
-            | Error e ->
-              Log.Error(e, "export failed")
-
-              status.OnNext(
-                getf(
-                  props.Culture,
-                  Keys.reviewExportFailed,
-                  [ e.Message :> obj ]
-                )
-              )
+            | Error e -> report(t Keys.reviewExport, e)
         with e ->
           // the picker runs fire-and-forget: an unhandled throw here dies
           // on a thread-pool thread and takes the process with it
-          Log.Error(e, "export picker failed")
-
-          status.OnNext(
-            getf(props.Culture, Keys.reviewExportFailed, [ e.Message :> obj ])
-          )
+          report(t Keys.reviewExport, e)
       }
       |> Async.Start
 
-    button(t Keys.reviewExport, pick))
+    command(t Keys.reviewExport, pick))
 
 // --- the page ---
 
@@ -182,12 +181,6 @@ type ReviewPage(props: ReviewPageProps) as this =
             | PlanReview.PlanChanged plan -> latest.OnNext(Some plan))
           )
 
-        let save = saveButton(props, latest, status)
-
-        let actions =
-          exportButton(props, latest, status)
-          |> ValueOption.fold (fun _ picker -> [| save; picker |]) [| save |]
-
         let notes =
           NoteSection.NoteSection(
             {
@@ -202,19 +195,22 @@ type ReviewPage(props: ReviewPageProps) as this =
             ignore
           )
 
-        ScrollViewer()
-          .Content(
+        let save = saveCommand(props, latest, status)
+
+        let commands: Control list =
+          exportCommand(props, latest, status)
+          |> ValueOption.fold (fun _ picker -> [ save; picker ]) [ save ]
+
+        fluentPage {
+          Title = get(props.Culture, Keys.reviewTitle)
+          Commands = commands
+          Body =
             StackPanel()
-              .Margin(24.0)
               .Spacing(8.0)
               .Children(
-                title(get(props.Culture, Keys.reviewTitle)),
-                StackPanel()
-                  .Orientation(Orientation.Horizontal)
-                  .Spacing(8.0)
-                  .Children(actions),
                 TextBlock().Text(status).Foreground(muted).FontFamily(font),
                 review,
                 notes
               )
-          )
+          Measure = 760.0
+        }

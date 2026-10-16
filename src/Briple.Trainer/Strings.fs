@@ -20,6 +20,18 @@ module Language =
     | Es -> En
     | En -> Es
 
+  /// Reads a settings token ("es"/"en"); anything unknown reads as Es.
+  let ofToken(text: string) =
+    match text with
+    | "en" -> En
+    | _ -> Es
+
+  /// Writes the settings token of a language.
+  let toToken(language) =
+    match language with
+    | Es -> "es"
+    | En -> "en"
+
 let resourceManager =
   lazy
     ResourceManager("Briple.Trainer.Strings", Assembly.GetExecutingAssembly())
@@ -40,7 +52,16 @@ module Keys =
   let navAthletes = "nav.athletes"
 
   [<Literal>]
-  let navLanguage = "nav.language"
+  let navSettings = "nav.settings"
+
+  [<Literal>]
+  let commonBack = "common.back"
+
+  [<Literal>]
+  let commonCancel = "common.cancel"
+
+  [<Literal>]
+  let errorFriendly = "error.friendly"
 
   [<Literal>]
   let athletesTitle = "athletes.title"
@@ -271,6 +292,21 @@ module Keys =
   let wizardDiscard = "wizard.discard"
 
   [<Literal>]
+  let wizardDiscardTitle = "wizard.discardTitle"
+
+  [<Literal>]
+  let wizardDiscardBody = "wizard.discardBody"
+
+  [<Literal>]
+  let wizardRetry = "wizard.retry"
+
+  [<Literal>]
+  let wizardExit = "wizard.exit"
+
+  [<Literal>]
+  let wizardCancelGeneration = "wizard.cancelGeneration"
+
+  [<Literal>]
   let reviewTitle = "review.title"
 
   [<Literal>]
@@ -281,12 +317,6 @@ module Keys =
 
   [<Literal>]
   let reviewSaved = "review.saved"
-
-  [<Literal>]
-  let reviewSaveFailed = "review.saveFailed"
-
-  [<Literal>]
-  let reviewExportFailed = "review.exportFailed"
 
   [<Literal>]
   let reviewExported = "review.exported"
@@ -347,6 +377,39 @@ module Keys =
 
   [<Literal>]
   let settingsMissing = "settings.missing"
+
+  [<Literal>]
+  let settingsLanguage = "settings.language"
+
+  [<Literal>]
+  let settingsLangEs = "settings.lang.es"
+
+  [<Literal>]
+  let settingsLangEn = "settings.lang.en"
+
+  [<Literal>]
+  let settingsTheme = "settings.theme"
+
+  [<Literal>]
+  let settingsThemeSystem = "settings.theme.system"
+
+  [<Literal>]
+  let settingsThemeLight = "settings.theme.light"
+
+  [<Literal>]
+  let settingsThemeDark = "settings.theme.dark"
+
+  [<Literal>]
+  let settingsProvider = "settings.provider"
+
+  [<Literal>]
+  let settingsConnected = "settings.connected"
+
+  [<Literal>]
+  let settingsConnect = "settings.connect"
+
+  [<Literal>]
+  let settingsMissingToken = "settings.missingToken"
 
   [<Literal>]
   let loginTitle = "login.title"
@@ -445,3 +508,14 @@ module Keys =
 
   [<Literal>]
   let advisoryTimedWithRir = "advisory.timedWithRir"
+
+/// One user-facing failure line: the action that failed and the cause,
+/// clipped to a readable length. The full detail belongs to the log.
+let friendly(culture: CultureInfo, action: string, reason: string) : string =
+  let clipped =
+    if reason.Length > 120 then
+      $"{reason.Substring(0, 117)}..."
+    else
+      reason
+
+  getf(culture, Keys.errorFriendly, [ action :> obj; clipped :> obj ])

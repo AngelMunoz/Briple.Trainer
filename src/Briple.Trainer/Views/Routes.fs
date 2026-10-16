@@ -2,6 +2,7 @@ module Briple.Trainer.Views.Routes
 
 open System
 open Avalonia.Controls
+open Microsoft.Extensions.Logging
 open Navs
 open Navs.Avalonia
 
@@ -17,7 +18,19 @@ open Briple.Trainer.Core.Requests
 open Briple.Trainer.Env
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
+open Briple.Trainer.Strings
 open Briple.Trainer.Views
+
+type RouteDeps<'T
+  when 'T :> IProvideStore
+  and 'T :> IProvideStores
+  and 'T :> IProvideCulture
+  and 'T :> IProvideLanguage
+  and 'T :> IProvideTheme
+  and 'T :> IProvideHost
+  and 'T :> IProvideAgent
+  and 'T :> IProvideCredentials
+  and 'T :> IProvideLogging> = 'T
 
 let inline go(nav: INavigable<Control>, url: string) : unit =
   asyncEx {
@@ -71,7 +84,16 @@ let newAthletePage
         asyncEx {
           match! env.Stores.Athletes.Add athlete with
           | Ok _ -> go(nav, "/")
-          | Error e -> Log.Error(e, "athlete save failed")
+          | Error e ->
+            Log.Error(e, "athlete save failed")
+
+            let action = get(env.Culture, Keys.athleteSave)
+
+            Briple.Trainer.Toasts.show(
+              action,
+              friendly(env.Culture, action, e.Message),
+              true
+            )
         }
         |> Async.StartImmediate
       | NewAthleteForm.Cancelled -> go(nav, "/")
@@ -188,53 +210,114 @@ let loginPage
     OnDone = fun () -> go(nav, "/")
   }
 
-let build
-  (env:
-    #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideLanguage & #IProvideHost & #IProvideAgent & #IProvideCredentials)
-  : Routes =
-  // the shell opens on the login when there is no working token yet
-  let initial =
-    if (env :> IProvideAgent).AgentAvailable then
-      "/"
-    else
-      "/login"
+let settingsPage
+  (
+    env: #IProvideCulture & #IProvideLanguage & #IProvideTheme & #IProvideAgent,
+    nav: INavigable<Control>
+  ) : Control =
+  Settings.SettingsPage {
+    Culture = env.Culture
+    Language = env.Language
+    Theme = env.Theme
+    AgentAvailable = env.AgentAvailable
+    OnLanguage = env.SetLanguage
+    OnTheme =
+      fun theme ->
+        env.SetTheme theme
+        applyTheme theme
+    OpenLogin = fun () -> go(nav, "/login")
+  }
 
-  Routes(initialUri = initial)
-    .Children(
-      Route("athletes", "/", (fun context nav -> athletesPage(env, nav))),
-      Route("login", "/login", (fun context nav -> loginPage(env, nav))),
-      Route(
-        "new-athlete",
-        "/athletes/new",
-        (fun context nav -> newAthletePage(env, nav))
-      ),
-      Route(
-        "athlete",
-        "/athletes/:athleteId<guid>",
-        fun context nav -> asyncEx {
-          match context with
-          | GuidParam "athleteId" athleteId ->
-            return! detailPage(env, athleteId, nav)
-          | _ -> return notFound()
-        }
-      ),
-      Route(
-        "generate",
-        "/athletes/:athleteId<guid>/generate",
-        fun context nav -> asyncEx {
-          match context with
-          | GuidParam "athleteId" athleteId ->
-            return! wizardPage(env, athleteId, nav)
-          | _ -> return notFound()
-        }
-      ),
-      Route(
-        "review",
-        "/athletes/:athleteId<guid>/review/:planId<guid>",
-        fun context nav -> asyncEx {
-          match context with
-          | GuidParam "planId" planId -> return! reviewPage(env, planId)
-          | _ -> return notFound()
-        }
-      )
+/// The agent gate, shared by every data route: the app's data sits
+/// behind the provider token, and without one the navigation sends the
+/// user to connect it. Only the login and the settings stay open. The
+/// routes carry no cache, so the guard runs on every activation.
+let requiresAgent(env: #IProvideAgent) : GuardResponse =
+  if env.AgentAvailable then
+    GuardResponse.Continue
+  else
+    GuardResponse.Redirect "/login"
+
+let build(env: RouteDeps<'T>) : IRouter<Control> =
+  // the boot fires at the athletes list; the guard decides whether that
+  // lands or the user goes to connect the provider first.
+  //
+  // The table is definitions built with the DSL and composed with pipes:
+  // guards (and cache, later) attach the same way on every route. The
+  // router is the library's own; the shell mounts it in a RouterOutlet.
+  let inline gate r =
+    r |> Navs.Route.canActivate(fun _ _ -> requiresAgent env)
+
+  let table: RouteDefinition<Control> list = [
+    Navs.Route.define<Control>(
+      "athletes",
+      "/",
+      fun _ nav -> athletesPage(env, nav)
     )
+    |> gate
+
+    Navs.Route.define<Control>(
+      "login",
+      "/login",
+      fun _ nav -> loginPage(env, nav)
+    )
+
+    Navs.Route.define<Control>(
+      "new-athlete",
+      "/athletes/new",
+      fun _ nav -> newAthletePage(env, nav)
+    )
+    |> gate
+
+    Navs.Route.define<Control>(
+      "athlete",
+      "/athletes/:athleteId<guid>",
+      fun context nav -> asyncEx {
+        match context with
+        | GuidParam "athleteId" athleteId ->
+          return! detailPage(env, athleteId, nav)
+        | _ -> return notFound()
+      }
+    )
+    |> gate
+
+    Navs.Route.define<Control>(
+      "generate",
+      "/athletes/:athleteId<guid>/generate",
+      fun context nav -> asyncEx {
+        match context with
+        | GuidParam "athleteId" athleteId ->
+          return! wizardPage(env, athleteId, nav)
+        | _ -> return notFound()
+      }
+    )
+    |> gate
+
+    Navs.Route.define<Control>(
+      "review",
+      "/athletes/:athleteId<guid>/review/:planId<guid>",
+      fun context _ -> asyncEx {
+        match context with
+        | GuidParam "planId" planId -> return! reviewPage(env, planId)
+        | _ -> return notFound()
+      }
+    )
+    |> gate
+
+    Navs.Route.define<Control>(
+      "settings",
+      "/settings",
+      fun _ nav -> settingsPage(env, nav)
+    )
+  ]
+
+  // the router logs through the app's Serilog pipeline, so its level
+  // follows the app's configuration, not a private default
+  let router =
+    AvaloniaRouter(table, logger = env.LoggerFactory.CreateLogger "Navs.Router")
+
+  // the boot fires at the athletes list; the guard decides whether that
+  // lands or the user goes to connect the provider first
+  go(router, "/")
+
+  router

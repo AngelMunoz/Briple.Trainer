@@ -135,27 +135,25 @@ type NewAthleteForm(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as 
 
         StackPanel().Spacing(6.0).Children rows :> Control
 
-      let saveButton =
-        let primary =
-          primaryButton(t Keys.athleteSave, (fun () -> dispatch Save))
+      let saveCommand =
+        let save = command(t Keys.athleteSave, (fun () -> dispatch Save))
 
-        primary.IsEnabled(saveEnabled)
+        save.IsEnabled(saveEnabled)
 
-      let cancelButton =
-        button(t Keys.athleteCancel, (fun () -> dispatch Cancel))
-
-      StackPanel()
-        .Spacing(4.0)
-        .Children(
-          field(t Keys.athleteName, (fun () -> nameEntry :> Control)),
-          field(t Keys.athleteGender, (fun () -> genderRadios)),
-          field(t Keys.athleteGoals, (fun () -> goalChecks)),
+      fluentPage {
+        Title = t Keys.athletesNew
+        Commands = [ saveCommand ]
+        Body =
           StackPanel()
-            .Orientation(Avalonia.Layout.Orientation.Horizontal)
-            .Spacing(8.0)
-            .Children(saveButton, cancelButton)
-        )
-      :> Control
+            .Spacing(4.0)
+            .Children(
+              field(t Keys.athleteName, (fun () -> nameEntry :> Control)),
+              field(t Keys.athleteGender, (fun () -> genderRadios)),
+              field(t Keys.athleteGoals, (fun () -> goalChecks)),
+              hyperlinkButton(t Keys.athleteCancel, (fun () -> dispatch Cancel))
+            )
+        Measure = 560.0
+      }
 
     let program = Program.mkProgram init (update onEvent) view
 

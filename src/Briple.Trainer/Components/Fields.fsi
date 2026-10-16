@@ -1,32 +1,52 @@
 module Briple.Trainer.Components.Fields
 
-// The flat Metro control factories: square corners, one accent, the app
-// font. Every control the app renders comes from here or from the MVUish
-// components, so the language stays uniform. `field` takes the input as a
-// `unit -> Control` hole (content projection): the caller decides when the
-// control is built.
+// The Fluent control kit: the type ramp, buttons, chips, inputs and the
+// page contract. One accent (the app's), hierarchy from type size and
+// weight, page commands in a CommandBar at the top. `field` takes the
+// input as a `unit -> Control` hole (content projection): the caller
+// decides when the control is built.
 
 open System
 open Avalonia.Controls
-open Avalonia.Media
 
-/// A section title.
-val inline title: text: string -> Control
+/// The page contract: title, page commands and body, read inside a
+/// measure so prose and forms keep a readable width.
+[<Struct>]
+type PageChrome = {
+  Title: string
+  Commands: Control list
+  Body: Control
+  Measure: float
+}
 
-/// A small muted label.
+/// The page title level: 28 SemiBold.
+val inline pageTitle: text: string -> Control
+
+/// The section header level: 20 SemiBold.
+val inline sectionTitle: text: string -> Control
+
+/// A secondary-text caption: 12, muted.
 val inline label: text: string -> Control
 
-/// A muted label over the control the hole builds.
+/// One labeled field: label above, input below.
 val inline field:
   labelText: string * [<InlineIfLambda>] input: (unit -> Control) -> Control
 
-/// A flat button.
+/// A plain button.
 val inline button:
   text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Button
 
-/// The accent button for the primary action.
+/// The primary action button: the accent fill.
 val inline primaryButton:
   text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Button
+
+/// A tertiary text action.
+val inline hyperlinkButton:
+  text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Control
+
+/// One command for the page's CommandBar.
+val inline command:
+  text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> CommandBarButton
 
 /// A single-choice chip row; the selected option renders in accent.
 val inline choiceChips:
@@ -82,5 +102,13 @@ val inline checkRow:
   [<InlineIfLambda>] onToggle: (unit -> unit) ->
     Control
 
-/// A page shell: title over scrolling content.
+/// The CommandBar of a page: the commands land as primaries, dynamic
+/// overflow takes the rest when the window runs narrow.
+val inline commandBar: commands: Control list -> Control
+
+/// The full page: the CommandBar under the title, the body below, all
+/// inside the measure.
+val inline fluentPage: chrome: PageChrome -> Control
+
+/// A body-only page: the page contract without commands.
 val inline page: titleText: string * content: Control -> Control

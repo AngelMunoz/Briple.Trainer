@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -18,8 +18,17 @@
   <data name="nav.athletes" xml:space="preserve">
     <value>Atletas</value>
   </data>
-  <data name="nav.language" xml:space="preserve">
-    <value>English</value>
+  <data name="nav.settings" xml:space="preserve">
+    <value>Ajustes</value>
+  </data>
+  <data name="common.back" xml:space="preserve">
+    <value>Atrás</value>
+  </data>
+  <data name="common.cancel" xml:space="preserve">
+    <value>Cancelar</value>
+  </data>
+  <data name="error.friendly" xml:space="preserve">
+    <value>{0} falló: {1}</value>
   </data>
   <data name="athletes.title" xml:space="preserve">
     <value>Atletas</value>
@@ -249,6 +258,21 @@
   <data name="wizard.discard" xml:space="preserve">
     <value>Descartar</value>
   </data>
+  <data name="wizard.discardTitle" xml:space="preserve">
+    <value>¿Descartar el plan?</value>
+  </data>
+  <data name="wizard.discardBody" xml:space="preserve">
+    <value>Se pierde el plan generado. Para recuperarlo hay que repetir la generación (1-2 minutos).</value>
+  </data>
+  <data name="wizard.retry" xml:space="preserve">
+    <value>Reintentar</value>
+  </data>
+  <data name="wizard.exit" xml:space="preserve">
+    <value>Salir sin generar</value>
+  </data>
+  <data name="wizard.cancelGeneration" xml:space="preserve">
+    <value>Cancelar generación</value>
+  </data>
   <data name="review.title" xml:space="preserve">
     <value>Revisión del plan</value>
   </data>
@@ -260,12 +284,6 @@
   </data>
   <data name="review.saved" xml:space="preserve">
     <value>Cambios guardados</value>
-  </data>
-  <data name="review.saveFailed" xml:space="preserve">
-    <value>No se pudo guardar: {0}</value>
-  </data>
-  <data name="review.exportFailed" xml:space="preserve">
-    <value>No se pudo exportar: {0}</value>
   </data>
   <data name="review.exported" xml:space="preserve">
     <value>Exportado a {0}</value>
@@ -326,6 +344,39 @@
   </data>
   <data name="settings.missing" xml:space="preserve">
     <value>Falta el archivo settings.json con la clave del proveedor (BYOK).</value>
+  </data>
+  <data name="settings.language" xml:space="preserve">
+    <value>Idioma</value>
+  </data>
+  <data name="settings.lang.es" xml:space="preserve">
+    <value>Español</value>
+  </data>
+  <data name="settings.lang.en" xml:space="preserve">
+    <value>Inglés</value>
+  </data>
+  <data name="settings.theme" xml:space="preserve">
+    <value>Tema</value>
+  </data>
+  <data name="settings.theme.system" xml:space="preserve">
+    <value>Sistema</value>
+  </data>
+  <data name="settings.theme.light" xml:space="preserve">
+    <value>Claro</value>
+  </data>
+  <data name="settings.theme.dark" xml:space="preserve">
+    <value>Oscuro</value>
+  </data>
+  <data name="settings.provider" xml:space="preserve">
+    <value>Proveedor</value>
+  </data>
+  <data name="settings.connected" xml:space="preserve">
+    <value>Conectado a DeepSeek.</value>
+  </data>
+  <data name="settings.connect" xml:space="preserve">
+    <value>Conectar</value>
+  </data>
+  <data name="settings.missingToken" xml:space="preserve">
+    <value>Sin token: la generación de planes necesita conectar el proveedor.</value>
   </data>
   <data name="login.title" xml:space="preserve">
     <value>Conectar DeepSeek</value>

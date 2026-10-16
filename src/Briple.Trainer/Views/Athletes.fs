@@ -142,14 +142,14 @@ let view
         .Margin(24.0)
         .Spacing(8.0)
         .Children(
-          title props.Athlete.Profile.Name,
+          pageTitle props.Athlete.Profile.Name,
           profileLine(props.Culture, props.Athlete.Profile),
           primaryButton(
             t Keys.plansGenerate,
             (fun () -> onEvent Event.GenerateRequested)
           )
             .HorizontalAlignment(HorizontalAlignment.Left),
-          title(t Keys.plansTitle),
+          sectionTitle(t Keys.plansTitle),
           planSection(props, model, onReview)
         )
     )

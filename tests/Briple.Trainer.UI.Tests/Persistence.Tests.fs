@@ -14,6 +14,10 @@ open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Persistence
 
+// migrations under test log through the app's pipeline (silent under the
+// default Serilog)
+let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
+
 let private wait(task: Task<Result<'a, exn>>) : Result<'a, exn> =
   task.GetAwaiter().GetResult()
 
@@ -75,7 +79,7 @@ let tests =
     test "migrate creates the schema and the store round-trips an athlete" {
       let db = tempDb()
 
-      match migrate db with
+      match migrate(testLogger, db) with
       | Ok() -> ()
       | Error e -> failtest $"migrate failed: {e}"
 
@@ -96,7 +100,7 @@ let tests =
     test "memories round-trip through confirm" {
       let db = tempDb()
 
-      migrate db |> ignore
+      migrate(testLogger, db) |> ignore
 
       let store = sqliteStore db
 
@@ -145,7 +149,7 @@ let tests =
     test "plans store the raw text verbatim and update it" {
       let db = tempDb()
 
-      migrate db |> ignore
+      migrate(testLogger, db) |> ignore
 
       let store = sqliteStore db
 
@@ -194,7 +198,7 @@ let tests =
     test "requests record the audit line" {
       let db = tempDb()
 
-      migrate db |> ignore
+      migrate(testLogger, db) |> ignore
 
       let store = sqliteStore db
 

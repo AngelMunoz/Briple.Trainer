@@ -155,11 +155,10 @@ let view
   let complete =
     model |> Observable.map(fun m -> not(String.IsNullOrWhiteSpace m.Token))
 
-  let saveButton =
-    let primary =
-      primaryButton(t Keys.loginSave, (fun () -> dispatch SaveRequested))
+  let saveCommand =
+    let save = command(t Keys.loginSave, fun () -> dispatch SaveRequested)
 
-    primary.IsEnabled(complete)
+    save.IsEnabled(complete)
 
   // the outcome area follows the save state stream
   let outcome =
@@ -171,20 +170,18 @@ let view
   outcomeHost.Bind(ContentControl.ContentProperty :> AvaloniaProperty, outcome)
   |> ignore
 
-  ScrollViewer()
-    .Content(
+  fluentPage {
+    Title = t Keys.loginTitle
+    Commands = [ saveCommand ]
+    Body =
       StackPanel()
-        .Margin(24.0)
-        .Spacing(4.0)
-        .MaxWidth(560.0)
-        .HorizontalAlignment(HorizontalAlignment.Left)
+        .Spacing(12.0)
         .Children(
-          title(t Keys.loginTitle),
           field(t Keys.loginToken, (fun () -> tokenEntry :> Control)),
-          StackPanel().Margin(0.0, 12.0).Children(saveButton),
           outcomeHost
         )
-    )
+    Measure = 560.0
+  }
 
 type LoginPage(props: LoginPageProps) as this =
   inherit UserControl()

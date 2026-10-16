@@ -365,15 +365,6 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
             for week in variant.Weeks -> week.Number
       ]
 
-      // the week pivot: one week at a time, built once per pick
-      let weekPivot =
-        radioRow(
-          weekNumbers |> List.distinct |> List.map string,
-          "plan-week",
-          "1",
-          fun picked -> dispatch(SetWeek(Int32.Parse picked))
-        )
-
       // one variant per emission: the match arm is the whole element, so
       // the comprehension yields it directly
       let render(weekNumber: int) : Control =
@@ -401,16 +392,35 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
 
         StackPanel().Spacing(12.0).Children sections
 
-      let weekHost =
-        ContentControl()
-          .Content(
-            model
-            |> Observable.map(fun m -> m.Week)
-            |> Observable.distinctUntilChanged
-            |> Observable.map(render >> box)
-          )
+      // the week pivot: one tab per week, the header carries the number
+      let weeks = weekNumbers |> List.distinct |> Array.ofList
 
-      StackPanel().Spacing(8.0).Children(weekPivot, weekHost)
+      let tabOf(weekNumber: int) : TabItem =
+        TabItem(
+          Header =
+            TextBlock()
+              .Text(getf(props.Culture, Keys.planWeek, [ weekNumber :> obj ]))
+              .FontSize(16.0)
+              .FontWeight(FontWeight.SemiBold)
+              .FontFamily(font),
+          Content = render weekNumber
+        )
+
+      let weekTabs = TabControl()
+
+      weeks
+      |> Array.iter(fun weekNumber ->
+        weekTabs.Items.Add(tabOf weekNumber) |> ignore)
+
+      weekTabs.SelectedIndex <- 0
+
+      weekTabs.SelectionChanged.Add(fun _ ->
+        let index = weekTabs.SelectedIndex
+
+        if index >= 0 && index < weeks.Length then
+          dispatch(SetWeek weeks[index]))
+
+      StackPanel().Spacing(8.0).Children(weekTabs)
 
     let program = Program.mkProgram init update view
 

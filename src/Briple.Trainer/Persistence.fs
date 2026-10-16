@@ -8,6 +8,7 @@ open System.Threading.Tasks
 open IcedTasks
 open IcedTasks.Polyfill.Task.Tasks
 open Microsoft.Data.Sqlite
+open Microsoft.Extensions.Logging
 open Donald
 open JDeck
 open Migrondi.Core
@@ -312,7 +313,7 @@ let defaultDbPath() =
   Directory.CreateDirectory dir |> ignore
   Path.Combine(dir, "briple.db")
 
-let migrate(dbPath: string) : Result<unit, exn> =
+let migrate(logger: ILogger, dbPath: string) : Result<unit, exn> =
   try
     let root = AppContext.BaseDirectory
 
@@ -322,7 +323,8 @@ let migrate(dbPath: string) : Result<unit, exn> =
           connection = $"Data Source={dbPath};"
     }
 
-    let migrondi = Migrondi.MigrondiFactory(config, root)
+    // Migrondi's diagnostics ride the app's logger, not a private default
+    let migrondi = Migrondi.MigrondiFactory(config, root, logger = logger)
     migrondi.Initialize()
 
     let pending =

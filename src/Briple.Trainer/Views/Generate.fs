@@ -9,11 +9,15 @@ open System
 open System.Globalization
 open System.Threading
 
+open Avalonia
+open Avalonia.Animation
 open Avalonia.Controls
 open Avalonia.Media
 open NXUI.Extensions
 
 open FSharp.Control.Reactive
+
+open IcedTasks
 
 open MVUish.Avalonia
 
@@ -218,7 +222,7 @@ type Step =
   | Memories
   | Brief
   | Generating
-  | Failed of reasons: string array
+  | Failed of reasons: string array * last: (int * Brief) voption
   | Done of plan: Plan * advisories: Violation list * kind: string
 
 type Model = {
@@ -226,6 +230,8 @@ type Model = {
   /// One entry per card that decided, confirm or discard.
   Decided: Guid list
   Confirmed: (Guid * Memory) list
+  /// The last submitted brief, what a retry re-sends.
+  LastBrief: (int * Brief) voption
   /// The generation in flight; cancelled when the wizard exits.
   Run: CancellationTokenSource voption
 }
@@ -253,6 +259,7 @@ let init(props: WizardPageProps) =
     Step = Memories
     Decided = []
     Confirmed = []
+    LastBrief = ValueNone
     Run = ValueNone
   },
   Cmd.none
@@ -358,6 +365,7 @@ let update
     {
       model with
           Step = Generating
+          LastBrief = ValueSome(weeks, brief)
           Run = ValueSome cts
     },
     Cmd.batch [ record; run ]
@@ -374,7 +382,7 @@ let update
 
       {
         model with
-            Step = Failed reasons
+            Step = Failed(reasons, model.LastBrief)
             Run = ValueNone
       },
       Cmd.none
@@ -391,7 +399,7 @@ let update
 
     {
       model with
-          Step = Failed [| reason |]
+          Step = Failed([| reason |], model.LastBrief)
           Run = ValueNone
     },
     Cmd.none
@@ -453,30 +461,34 @@ let memoriesStep
     List.length m.Decided = List.length props.Proposals
 
   let next =
-    primaryButton(t Keys.wizardNext, (fun () -> dispatch NextRequested))
-    |> fun primary -> primary.IsEnabled(model |> Observable.map resolved)
+    let step = command(t Keys.wizardNext, (fun () -> dispatch NextRequested))
 
-  let cards: Control array = [|
-    for entity in props.Proposals ->
-      MemoryReview.MemoryReview(
-        {
-          Culture = props.Culture
-          Id = entity.Id
-          Memory = entity.Memory
-        },
-        MemoryDecided >> dispatch
-      )
-  |]
+    step.IsEnabled(model |> Observable.map resolved)
 
   let decided =
+    let cards: Control array = [|
+      for entity in props.Proposals ->
+        MemoryReview.MemoryReview(
+          {
+            Culture = props.Culture
+            Id = entity.Id
+            Memory = entity.Memory
+          },
+          MemoryDecided >> dispatch
+        )
+    |]
+
     if Array.isEmpty cards then
       label(t Keys.memoriesEmpty)
     else
       linesPanel cards
 
-  StackPanel()
-    .Spacing(8.0)
-    .Children(title(t Keys.wizardStepMemories), decided, next :> Control)
+  fluentPage {
+    Title = t Keys.wizardStepMemories
+    Commands = [ next ]
+    Body = decided
+    Measure = 760.0
+  }
 
 let briefStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
   let t key = get(props.Culture, key)
@@ -487,91 +499,164 @@ let briefStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
       dispatch(BriefSubmitted(weeks, brief))
     | WizardBrief.Event.Cancelled -> dispatch Cancelled
 
-  StackPanel()
-    .Spacing(8.0)
-    .Children(
-      title(t Keys.wizardStepBrief),
+  let back = command(t Keys.wizardBack, (fun () -> dispatch BackToMemories))
+
+  fluentPage {
+    Title = t Keys.wizardStepBrief
+    Commands = [ back ]
+    Body =
       WizardBrief.WizardBrief(
         {
           Culture = props.Culture
           Athlete = props.Athlete.Profile
         },
         submitted
-      ),
-      button(t Keys.wizardBack, (fun () -> dispatch BackToMemories))
+      )
+    Measure = 760.0
+  }
+
+/// The generation runs for one or two minutes: an indeterminate bar, the
+/// status line, and the way out in the command bar.
+let generatingStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
+  let cancel =
+    command(
+      get(props.Culture, Keys.wizardCancelGeneration),
+      (fun () -> dispatch Cancelled)
     )
 
-/// The generation runs for one or two minutes: an indeterminate bar and
-/// the status line; nothing else to press while it works.
-let inline generatingStep(props: WizardPageProps) : Control =
-  StackPanel()
-    .Spacing(12.0)
-    .Margin(0.0, 16.0, 0.0, 16.0)
-    .Children(
-      ProgressBar(IsIndeterminate = true, Maximum = 100.0, MinWidth = 240.0),
-      statusLine(get(props.Culture, Keys.wizardGenerating), false)
+  fluentPage {
+    Title = get(props.Culture, Keys.wizardTitle)
+    Commands = [ cancel ]
+    Body =
+      StackPanel()
+        .Spacing(12.0)
+        .Margin(0.0, 16.0, 0.0, 16.0)
+        .Children(
+          ProgressBar(IsIndeterminate = true, Maximum = 100.0, MinWidth = 240.0),
+          statusLine(get(props.Culture, Keys.wizardGenerating), false)
+        )
+    Measure = 560.0
+  }
+
+/// What the failed step renders from, as one value.
+[<Struct>]
+type FailureContext = {
+  Props: WizardPageProps
+  Reasons: string array
+  Last: (int * Brief) voption
+}
+
+let failedStep(ctx: FailureContext, dispatch: Dispatch<Msg>) : Control =
+  let t key = get(ctx.Props.Culture, key)
+
+  // the retry re-sends the last brief instead of walking the steps again
+  let retry =
+    command(
+      t Keys.wizardRetry,
+      fun () ->
+        ctx.Last
+        |> ValueOption.iter(fun (weeks, brief) ->
+          dispatch(BriefSubmitted(weeks, brief)))
     )
 
-let failedStep
-  (props: WizardPageProps, dispatch: Dispatch<Msg>, reasons: string array)
-  : Control =
-  let t key = get(props.Culture, key)
+  let exit = command(t Keys.wizardExit, (fun () -> dispatch Cancelled))
 
   let reasonsPanel =
-    linesPanel [| for reason in reasons -> statusLine(reason, true) |]
+    linesPanel [| for reason in ctx.Reasons -> statusLine(reason, true) |]
 
-  StackPanel()
-    .Spacing(8.0)
-    .Children(
-      title(t Keys.errorTitle),
-      reasonsPanel,
-      button(t Keys.wizardBack, (fun () -> dispatch Cancelled))
-    )
+  fluentPage {
+    Title = t Keys.errorTitle
+    Commands = [ retry; exit ]
+    Body = reasonsPanel
+    Measure = 760.0
+  }
 
-let doneStep
-  (
-    props: WizardPageProps,
-    dispatch: Dispatch<Msg>,
-    plan: Plan,
-    advisories: Violation list
-  ) : Control =
-  let t key = get(props.Culture, key)
+/// What the done step renders from, as one value.
+[<Struct>]
+type DoneContext = {
+  Props: WizardPageProps
+  Plan: Plan
+  Advisories: Violation list
+}
+
+let doneStep(ctx: DoneContext, dispatch: Dispatch<Msg>) : Control =
+  let t key = get(ctx.Props.Culture, key)
 
   let advisoryPanel =
     linesPanel [|
-      for advisory in advisories ->
-        statusLine(describeViolation(props.Culture, advisory), true)
+      for advisory in ctx.Advisories ->
+        statusLine(describeViolation(ctx.Props.Culture, advisory), true)
     |]
 
-  StackPanel()
-    .Spacing(8.0)
-    .Children(
-      PlanReview.PlanReview(
-        {
-          Culture = props.Culture
-          Parsed = { Plan = plan; Warnings = [] }
-        },
-        ignore
-      ),
-      advisoryPanel,
-      primaryButton(t Keys.wizardConfirm, (fun () -> dispatch ConfirmPlan))
-      :> Control,
-      button(t Keys.wizardDiscard, (fun () -> dispatch Cancelled))
-    )
+  // discarding throws away one or two minutes of generation: it asks
+  let discard() =
+    asyncEx {
+      let! sure =
+        Briple.Trainer.Dialogs.confirmAsync {
+          Title = t Keys.wizardDiscardTitle
+          Body = t Keys.wizardDiscardBody
+          Accept = t Keys.wizardDiscard
+          Cancel = t Keys.commonCancel
+        }
 
-let stepView
-  (
-    props: WizardPageProps,
-    model: IObservable<Model>,
-    dispatch: Dispatch<Msg>,
-    step: Step
-  ) : Control =
+      if sure then
+        dispatch Cancelled
+    }
+    |> Async.StartImmediate
+
+  fluentPage {
+    Title = t Keys.wizardTitle
+    Commands = [
+      command(t Keys.wizardConfirm, (fun () -> dispatch ConfirmPlan))
+      command(t Keys.wizardDiscard, discard)
+    ]
+    Body =
+      StackPanel()
+        .Spacing(8.0)
+        .Children(
+          PlanReview.PlanReview(
+            {
+              Culture = ctx.Props.Culture
+              Parsed = { Plan = ctx.Plan; Warnings = [] }
+            },
+            ignore
+          ),
+          advisoryPanel
+        )
+    Measure = 760.0
+  }
+
+/// What a step renders from, as one value.
+[<Struct>]
+type StepContext = {
+  Props: WizardPageProps
+  Model: IObservable<Model>
+  Dispatch: Dispatch<Msg>
+}
+
+let stepView(ctx: StepContext, step: Step) : Control =
   match step with
-  | Memories -> memoriesStep(props, model, dispatch)
-  | Brief -> briefStep(props, dispatch)
-  | Generating -> generatingStep props
-  | Failed reasons -> failedStep(props, dispatch, reasons)
-  | Done(plan, advisories, _) -> doneStep(props, dispatch, plan, advisories)
+  | Memories -> memoriesStep(ctx.Props, ctx.Model, ctx.Dispatch)
+  | Brief -> briefStep(ctx.Props, ctx.Dispatch)
+  | Generating -> generatingStep(ctx.Props, ctx.Dispatch)
+  | Failed(reasons, last) ->
+    failedStep(
+      {
+        Props = ctx.Props
+        Reasons = reasons
+        Last = last
+      },
+      ctx.Dispatch
+    )
+  | Done(plan, advisories, _) ->
+    doneStep(
+      {
+        Props = ctx.Props
+        Plan = plan
+        Advisories = advisories
+      },
+      ctx.Dispatch
+    )
 
 // --- the page ---
 
@@ -580,30 +665,34 @@ let view
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
-  let shell(body: Control) =
-    ScrollViewer()
-      .Content(StackPanel().Margin(24.0).Spacing(8.0).Children(body))
-    :> Control
-
   if not props.Agent.AgentAvailable then
-    shell(
-      StackPanel()
-        .Spacing(8.0)
-        .Children(
-          title(get(props.Culture, Keys.wizardTitle)),
-          label(get(props.Culture, Keys.settingsMissing))
-        )
-    )
+    fluentPage {
+      Title = get(props.Culture, Keys.wizardTitle)
+      Commands = []
+      Body = label(get(props.Culture, Keys.settingsMissing))
+      Measure = 560.0
+    }
   else
     // the host's content follows the step stream; distinct steps only, so
-    // the memory cards keep their in-progress selections between decisions
+    // the memory cards keep their in-progress selections between
+    // decisions, and the swap crossfades
     let steps =
       model
       |> Observable.map(fun m -> m.Step)
       |> Observable.distinctUntilChanged
-      |> Observable.map(fun step -> box(stepView(props, model, dispatch, step)))
+      |> Observable.map(fun step ->
+        stepView(
+          {
+            Props = props
+            Model = model
+            Dispatch = dispatch
+          },
+          step
+        ))
 
-    shell(ContentControl().Content steps)
+    TransitioningContentControl()
+      .PageTransition(CrossFade(TimeSpan.FromMilliseconds 150.0))
+      .Content(steps)
 
 type WizardPage
   (props: WizardPageProps, [<InlineIfLambda>] onOutcome: Outcome -> unit) as this

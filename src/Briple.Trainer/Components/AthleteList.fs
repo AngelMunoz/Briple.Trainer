@@ -108,13 +108,16 @@ let view
     label(t Keys.athletesEmpty)
       .IsVisible(model |> Observable.map(fun m -> List.isEmpty m.Athletes))
 
-  let newButton =
-    primaryButton(t Keys.athletesNew, (fun () -> onEvent Event.NewRequested))
-      .HorizontalAlignment(HorizontalAlignment.Left)
+  let newCommand =
+    command(t Keys.athletesNew, (fun () -> onEvent Event.NewRequested))
 
-  page(
-    t Keys.athletesTitle,
-    StackPanel().Spacing(8.0).Children(newButton :> Control, emptyState, rows)
+  fluentPage(
+    {
+      Title = t Keys.athletesTitle
+      Commands = [ newCommand ]
+      Body = StackPanel().Spacing(8.0).Children(emptyState, rows)
+      Measure = 760.0
+    }
   )
 
 type AthleteList

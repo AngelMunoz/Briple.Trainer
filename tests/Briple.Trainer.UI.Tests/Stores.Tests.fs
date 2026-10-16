@@ -17,6 +17,10 @@ open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 open Briple.Trainer.UI.Tests.Harness
 
+// migrations under test log through the app's pipeline (silent under the
+// default Serilog)
+let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
+
 let private wait(task: Task<Result<'a, exn>>) : Result<'a, exn> =
   task.GetAwaiter().GetResult()
 
@@ -33,7 +37,7 @@ let tests =
   testList "stores" [
     test "the athlete store emits the saved athlete and replays it" {
       let db = tempDb()
-      migrate db |> ignore
+      migrate(testLogger, db) |> ignore
 
       let stores = createStores(sqliteStore db, ignore)
 
@@ -72,7 +76,7 @@ let tests =
 
     test "the memory store loads the slice per athlete and re-emits writes" {
       let db = tempDb()
-      migrate db |> ignore
+      migrate(testLogger, db) |> ignore
 
       let stores = createStores(sqliteStore db, ignore)
 
@@ -126,7 +130,7 @@ let tests =
 
     test "the plan store emits the saved plan slice" {
       let db = tempDb()
-      migrate db |> ignore
+      migrate(testLogger, db) |> ignore
 
       let stores = createStores(sqliteStore db, ignore)
 

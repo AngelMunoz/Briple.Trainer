@@ -27,6 +27,10 @@ open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 open Briple.Trainer.UI.Tests.Harness
 
+// migrations under test log through the app's pipeline (silent under the
+// default Serilog)
+let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
+
 let private es = Language.toCulture Es
 
 let private sampleAthlete: Athlete = {
@@ -366,7 +370,7 @@ let noteTests =
       let db =
         Path.Combine(Path.GetTempPath(), $"briple-note-{Guid.NewGuid():N}.db")
 
-      migrate db |> ignore
+      migrate(testLogger, db) |> ignore
 
       let stores = createStores(sqliteStore db, ignore)
 

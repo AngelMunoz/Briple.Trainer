@@ -9,6 +9,7 @@ module Briple.Trainer.Persistence
 
 open System
 open System.Threading.Tasks
+open Microsoft.Extensions.Logging
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
@@ -71,8 +72,9 @@ type IStore =
 /// The database file under the user's application data.
 val defaultDbPath: unit -> string
 
-/// Applies the pending migrations shipped next to the executable.
-val migrate: dbPath: string -> Result<unit, exn>
+/// Applies the pending migrations shipped next to the executable; the
+/// Migrondi diagnostics ride the given logger.
+val migrate: logger: ILogger * dbPath: string -> Result<unit, exn>
 
 /// The store implementation over the given database file.
 val sqliteStore: dbPath: string -> IStore

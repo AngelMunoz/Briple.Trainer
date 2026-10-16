@@ -3,10 +3,13 @@ module Briple.Trainer.Env
 open System
 open System.Globalization
 open System.IO
+open System.Reactive.Subjects
 open System.Text.Json
 open System.Threading
 open System.Threading.Tasks
+open Avalonia
 open Avalonia.Controls
+open Avalonia.Styling
 open IcedTasks
 open IcedTasks.Polyfill.Task.Tasks
 open Microsoft.Extensions.AI
@@ -27,6 +30,10 @@ type AppSettings = {
   Endpoint: Uri
   Model: string
   Key: string
+  /// The persisted UI language token ("es"/"en").
+  Language: string
+  /// The persisted theme token ("system"/"light"/"dark").
+  Theme: string
 }
 
 let defaultSettings = {
@@ -34,7 +41,41 @@ let defaultSettings = {
   Endpoint = Uri "https://api.deepseek.com/responses"
   Model = "deepseek-flash"
   Key = ""
+  Language = "es"
+  Theme = "system"
 }
+
+/// The user's theme preference: the OS theme or a fixed variant.
+[<Struct>]
+type ThemeChoice =
+  | System
+  | Light
+  | Dark
+
+module ThemeChoice =
+
+  let ofToken(text: string) =
+    match text with
+    | "light" -> Light
+    | "dark" -> Dark
+    | _ -> System
+
+  let toToken(theme: ThemeChoice) =
+    match theme with
+    | System -> "system"
+    | Light -> "light"
+    | Dark -> "dark"
+
+/// Applies a theme choice to the running application, when there is one.
+let applyTheme(theme: ThemeChoice) =
+  match Application.Current with
+  | null -> ()
+  | app ->
+    app.RequestedThemeVariant <-
+      match theme with
+      | Light -> ThemeVariant.Light
+      | Dark -> ThemeVariant.Dark
+      | System -> ThemeVariant.Default
 
 /// What saving the token produced; the Insecure case carries the reason
 /// the OS vault failed, phrased for the user.
@@ -57,6 +98,17 @@ type IProvideStores =
 
 type IProvideLanguage =
   abstract Language: Language
+
+  /// Emits on every language switch; the shell rebuilds its chrome and
+  /// the pages re-render through it.
+  abstract LanguageChanged: IObservable<Language>
+
+  abstract SetLanguage: language: Language -> unit
+
+type IProvideTheme =
+  abstract Theme: ThemeChoice
+
+  abstract SetTheme: theme: ThemeChoice -> unit
 
 type IProvideCulture =
   abstract Culture: CultureInfo
@@ -87,6 +139,11 @@ type IProvideCredentials =
 type IProvideHost =
   abstract Host: Window voption
 
+/// The logging capability: one factory bridged to Serilog, so every
+/// service that accepts a logger lands in the same sink and level.
+type IProvideLogging =
+  abstract LoggerFactory: ILoggerFactory
+
 /// The Core agent capabilities: one provider client plus the app's
 /// logger. One value per call; Core never sees the concrete app env.
 /// (The log type is qualified: `open Serilog` shadows `ILogger` here.)
@@ -113,6 +170,12 @@ let guarded(op: unit -> Task<'a>) : Task<Result<'a, exn>> = task {
   with e ->
     return Error e
 }
+
+/// The one logging factory of the process: every service that accepts a
+/// logger takes one made here, all bridged to the Serilog pipeline
+/// Program configured. It exists before the env so the boot steps
+/// (Migrondi among them) log through the app too.
+let loggerFactory = (new LoggerFactory()).AddSerilog Log.Logger
 
 let settingsPath() =
   Path.Combine(
@@ -150,6 +213,10 @@ let writeSettings(settings: AppSettings) : Result<unit, string> =
 
       writer.WriteString("key", settings.Key)
 
+      writer.WriteString("language", settings.Language)
+
+      writer.WriteString("theme", settings.Theme)
+
       writer.WriteEndObject()
 
     Ok()
@@ -159,15 +226,40 @@ let writeSettings(settings: AppSettings) : Result<unit, string> =
 type AppEnv
   (stores: DataStores, vault: ISecureStorage, settings: AppSettings voption) =
 
-  let mutable currentLanguage = Es
+  // the disk shape as loaded: preference writes re-write it with the
+  // provider fields and the key untouched
+  let disk = settings |> ValueOption.defaultValue defaultSettings
+
+  let bootLanguage = Language.ofToken disk.Language
+
+  let mutable currentLanguage = bootLanguage
+
+  let languageChanged = new BehaviorSubject<Language>(bootLanguage)
+
+  let mutable currentTheme = ThemeChoice.ofToken disk.Theme
+
   let mutable host = ValueNone
 
   let mutable workingSettings =
     settings |> ValueOption.filter(fun s -> s.Key <> "")
 
-  // the Serilog bridge, built once: typed loggers over the logger
-  // Program configured before the env exists
-  let loggerFactory = (new LoggerFactory()).AddSerilog Log.Logger
+  do
+    let culture = Language.toCulture bootLanguage
+
+    CultureInfo.DefaultThreadCurrentUICulture <- culture
+    Thread.CurrentThread.CurrentUICulture <- culture
+
+  // a preference write keeps the provider fields and the key as loaded
+  let persistPrefs(language: string, theme: string) =
+    match
+      writeSettings {
+        disk with
+            Language = language
+            Theme = theme
+      }
+    with
+    | Ok() -> ()
+    | Error reason -> Log.Error("settings write failed: {Razon}", reason)
 
   // the env is insecure only when the plain field carried the token
   let mutable tokenInsecure =
@@ -203,11 +295,36 @@ type AppEnv
   interface IProvideLanguage with
     member _.Language = currentLanguage
 
+    member _.LanguageChanged = languageChanged :> IObservable<Language>
+
+    member _.SetLanguage(language: Language) =
+      currentLanguage <- language
+
+      languageChanged.OnNext language
+
+      let culture = Language.toCulture language
+
+      CultureInfo.DefaultThreadCurrentUICulture <- culture
+      Thread.CurrentThread.CurrentUICulture <- culture
+
+      persistPrefs(Language.toToken language, ThemeChoice.toToken currentTheme)
+
+  interface IProvideTheme with
+    member _.Theme = currentTheme
+
+    member _.SetTheme(theme: ThemeChoice) =
+      currentTheme <- theme
+
+      persistPrefs(Language.toToken currentLanguage, ThemeChoice.toToken theme)
+
   interface IProvideCulture with
     member _.Culture = Language.toCulture currentLanguage
 
   interface IProvideHost with
     member _.Host = host
+
+  interface IProvideLogging with
+    member _.LoggerFactory = loggerFactory
 
   interface IProvideAgent with
     member _.AgentAvailable = workingSettings.IsSome
@@ -257,14 +374,6 @@ type AppEnv
           Ok(Insecure vaultReason)
         | Error reason -> Error reason
 
-  member _.SetLanguage(language: Language) =
-    currentLanguage <- language
-
-    let culture = Language.toCulture language
-
-    CultureInfo.DefaultThreadCurrentUICulture <- culture
-    Thread.CurrentThread.CurrentUICulture <- culture
-
   member _.SetHost(window: Window) = host <- ValueSome window
 
   member _.Settings = workingSettings
@@ -277,6 +386,9 @@ type AppEnv
 
   /// The culture of the current language, reachable without a cast.
   member this.Culture = (this :> IProvideCulture).Culture
+
+  /// The language switches, reachable without a cast.
+  member _.LanguageChanged = languageChanged :> IObservable<Language>
 
 let loadSettings() : Result<AppSettings voption, exn> =
   try
@@ -301,13 +413,15 @@ let loadSettings() : Result<AppSettings voption, exn> =
           Endpoint = Uri(read("endpoint", string defaultSettings.Endpoint))
           Model = read("model", defaultSettings.Model)
           Key = read("key", "")
+          Language = read("language", defaultSettings.Language)
+          Theme = read("theme", defaultSettings.Theme)
         }
       )
   with e ->
     Error e
 
 let create(dbPath: string) : Result<AppEnv, exn> =
-  migrate dbPath
+  migrate(loggerFactory.CreateLogger "Migrondi", dbPath)
   |> Result.bind(fun () ->
     loadSettings()
     |> Result.map(fun disk ->
