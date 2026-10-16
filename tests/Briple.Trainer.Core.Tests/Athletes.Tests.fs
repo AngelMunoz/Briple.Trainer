@@ -21,8 +21,8 @@ let private twoAthletesOf plan =
 let tests =
   testList "Athletes" [
     testCase "month 1: two athletes, one per block" (fun () ->
-      match readFixture "training_plan_4w.txt" |> parsePlan with
-      | Error error -> failtest $"parse error at line {error.Line}"
+      match readFixture "training_plan_4w.txt" |> parse with
+      | Error error -> failtest $"parse error: {Parse.describe error}"
       | Ok parsed ->
         let man, woman = twoAthletesOf parsed.Plan
 
@@ -33,8 +33,8 @@ let tests =
         Expect.equal man.Goals [] "the plan carries no goals")
 
     testCase "month 2: the same two athletes" (fun () ->
-      match readFixture "month2_4w.txt" |> parsePlan with
-      | Error error -> failtest $"parse error at line {error.Line}"
+      match readFixture "month2_4w.txt" |> parse with
+      | Error error -> failtest $"parse error: {Parse.describe error}"
       | Ok parsed ->
         let man, _ = twoAthletesOf parsed.Plan
 

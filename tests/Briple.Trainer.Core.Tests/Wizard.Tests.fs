@@ -50,13 +50,19 @@ let tests =
       let step4 = DefineBrief(athlete, [ confirmed ], 4)
 
       // 4: output the brief; 5: input the assembled request
-      let request = newRequest athlete [ confirmed ] 4 brief
+      let request = {
+        Athlete = athlete
+        Memories = [ confirmed ]
+        Weeks = 4
+        Brief = brief
+      }
+
       let step5 = Generate(NewPlan request)
 
       // 5: output the validated candidate; 6: input candidate + warnings
       let (candidate, warnings) =
-        match readFixture "training_plan_4w.txt" |> parsePlan with
-        | Error error -> failtest $"parse error at line {error.Line}"
+        match readFixture "training_plan_4w.txt" |> parse with
+        | Error error -> failtest $"parse error: {Parse.describe error}"
         | Ok parsed -> (parsed.Plan, parsed.Warnings)
 
       let step6 = Review(candidate, warnings)
@@ -83,11 +89,17 @@ let tests =
 
     testCase "the adjustment also generates from step 5" (fun () ->
       let month1 =
-        match readFixture "training_plan_4w.txt" |> parsePlan with
-        | Error error -> failtest $"parse error at line {error.Line}"
+        match readFixture "training_plan_4w.txt" |> parse with
+        | Error error -> failtest $"parse error: {Parse.describe error}"
         | Ok parsed -> parsed.Plan
 
-      let request = adjustmentRequest athlete [] 4 brief month1
+      let request = {
+        Athlete = athlete
+        Memories = []
+        Weeks = 4
+        Brief = brief
+        PreviousPlan = month1
+      }
 
       let step = Generate(PlanAdjustment request)
 

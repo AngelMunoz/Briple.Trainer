@@ -23,6 +23,7 @@
     <Compile Include="Validator.Tests.fs" />
     <Compile Include="Prompts.Tests.fs" />
     <Compile Include="Agent.Tests.fs" />
+    <Compile Include="Agent.Cancellation.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

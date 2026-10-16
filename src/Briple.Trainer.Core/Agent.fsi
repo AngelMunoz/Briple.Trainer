@@ -2,14 +2,17 @@ module Briple.Trainer.Core.Agent
 
 // The agent orchestration over Microsoft.Extensions.AI with BYOK
 // OpenAI-compatible providers. Responses stream in chunks inside a
-// cancellableTask. The model answers data as JSON; the domain plan is
-// converted with Plan.Data, checked against the request parameters and
-// the format is written by Plan.Writer deterministically. Rejected
-// outputs are discarded; there is no repair.
+// cancellableTask: the token travels ambient from the caller's
+// asyncEx/cancellableTask down to the provider stream, and surfaces as
+// OperationCanceledException when cancelled. The model answers data as
+// JSON; the domain plan is converted with Plan.Data, checked against the
+// request parameters and the format is written by Plan.Writer
+// deterministically. Rejected outputs are discarded; there is no repair.
 
 open System
-open System.Threading.Tasks
+open IcedTasks
 open Microsoft.Extensions.AI
+open Microsoft.Extensions.Logging
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Requests
@@ -40,16 +43,29 @@ type Run = {
   Verdict: Verdict
 }
 
-val generateNew: client: IChatClient -> request: NewPlanRequest -> Task<Run>
+/// Capability: the provider's chat client.
+type IProvideChat =
+  abstract Chat: IChatClient
+
+/// Capability: the boundary log. The app injects its own provider;
+/// Core never creates a logger.
+type IProvideLog =
+  abstract Log: ILogger
+
+val generateNew:
+  env: #IProvideChat & #IProvideLog * request: NewPlanRequest ->
+    CancellableTask<Run>
 
 val generateAdjustment:
-  client: IChatClient -> request: AdjustmentRequest -> Task<Run>
+  env: #IProvideChat & #IProvideLog * request: AdjustmentRequest ->
+    CancellableTask<Run>
 
 /// The agent consolidates the marks into proposed memories. Lines that
 /// do not follow the protocol are discarded; numeric deltas tolerate
 /// sign and percentage (load +5% reads as load 5).
 val consolidateMarks:
-  client: IChatClient -> marks: FeedbackMark list -> Task<Memory list>
+  env: #IProvideChat & #IProvideLog * marks: FeedbackMark list ->
+    CancellableTask<Memory list>
 
 // --- note interpretation -----------------------------------------------------
 
@@ -59,6 +75,7 @@ val consolidateMarks:
 type Rejection =
   | UnknownLabel of token: string
   | UnknownTarget of text: string
+  | MissingField of field: string
   | OutsideProtocol of detail: string
 
 /// The reading of one trainer's note: the memories that mapped to the
@@ -66,6 +83,15 @@ type Rejection =
 type NoteInterpretation = {
   Memories: Memory list
   Rejections: Rejection list
+}
+
+/// What a note reading needs: the closed vocabulary, the note verbatim,
+/// and the day the fact was observed. The date travels here; Core never
+/// reads the clock.
+type NoteAsk = {
+  Targets: Target list
+  Note: string
+  Date: DateOnly
 }
 
 /// The closed target vocabulary of a plan: its exercise names and day
@@ -80,8 +106,8 @@ val interpretationOf:
   targets: Target list * date: DateOnly * response: string -> NoteInterpretation
 
 /// The agent reads the trainer's free-text note and answers with the
-/// memories it maps to the closed surface. The note travels alone in
-/// the user message; the system message carries the surface.
+/// memories it maps to the closed surface. The note travels alone in the
+/// user message; the system message carries the surface.
 val interpretNote:
-  client: IChatClient * targets: Target list * note: string ->
-    Task<NoteInterpretation>
+  env: #IProvideChat & #IProvideLog * reading: NoteAsk ->
+    CancellableTask<NoteInterpretation>

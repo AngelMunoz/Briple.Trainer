@@ -96,7 +96,13 @@ let tests =
     testCase
       "the adjustment fixes the previous counts and forbids changing them"
       (fun () ->
-        let request = adjustmentRequest maleAthlete [] 4 brief (planWith 2)
+        let request = {
+          Athlete = maleAthlete
+          Memories = []
+          Weeks = 4
+          Brief = brief
+          PreviousPlan = planWith 2
+        }
 
         let instructions = forAdjustment request
 
@@ -116,7 +122,15 @@ let tests =
           "the adjustment touches neither counts, options nor format")
 
     testCase "the new plan owns its volume" (fun () ->
-      let instructions = forNew(newRequest maleAthlete [] 4 brief)
+      let instructions =
+        forNew(
+          {
+            Athlete = maleAthlete
+            Memories = []
+            Weeks = 4
+            Brief = brief
+          }
+        )
 
       Expect.isFalse
         (instructions.Fix
@@ -131,7 +145,15 @@ let tests =
         "the new plan touches neither options nor format")
 
     testCase "the weeks and the frequency get fixed in both flows" (fun () ->
-      let newPlan = forNew(newRequest maleAthlete [] 4 brief)
+      let newPlan =
+        forNew(
+          {
+            Athlete = maleAthlete
+            Memories = []
+            Weeks = 4
+            Brief = brief
+          }
+        )
 
       Expect.contains newPlan.Fix (PlanWeeks(4, TrainerBrief)) "weeks fixed"
 

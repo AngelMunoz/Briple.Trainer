@@ -6,9 +6,12 @@ module Briple.Trainer.Core.Plan.Parser
 //
 // Recoverable problems (unknown blocks, unrecognized day names, malformed
 // #ej rows, unknown meta keys, duplicates, empty days, wrong versions) come
-// back as warnings in ParsedPlan; the raw file is stored alongside so
-// skipping anything stays lossless. Structural breakage (#end mismatches,
-// unterminated blocks, a missing #start plan header) is a hard ParseError.
+// back as warnings in ParsedPlan. Structural breakage (#end mismatches,
+// unterminated blocks, a missing #start plan header) is the leaf's IWSAM
+// error: the caller's edge type implements IPlanFormatError, so failures
+// compose without mapError and the edge matches exhaustively.
+
+#nowarn "3535"
 
 open System
 open XParsec
@@ -17,6 +20,10 @@ open XParsec.Parsers
 open XParsec.CharParsers
 open XParsec.ErrorFormatting
 open Briple.Trainer.Core.Plan.Types
+
+// The IWSAM leaf interface (IPlanFormatError) and the display edge
+// (PlanFailure) live in Plan.Types: that file has no signature file, so
+// it can host the static-abstract implementations.
 
 let runLine parser (line: string) : Result<'parsed, string> =
   match parser(Reader.ofString line ()) with
@@ -148,7 +155,9 @@ let dayTable =
 let tryDayOfWeek(name: string) : DayOfWeek option =
   dayTable |> Map.tryFind(normalizeName name)
 
-let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
+let parsePlan<'e when IPlanFormatError<'e>>
+  (input: string)
+  : Result<ParsedPlan, 'e> =
   let lines =
     input.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
     |> Array.mapi(fun index text -> { Number = index + 1; Text = text })
@@ -173,49 +182,49 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
     else
       None
 
-  let unterminated(block: string) : ParseError = {
-    Line = lastNumber
-    Message = $"unterminated #start {block}"
-    Detail = None
-  }
-
-  let errAt (line: Line) (message: string) : Result<'a, ParseError> =
-    Error {
-      Line = line.Number
-      Message = message
-      Detail = None
-    }
+  let unterminated(block: string) : Result<'a, 'e> =
+    Error('e.Unterminated(lastNumber, block))
 
   // Consumes lines until the unknown block's matching #end; the caller has
   // already consumed the #start line. Unterminated unknown blocks stop at
   // EOF and the enclosing block reports the structural error.
   let skipBalanced() =
-    let mutable depth = 1
+    let rec loop depth =
+      if depth <= 0 then
+        ()
+      else
+        match advance() with
+        | None -> ()
+        | Some line ->
+          match classify line.Text with
+          | StartLine _ -> loop(depth + 1)
+          | EndLine _ -> loop(depth - 1)
+          | _ -> loop depth
 
-    while depth > 0 do
-      match advance() with
-      | None -> depth <- 0
-      | Some line ->
-        match classify line.Text with
-        | StartLine _ -> depth <- depth + 1
-        | EndLine _ -> depth <- depth - 1
-        | _ -> ()
+    loop 1
 
   // The block assembler is a linear pipeline: each level only recurses into
   // itself or calls the level below it (day <- week <- variant <- block
-  // <- planBody <- header), so no mutual recursion is needed.
-  let rec parseDay(day: Day) : Result<Day, ParseError> =
+  // <- planBody <- header), so no mutual recursion is needed. The inner
+  // functions inherit 'e from parsePlan.
+  let rec parseDay(day: Day) : Result<Day, 'e> =
     match advance() with
-    | None -> Error(unterminated $"dia {day.Id}")
+    | None -> unterminated $"dia {day.Id}"
     | Some line ->
       match classify line.Text with
       | EndLine "dia" ->
+        // the rows accumulated in reverse; the file order returns here
+        let day = {
+          day with
+              Exercises = List.rev day.Exercises
+        }
+
         if List.isEmpty day.Exercises then
           warn line.Number EmptyDay $"day '{day.Id}' has no #ej rows"
 
         Ok day
       | EndLine kind ->
-        errAt line $"#end {kind} does not match #start dia {day.Id}"
+        Error('e.MismatchedEnd(line.Number, kind, $"dia {day.Id}"))
       | StartLine(kind, arg) ->
         warn
           line.Number
@@ -233,16 +242,8 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
       | EjLine fields ->
         match fields with
         | [ circuit; laps; orderText; name; reps; rir; rest; notes ] ->
-          let orderOk, order = Int32.TryParse orderText
-
-          if name.Trim().Length = 0 || not orderOk then
-            warn
-              line.Number
-              BadEjField
-              "invalid #ej row (empty name or non-integer order)"
-
-            parseDay day
-          else
+          match Int32.TryParse orderText with
+          | true, order when not(String.IsNullOrWhiteSpace name) ->
             let exercise = {
               Circuit = circuit.Trim()
               Laps = laps.Trim()
@@ -256,13 +257,25 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
 
             parseDay {
               day with
-                  Exercises = day.Exercises @ [ exercise ]
+                  Exercises = exercise :: day.Exercises
             }
+          | _ ->
+            warn
+              line.Number
+              BadEjField
+              $"invalid #ej row (empty name or non-integer order): '{line.Text.Trim()}'"
+
+            parseDay day
         | _ ->
-          warn line.Number BadEjField "invalid #ej row (wrong field count)"
+          warn
+            line.Number
+            BadEjField
+            $"invalid #ej row (wrong field count): '{line.Text.Trim()}'"
+
           parseDay day
       | BadEj ->
-        warn line.Number BadEjField "malformed #ej row"
+        warn line.Number BadEjField $"malformed #ej row: '{line.Text.Trim()}'"
+
         parseDay day
       | ExtraLine _ ->
         warn
@@ -272,18 +285,19 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
 
         parseDay day
       | Unknown ->
-        warn line.Number UnknownLine "unrecognized line"
+        warn line.Number UnknownLine $"unrecognized line: '{line.Text.Trim()}'"
+
         parseDay day
       | Blank -> parseDay day
 
-  let rec parseWeek(week: Week) : Result<Week, ParseError> =
+  let rec parseWeek(week: Week) : Result<Week, 'e> =
     match advance() with
-    | None -> Error(unterminated $"semana {week.Number}")
+    | None -> unterminated $"semana {week.Number}"
     | Some line ->
       match classify line.Text with
-      | EndLine "semana" -> Ok week
+      | EndLine "semana" -> Ok { week with Days = List.rev week.Days }
       | EndLine kind ->
-        errAt line $"#end {kind} does not match #start semana {week.Number}"
+        Error('e.MismatchedEnd(line.Number, kind, $"semana {week.Number}"))
       | StartLine("dia", id) ->
         let day = {
           Id = id
@@ -302,10 +316,7 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           warn line.Number UnknownDayName $"day name '{id}' is not recognized"
 
         parseDay day
-        |> Result.map(fun parsed -> {
-          week with
-              Days = week.Days @ [ parsed ]
-        })
+        |> Result.map(fun parsed -> { week with Days = parsed :: week.Days })
         |> Result.bind parseWeek
       | StartLine(kind, arg) ->
         warn
@@ -328,18 +339,23 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
         parseWeek week
       | ExtraLine _
       | Unknown ->
-        warn line.Number UnknownLine "unrecognized line"
+        warn line.Number UnknownLine $"unrecognized line: '{line.Text.Trim()}'"
+
         parseWeek week
       | Blank -> parseWeek week
 
-  let rec parseVariant(variant: Variant) : Result<Variant, ParseError> =
+  let rec parseVariant(variant: Variant) : Result<Variant, 'e> =
     match advance() with
-    | None -> Error(unterminated $"opcion {variant.Id}")
+    | None -> unterminated $"opcion {variant.Id}"
     | Some line ->
       match classify line.Text with
-      | EndLine "opcion" -> Ok variant
+      | EndLine "opcion" ->
+        Ok {
+          variant with
+              Weeks = List.rev variant.Weeks
+        }
       | EndLine kind ->
-        errAt line $"#end {kind} does not match #start opcion {variant.Id}"
+        Error('e.MismatchedEnd(line.Number, kind, $"opcion {variant.Id}"))
       | StartLine("semana", numberText) ->
         match Int32.TryParse numberText with
         | true, number ->
@@ -355,11 +371,10 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           parseWeek { Number = number; Days = [] }
           |> Result.map(fun parsed -> {
             variant with
-                Weeks = variant.Weeks @ [ parsed ]
+                Weeks = parsed :: variant.Weeks
           })
           |> Result.bind parseVariant
-        | _ ->
-          errAt line $"#start semana requires an integer, got '{numberText}'"
+        | _ -> Error('e.BadWeekNumber(line.Number, numberText))
       | StartLine(kind, arg) ->
         warn
           line.Number
@@ -383,20 +398,30 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
         parseVariant variant
       | ExtraLine _
       | Unknown ->
-        warn line.Number UnknownLine "unrecognized line"
+        warn line.Number UnknownLine $"unrecognized line: '{line.Text.Trim()}'"
+
         parseVariant variant
       | Blank -> parseVariant variant
 
-  let rec parseBlock(block: Block) : Result<Block, ParseError> =
+  let rec parseBlock(block: Block) : Result<Block, 'e> =
     match advance() with
-    | None -> Error(unterminated $"genero {Gender.toFileToken block.Gender}")
+    | None -> unterminated $"genero {Gender.toFileToken block.Gender}"
     | Some line ->
       match classify line.Text with
-      | EndLine "genero" -> Ok block
+      | EndLine "genero" ->
+        Ok {
+          block with
+              Variants = List.rev block.Variants
+        }
       | EndLine kind ->
-        errAt
-          line
-          $"#end {kind} does not match #start genero {Gender.toFileToken block.Gender}"
+        Error(
+          'e
+            .MismatchedEnd(
+              line.Number,
+              kind,
+              $"genero {Gender.toFileToken block.Gender}"
+            )
+        )
       | StartLine("opcion", id) ->
         if block.Variants |> List.exists(fun existing -> existing.Id = id) then
           warn line.Number DuplicateEntry $"duplicate opcion '{id}'"
@@ -404,7 +429,7 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
         parseVariant { Id = id; Title = None; Weeks = [] }
         |> Result.map(fun parsed -> {
           block with
-              Variants = block.Variants @ [ parsed ]
+              Variants = parsed :: block.Variants
         })
         |> Result.bind parseBlock
       | StartLine(kind, arg) ->
@@ -428,18 +453,25 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
         parseBlock block
       | ExtraLine _
       | Unknown ->
-        warn line.Number UnknownLine "unrecognized line"
+        warn line.Number UnknownLine $"unrecognized line: '{line.Text.Trim()}'"
+
         parseBlock block
       | Blank -> parseBlock block
 
-  let rec parsePlanBody
-    (plan: Plan)
-    : Result<Plan * ParseWarning list, ParseError> =
+  let rec parsePlanBody(plan: Plan) : Result<Plan * ParseWarning list, 'e> =
     match advance() with
-    | None -> Error(unterminated "plan")
+    | None -> unterminated "plan"
     | Some line ->
       match classify line.Text with
       | EndLine "plan" ->
+        // blocks and extras accumulated in reverse; the file order
+        // returns here
+        let plan = {
+          plan with
+              Blocks = List.rev plan.Blocks
+              Extras = List.rev plan.Extras
+        }
+
         if plan.Title = "" then
           warn line.Number MissingMeta "missing #meta titulo"
 
@@ -447,7 +479,7 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           warn line.Number MissingMeta "missing #meta semanas"
 
         Ok(plan, List.ofSeq warnings)
-      | EndLine kind -> errAt line $"#end {kind} does not match #start plan"
+      | EndLine kind -> Error('e.MismatchedEnd(line.Number, kind, "plan"))
       | StartLine("genero", name) ->
         (match Gender.tryFileToken name with
          | Some gender ->
@@ -460,7 +492,7 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
            parseBlock { Gender = gender; Variants = [] }
            |> Result.map(fun parsed -> {
              plan with
-                 Blocks = plan.Blocks @ [ parsed ]
+                 Blocks = parsed :: plan.Blocks
            })
            |> Result.bind parsePlanBody
          | None ->
@@ -499,33 +531,36 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
       | ExtraLine text ->
         parsePlanBody {
           plan with
-              Extras = plan.Extras @ [ text ]
+              Extras = text :: plan.Extras
         }
       | EjLine _
       | BadEj ->
         warn line.Number UnknownLine "#ej row outside a dia"
         parsePlanBody plan
       | Unknown ->
-        warn line.Number UnknownLine "unrecognized line"
+        warn line.Number UnknownLine $"unrecognized line: '{line.Text.Trim()}'"
+
         parsePlanBody plan
       | Blank -> parsePlanBody plan
 
-  let rec parseHeader() : Result<Plan * ParseWarning list, ParseError> =
+  let rec parseHeader() : Result<Plan * ParseWarning list, 'e> =
     match advance() with
-    | None -> Error(unterminated "plan")
+    | None -> unterminated "plan"
     | Some line ->
       match classify line.Text with
       | Blank -> parseHeader()
       | StartLine("plan", versionText) ->
-        let versionOk, version =
+        let version =
           if versionText.StartsWith("v") then
-            Int32.TryParse(versionText.Substring(1))
+            match Int32.TryParse(versionText.Substring(1)) with
+            | true, v -> Some v
+            | _ -> None
           else
-            false, 0
+            None
 
-        if not versionOk then
-          errAt line $"invalid plan version '{versionText}'"
-        else
+        match version with
+        | None -> Error('e.BadVersion(line.Number, versionText))
+        | Some version ->
           if version <> 1 then
             warn
               line.Number
@@ -543,10 +578,30 @@ let parsePlan(input: string) : Result<ParsedPlan, ParseError> =
           }
 
           parsePlanBody plan
-      | _ -> errAt line "expected '#start plan v1' as the first line"
+      | _ -> Error('e.MissingStart(line.Number))
 
   parseHeader()
   |> Result.map(fun (plan, allWarnings) -> {
     Plan = plan
     Warnings = allWarnings
   })
+
+/// The fixed display edge of the parse leaf.
+module Parse =
+
+  /// Parses with `PlanFailure`; the annotation is what fixes `'e`.
+  let parse(input: string) : Result<ParsedPlan, PlanFailure> = parsePlan input
+
+  /// One diagnostic line per failure. The file format is the domain, so
+  /// the description is technical and single-language, like the parse
+  /// warnings themselves.
+  let describe(failure: PlanFailure) : string =
+    match failure with
+    | Unterminated(lastLine, block) ->
+      $"line {lastLine}: unterminated #start {block}"
+    | MismatchedEnd(line, found, expected) ->
+      $"line {line}: #end {found} does not match #start {expected}"
+    | MissingStart line -> $"line {line}: expected '#start plan v1' first"
+    | BadVersion(line, raw) -> $"line {line}: invalid plan version '{raw}'"
+    | BadWeekNumber(line, raw) ->
+      $"line {line}: #start semana requires an integer, got '{raw}'"

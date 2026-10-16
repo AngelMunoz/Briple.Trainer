@@ -1,8 +1,10 @@
 module Briple.Trainer.Core.Tests.Data.Tests
 
 // The data boundary: the model's JSON converts to the domain or
-// accumulates failures with their path. The {"data": "..."} wrapper
-// unwraps before converting.
+// accumulates typed failures with their path. The {"data": "..."}
+// wrapper unwraps before converting.
+
+#nowarn "3535"
 
 open System
 open Expecto
@@ -11,6 +13,19 @@ open Briple.Trainer.Core.Plan.Data
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Tests.TestSupport
+
+/// The tests' edge of the decode leaf: the DataFailure list the
+/// assertions inspect.
+type DataEdge =
+  | Invalid of failures: DataFailure list
+
+  interface IPlanDataError<DataEdge> with
+    static member InvalidData failures = Invalid failures
+
+let ofJson json : Result<Plan, DataFailure list> =
+  match fromJson json: Result<_, DataEdge> with
+  | Ok plan -> Ok plan
+  | Error(Invalid failures) -> Error failures
 
 let validJson =
   """
@@ -53,10 +68,16 @@ let validJson =
 }
 """
 
+/// Ok of the decode as an option, for round-trip assertions.
+let private convertBack(json: string) =
+  match ofJson json with
+  | Ok plan -> Some plan
+  | Error _ -> None
+
 let tests =
   testList "Data" [
     testCase "the valid json converts to the domain" (fun () ->
-      match fromJson validJson with
+      match ofJson validJson with
       | Ok plan ->
         Expect.equal plan.Title "Plan de prueba" "title"
         Expect.equal plan.Weeks 2 "weeks"
@@ -87,19 +108,21 @@ let tests =
       let json = Encode.string validJson
       let wrapped = $"{{ \"data\": {json.ToJsonString()} }}"
 
-      match fromJson wrapped with
+      match ofJson wrapped with
       | Ok plan -> Expect.equal plan.Title "Plan de prueba" "same plan"
       | Error failures -> failtest $"expected Ok: %A{failures}")
 
     testCase "an unknown gender accumulates a failure" (fun () ->
       let json = validJson.Replace("\"male\"", "\"alien\"")
 
-      match fromJson json with
+      match ofJson json with
       | Ok _ -> failtest "expected Error"
       | Error failures ->
         Expect.exists
           failures
-          (fun failure -> failure.Contains "gender")
+          (function
+          | BadGender "alien" -> true
+          | _ -> false)
           "the failure names the gender")
 
     testCase
@@ -107,13 +130,14 @@ let tests =
       (fun () ->
         let json = validJson.Replace("\"lunes\"", "\"samedi\"")
 
-        match fromJson json with
+        match ofJson json with
         | Ok _ -> failtest "expected Error"
         | Error failures ->
           Expect.exists
             failures
-            (fun failure ->
-              failure.Contains "days[0]" && failure.Contains "samedi")
+            (function
+            | UnknownDay(path, "samedi") -> path.Contains "days[0]"
+            | _ -> false)
             "the failure carries the path")
 
     testCase
@@ -122,27 +146,77 @@ let tests =
         let json =
           validJson.Replace("\"name\": \"Sentadilla\"", "\"name\": \" \"")
 
-        match fromJson json with
+        match ofJson json with
         | Ok _ -> failtest "expected Error"
         | Error failures ->
           Expect.exists
             failures
-            (fun failure ->
-              failure.Contains "exercises[0]" && failure.Contains "empty name")
+            (function
+            | EmptyExerciseName path -> path.Contains "exercises[0]"
+            | _ -> false)
             "the failure carries the path")
 
     testCase "a broken json gives an unreadable failure" (fun () ->
-      match fromJson "{ esto no es json" with
+      match ofJson "{ esto no es json" with
       | Ok _ -> failtest "expected Error"
       | Error failures ->
         Expect.exists
           failures
-          (fun failure -> failure.Contains "unreadable")
+          (function
+          | UnreadableJson _ -> true
+          | _ -> false)
           "unreadable failures")
 
+    testCase "every bad field is reported, not only the first" (fun () ->
+      // reps and rir arrive as numbers where strings belong: two bad
+      // fields, both must come back
+      let json =
+        validJson
+          .Replace("\"reps\": \"6-8\"", "\"reps\": 68")
+          .Replace("\"rir\": \"1-2\"", "\"rir\": 12")
+
+      match ofJson json with
+      | Ok _ -> failtest "expected Error"
+      | Error failures ->
+        let unreadable =
+          failures
+          |> List.filter(function
+            | UnreadableJson _ -> true
+            | _ -> false)
+
+        Expect.hasLength unreadable 2 "both bad fields are reported")
+
+    testCase "a missing week number is a failure, not a silent zero" (fun () ->
+      let json = validJson.Replace("\"number\": 1,", "\"number\": null,")
+
+      match ofJson json with
+      | Ok _ -> failtest "expected Error"
+      | Error failures ->
+        Expect.exists
+          failures
+          (function
+          | MissingWeekNumber path -> path.Contains "weeks[0]"
+          | _ -> false)
+          "the absent week number is reported")
+
+    testCase
+      "a missing exercise order is a failure, not a silent zero"
+      (fun () ->
+        let json = validJson.Replace("\"order\": 1,", "\"order\": null,")
+
+        match ofJson json with
+        | Ok _ -> failtest "expected Error"
+        | Error failures ->
+          Expect.exists
+            failures
+            (function
+            | MissingOrder path -> path.Contains "exercises[0]"
+            | _ -> false)
+            "the absent order is reported")
+
     testCase "toJson and fromJson round-trip the single-block plan" (fun () ->
-      match readFixture "training_plan_4w.txt" |> parsePlan with
-      | Error error -> failtest $"parse error: {error.Message}"
+      match parse(readFixture "training_plan_4w.txt") with
+      | Error error -> failtest $"parse error: {Parse.describe error}"
       | Ok parsed ->
         let manOnly = {
           parsed.Plan with
@@ -151,8 +225,32 @@ let tests =
                 |> List.filter(fun block -> block.Gender = Male)
         }
 
-        match toJson manOnly |> fromJson with
-        | Ok converted ->
+        match toJson(Male, manOnly) |> Option.bind convertBack with
+        | Some converted ->
           Expect.equal converted manOnly "the plan survives the round-trip"
-        | Error failures -> failtest $"expected Ok: %A{failures}")
+        | None -> failtest "expected the male block to serialize")
+
+    testCase "toJson: a plan without the asked gender is None" (fun () ->
+      match parse(readFixture "training_plan_4w.txt") with
+      | Error error -> failtest $"parse error: {Parse.describe error}"
+      | Ok parsed ->
+        let empty = { parsed.Plan with Blocks = [] }
+
+        Expect.equal (toJson(Male, empty)) None "nothing to serialize")
+
+    testCase "toJson serializes the block of the asked gender" (fun () ->
+      match parse(readFixture "training_plan_4w.txt") with
+      | Error error -> failtest $"parse error: {Parse.describe error}"
+      | Ok parsed ->
+        let mujer = parsed.Plan.Blocks |> List.item 1
+
+        Expect.equal mujer.Gender Female "the fixture's second block"
+
+        match toJson(Female, parsed.Plan) |> Option.bind convertBack with
+        | Some converted ->
+          Expect.equal
+            converted.Blocks
+            [ mujer ]
+            "the asked block, not the first"
+        | None -> failtest "expected the female block to serialize")
   ]

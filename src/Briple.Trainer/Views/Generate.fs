@@ -7,6 +7,7 @@ module Briple.Trainer.Views.Generate
 
 open System
 open System.Globalization
+open System.Threading
 
 open Avalonia.Controls
 open Avalonia.Media
@@ -57,7 +58,7 @@ type WizardPageProps = {
 let (|AdjustmentBase|_|)(previous: PlanEntity voption) =
   previous
   |> ValueOption.bind(fun entity ->
-    match Briple.Trainer.Core.Plan.Parser.parsePlan entity.Raw with
+    match Briple.Trainer.Core.Plan.Parser.Parse.parse entity.Raw with
     | Ok parsed -> ValueSome parsed.Plan
     | _ -> ValueNone)
 
@@ -75,10 +76,21 @@ type RequestParts = {
 let requestOf(parts: RequestParts) : Generation =
   match parts.Previous with
   | AdjustmentBase plan ->
-    adjustmentRequest parts.Athlete parts.Memories parts.Weeks parts.Brief plan
+    {
+      Athlete = parts.Athlete
+      Memories = parts.Memories
+      Weeks = parts.Weeks
+      Brief = parts.Brief
+      PreviousPlan = plan
+    }
     |> Generation.PlanAdjustment
   | _ ->
-    newRequest parts.Athlete parts.Memories parts.Weeks parts.Brief
+    {
+      Athlete = parts.Athlete
+      Memories = parts.Memories
+      Weeks = parts.Weeks
+      Brief = parts.Brief
+    }
     |> Generation.NewPlan
 
 let inline kindOf kind =
@@ -86,10 +98,107 @@ let inline kindOf kind =
   | Generation.NewPlan _ -> "new"
   | Generation.PlanAdjustment _ -> "adjust"
 
-let inline callOf(agent: IProvideAgent) =
+// --- violation rendering: typed cases to one localized line each ---
+// (the Generate.fsi hides all of these; the page class is the export)
+
+let genderName(culture: CultureInfo, gender: Gender) =
+  match gender with
+  | Male -> get(culture, Keys.genderMale)
+  | Female -> get(culture, Keys.genderFemale)
+
+let describeDataFailure (culture: CultureInfo) (failure: DataFailure) : string =
+  match failure with
+  | UnreadableJson message ->
+    getf(culture, Keys.dataUnreadableJson, [ message :> obj ])
+  | BadGender raw -> getf(culture, Keys.dataBadGender, [ raw :> obj ])
+  | MissingTitle -> get(culture, Keys.dataMissingTitle)
+  | BadWeeks value -> getf(culture, Keys.dataBadWeeks, [ value :> obj ])
+  | EmptyVariantId path ->
+    getf(culture, Keys.dataEmptyVariantId, [ path :> obj ])
+  | MissingWeekNumber path ->
+    getf(culture, Keys.dataMissingWeekNumber, [ path :> obj ])
+  | MissingOrder path -> getf(culture, Keys.dataMissingOrder, [ path :> obj ])
+  | UnknownDay(path, raw) ->
+    getf(culture, Keys.dataUnknownDay, [ path :> obj; raw :> obj ])
+  | EmptyExerciseName path ->
+    getf(culture, Keys.dataEmptyExerciseName, [ path :> obj ])
+
+let describeAdvisory
+  (culture: CultureInfo)
+  (advisory: PrescriptionAdvisory)
+  : string =
+  match advisory with
+  | NotPureRange raw -> getf(culture, Keys.advisoryNotPureRange, [ raw :> obj ])
+  | UnknownUnit raw -> getf(culture, Keys.advisoryUnknownUnit, [ raw :> obj ])
+  | MultipleExercises name ->
+    getf(culture, Keys.advisoryMultipleExercises, [ name :> obj ])
+  | RepsWithoutEffort name ->
+    getf(culture, Keys.advisoryRepsWithoutEffort, [ name :> obj ])
+  | TimedWithRir name ->
+    getf(culture, Keys.advisoryTimedWithRir, [ name :> obj ])
+
+/// One user-facing line per violation case, in the page culture. The
+/// broken-format detail stays technical (single-language, from Core):
+/// the file format is the domain, like the parse warnings themselves.
+let describeViolation(culture: CultureInfo, violation: Violation) : string =
+  match violation with
+  | GenderMismatch(expected, found) ->
+    getf(
+      culture,
+      Keys.violationGenderMismatch,
+      [ genderName(culture, expected) :> obj; found :> obj ]
+    )
+  | WrongWeeks(expected, found) ->
+    getf(culture, Keys.violationWeeks, [ expected :> obj; found :> obj ])
+  | WrongVariants(expected, found) ->
+    let e = String.concat ", " expected
+    let f = String.concat ", " found
+
+    getf(culture, Keys.violationVariants, [ e :> obj; f :> obj ])
+  | BadVariantWeeks(variant, found, expected) ->
+    let weeks = found |> List.map string |> String.concat ", "
+
+    getf(
+      culture,
+      Keys.violationVariantWeeks,
+      [ variant :> obj; weeks :> obj; expected :> obj ]
+    )
+  | WrongFrequency(variant, week, found, expected) ->
+    getf(
+      culture,
+      Keys.violationFrequency,
+      [ variant :> obj; found :> obj; week :> obj; expected :> obj ]
+    )
+  | WrongRir(week, found, expected) ->
+    getf(
+      culture,
+      Keys.violationRir,
+      [ week :> obj; found :> obj; expected :> obj ]
+    )
+  | MissingRir(week, expected) ->
+    getf(culture, Keys.violationMissingRir, [ week :> obj; expected :> obj ])
+  | CountChanged(variant, expected, found) ->
+    getf(
+      culture,
+      Keys.violationCount,
+      [ variant :> obj; expected :> obj; found :> obj ]
+    )
+  | BrokenFormat failure ->
+    Briple.Trainer.Core.Plan.Parser.Parse.describe failure
+  | FormatWarning warning ->
+    getf(
+      culture,
+      Keys.violationFormatWarning,
+      [ warning.Line :> obj; warning.Message :> obj ]
+    )
+  | Data failures ->
+    failures |> List.map(describeDataFailure culture) |> String.concat "; "
+  | Prescription advisory -> describeAdvisory culture advisory
+
+let inline callOf(agent: IProvideAgent, ct: CancellationToken) =
   function
-  | Generation.NewPlan request -> agent.GenerateNew request
-  | Generation.PlanAdjustment request -> agent.GenerateAdjustment request
+  | Generation.NewPlan request -> agent.GenerateNew(request, ct)
+  | Generation.PlanAdjustment request -> agent.GenerateAdjustment(request, ct)
 
 /// Persists the edited proposal and re-emits the athlete's slice.
 let updateMemory (store: MemoryStore) (entity: MemoryEntity) =
@@ -117,6 +226,8 @@ type Model = {
   /// One entry per card that decided, confirm or discard.
   Decided: Guid list
   Confirmed: (Guid * Memory) list
+  /// The generation in flight; cancelled when the wizard exits.
+  Run: CancellationTokenSource voption
 }
 
 type Msg =
@@ -142,6 +253,7 @@ let init(props: WizardPageProps) =
     Step = Memories
     Decided = []
     Confirmed = []
+    Run = ValueNone
   },
   Cmd.none
 
@@ -230,32 +342,57 @@ let update
          $"weeks={weeks};freq={VariantFrequency.toFileToken brief.Frequency}")
         (fun _ -> Recorded)
 
+    // one run, one CTS: leaving the wizard or a new run cancels it
+    model.Run
+    |> ValueOption.iter(fun cts ->
+      cts.Cancel()
+      cts.Dispose())
+
+    let cts = new CancellationTokenSource()
+
     let run =
-      Cmd.OfTask.perform (callOf props.Agent) request (function
+      Cmd.OfTask.perform (callOf(props.Agent, cts.Token)) request (function
         | Ok run -> GenerationDone(run, kind)
         | Error e -> GenerationFailed e.Message)
 
-    { model with Step = Generating }, Cmd.batch [ record; run ]
+    {
+      model with
+          Step = Generating
+          Run = ValueSome cts
+    },
+    Cmd.batch [ record; run ]
 
   | GenerationDone(run, kind) ->
+    model.Run |> ValueOption.iter(fun cts -> cts.Dispose())
+
     match run.Verdict with
     | Rejected violations ->
       let reasons = [|
-        for violation in violations -> $"{violation.Rule}: {violation.Detail}"
+        for violation in violations ->
+          describeViolation(props.Culture, violation)
       |]
 
-      { model with Step = Failed reasons }, Cmd.none
+      {
+        model with
+            Step = Failed reasons
+            Run = ValueNone
+      },
+      Cmd.none
     | Valid(plan, advisories) ->
       {
         model with
             Step = Done(plan, advisories, kind)
+            Run = ValueNone
       },
       Cmd.none
 
   | GenerationFailed reason ->
+    model.Run |> ValueOption.iter(fun cts -> cts.Dispose())
+
     {
       model with
           Step = Failed [| reason |]
+          Run = ValueNone
     },
     Cmd.none
 
@@ -273,16 +410,26 @@ let update
     | _ -> model, Cmd.none
 
   | PlanSaved(Ok entity) ->
+    model.Run |> ValueOption.iter(fun cts -> cts.Dispose())
+
     onOutcome(PlanFinished entity.Id)
-    model, Cmd.none
+
+    { model with Run = ValueNone }, Cmd.none
 
   | PlanSaved(Error e) ->
     Log.Error(e, "plan save failed")
     model, Cmd.none
 
   | Cancelled ->
+    // the user left mid-run: the generation stops with the wizard
+    model.Run
+    |> ValueOption.iter(fun cts ->
+      cts.Cancel()
+      cts.Dispose())
+
     onOutcome WizardCancelled
-    model, Cmd.none
+
+    { model with Run = ValueNone }, Cmd.none
 
   | Recorded -> model, Cmd.none
 
@@ -393,7 +540,7 @@ let doneStep
   let advisoryPanel =
     linesPanel [|
       for advisory in advisories ->
-        statusLine($"{advisory.Rule}: {advisory.Detail}", true)
+        statusLine(describeViolation(props.Culture, advisory), true)
     |]
 
   StackPanel()

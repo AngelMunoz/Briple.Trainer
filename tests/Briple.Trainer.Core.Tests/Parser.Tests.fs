@@ -9,8 +9,6 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Tests.TestSupport
 
-let parse(text: string) = parsePlan text
-
 let hasWarning (kind: WarningKind) (line: int) (warnings: ParseWarning list) =
   warnings
   |> List.exists(fun warning -> warning.Kind = kind && warning.Line = line)
@@ -21,19 +19,11 @@ let block (plan: Plan) (gender: Gender) =
 let variant (block: Block) (id: string) =
   block.Variants |> List.find(fun o -> o.Id = id)
 
-let totalExercises(plan: Plan) =
-  plan.Blocks
-  |> List.sumBy(fun block ->
-    block.Variants
-    |> List.sumBy(fun variant ->
-      variant.Weeks
-      |> List.sumBy(fun week ->
-        week.Days |> List.sumBy(fun d -> d.Exercises.Length))))
+let totalExercises(plan: Plan) = plan |> Tree.exercisesOf |> Seq.length
 
 let assertSamplePlan(text: string) =
   match parse text with
-  | Error error ->
-    failtest $"unexpected parse error at line {error.Line}: {error.Message}"
+  | Error error -> failtest $"unexpected parse error: {Parse.describe error}"
   | Ok parsed ->
     let plan = parsed.Plan
 
@@ -149,8 +139,7 @@ let tests =
     testCase "the month 2 sample plan parses with zero warnings" (fun () ->
       match readFixture "month2_4w.txt" |> parse with
       | Error error ->
-        failtest
-          $"unexpected parse error at line {error.Line}: {error.Message}"
+        failtest $"unexpected parse error: {Parse.describe error}"
       | Ok parsed ->
         let plan = parsed.Plan
 
@@ -192,7 +181,10 @@ let tests =
 
       match parse fixture with
       | Error error ->
-        Expect.equal error.Line 5 "error points at the mismatched line"
+        Expect.equal
+          error
+          (MismatchedEnd(5, "opcion", "genero hombre"))
+          "the mismatch carries line, found and expected"
       | Ok _ -> failtest "expected a parse error")
 
     testCase "an unterminated block is a hard error" (fun () ->
@@ -201,9 +193,10 @@ let tests =
           "#start plan v1\n#meta titulo T\n#meta semanas 1\n#start genero Hombre\n"
       with
       | Error error ->
-        Expect.isTrue
-          (error.Message.StartsWith "unterminated")
-          "reports the unterminated block"
+        Expect.equal
+          error
+          (Unterminated(5, "genero hombre"))
+          "reports the unterminated block with its last line"
       | Ok _ -> failtest "expected a parse error")
 
     testCase "a malformed #ej row warns instead of failing" (fun () ->
@@ -220,7 +213,7 @@ let tests =
           (hasWarning EmptyDay 9 parsed.Warnings)
           "the day ends up empty"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "an #ej row without a name warns" (fun () ->
       let fixture =
@@ -232,7 +225,7 @@ let tests =
           (hasWarning BadEjField 8 parsed.Warnings)
           "empty name reported at its line"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "an #ej row with a pipe inside the name warns" (fun () ->
       let fixture =
@@ -244,7 +237,7 @@ let tests =
           (hasWarning BadEjField 8 parsed.Warnings)
           "pipe in name reported at its line"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "an unrecognized day name warns" (fun () ->
       let fixture =
@@ -261,7 +254,7 @@ let tests =
           1
           "day kept in the model"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "an unknown block is skipped in a balanced way" (fun () ->
       let fixture =
@@ -280,7 +273,7 @@ let tests =
           0
           "no gender parsed from the unknown block"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "a duplicate week warns" (fun () ->
       let fixture =
@@ -292,7 +285,7 @@ let tests =
           (hasWarning DuplicateEntry 8 parsed.Warnings)
           "duplicate reported at second start"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "an unsupported plan version warns but parses" (fun () ->
       match
@@ -303,7 +296,7 @@ let tests =
           (hasWarning UnsupportedVersion 1 parsed.Warnings)
           "version warning at line 1"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "missing required meta warns at #end plan" (fun () ->
       match parse "#start plan v1\n#end plan\n" with
@@ -318,7 +311,7 @@ let tests =
         Expect.equal parsed.Plan.Title "" "title defaulted"
         Expect.equal parsed.Plan.Weeks 0 "weeks defaulted"
       | Error error ->
-        failtest $"expected warnings, got error: {error.Message}")
+        failtest $"expected warnings, got error: {Parse.describe error}")
 
     testCase "the smallest valid plan parses cleanly" (fun () ->
       match
@@ -328,5 +321,5 @@ let tests =
         Expect.equal parsed.Warnings [] $"no warnings, got %A{parsed.Warnings}"
         Expect.equal parsed.Plan.Blocks.Length 0 "no blocks"
       | Error error ->
-        failtest $"expected a clean parse, got error: {error.Message}")
+        failtest $"expected a clean parse, got error: {Parse.describe error}")
   ]

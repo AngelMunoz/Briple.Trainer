@@ -234,7 +234,9 @@ let newPlanPrompt(request: NewPlanRequest) =
   $"ATHLETE\n{athleteText request.Athlete}{emphasisText request.Brief}\n\nMANDATORY IN THE RESPONSE:\n{fixedLines}\n\nWHAT YOU DECIDE:\n{asked}\n\nFORBIDDEN:\n{forbidden}"
 
 /// User message for the adjustment flow: the common part plus the
-/// previous plan as reference in the same schema.
+/// previous plan as reference in the same schema. When the previous
+/// plan has no block for the athlete's gender, the reference section is
+/// omitted.
 let adjustmentPrompt(request: AdjustmentRequest) =
   let instructions = forAdjustment request
 
@@ -245,7 +247,13 @@ let adjustmentPrompt(request: AdjustmentRequest) =
 
   let forbidden = instructions.Forbid |> List.map prohibitionText |> join "\n"
 
-  $"ATHLETE\n{athleteText request.Athlete}{emphasisText request.Brief}\n\nMANDATORY IN THE RESPONSE:\n{fixedLines}\n\nWHAT YOU DECIDE:\n{asked}\n\nFORBIDDEN:\n{forbidden}\n\nPREVIOUS PLAN (adjustment reference, same schema):\n{toJson request.PreviousPlan}"
+  let reference =
+    match toJson(request.Athlete.Gender, request.PreviousPlan) with
+    | Some json ->
+      $"\n\nPREVIOUS PLAN (adjustment reference, same schema):\n{json}"
+    | None -> ""
+
+  $"ATHLETE\n{athleteText request.Athlete}{emphasisText request.Brief}\n\nMANDATORY IN THE RESPONSE:\n{fixedLines}\n\nWHAT YOU DECIDE:\n{asked}\n\nFORBIDDEN:\n{forbidden}{reference}"
 
 /// User message for consolidation: the recorded marks.
 let consolidationPrompt(marks: FeedbackMark list) =

@@ -354,4 +354,73 @@
   <data name="error.title" xml:space="preserve">
     <value>Error</value>
   </data>
+  <data name="violation.genderMismatch" xml:space="preserve">
+    <value>expected only the {0} block, found {1}</value>
+  </data>
+  <data name="violation.weeks" xml:space="preserve">
+    <value>expected {0} weeks, the plan declares {1}</value>
+  </data>
+  <data name="violation.variants" xml:space="preserve">
+    <value>expected variants [{0}], the plan has [{1}]</value>
+  </data>
+  <data name="violation.variantWeeks" xml:space="preserve">
+    <value>option {0} has weeks {1}, expected 1..{2}</value>
+  </data>
+  <data name="violation.frequency" xml:space="preserve">
+    <value>option {0} trains {1} days in week {2}, expected {3}</value>
+  </data>
+  <data name="violation.rir" xml:space="preserve">
+    <value>week {0} declares RIR {1}, expected {2}</value>
+  </data>
+  <data name="violation.missingRir" xml:space="preserve">
+    <value>week {0} does not declare RIR {1}</value>
+  </data>
+  <data name="violation.count" xml:space="preserve">
+    <value>option {0} must keep {1} exercises, has {2}</value>
+  </data>
+  <data name="violation.formatWarning" xml:space="preserve">
+    <value>line {0}: {1}</value>
+  </data>
+  <data name="data.unreadableJson" xml:space="preserve">
+    <value>unreadable json: {0}</value>
+  </data>
+  <data name="data.badGender" xml:space="preserve">
+    <value>gender: '{0}' is neither male nor female</value>
+  </data>
+  <data name="data.missingTitle" xml:space="preserve">
+    <value>missing title</value>
+  </data>
+  <data name="data.badWeeks" xml:space="preserve">
+    <value>weeks: {0} is not positive</value>
+  </data>
+  <data name="data.emptyVariantId" xml:space="preserve">
+    <value>{0}: empty option id</value>
+  </data>
+  <data name="data.missingWeekNumber" xml:space="preserve">
+    <value>{0}: missing week number</value>
+  </data>
+  <data name="data.missingOrder" xml:space="preserve">
+    <value>{0}: missing order</value>
+  </data>
+  <data name="data.unknownDay" xml:space="preserve">
+    <value>{0}: day '{1}' not recognized</value>
+  </data>
+  <data name="data.emptyExerciseName" xml:space="preserve">
+    <value>{0}: empty name</value>
+  </data>
+  <data name="advisory.notPureRange" xml:space="preserve">
+    <value>reps is not a pure range or duration: '{0}'</value>
+  </data>
+  <data name="advisory.unknownUnit" xml:space="preserve">
+    <value>unknown duration unit: '{0}'</value>
+  </data>
+  <data name="advisory.multipleExercises" xml:space="preserve">
+    <value>'{0}' groups more than one exercise (alternatives go in notes)</value>
+  </data>
+  <data name="advisory.repsWithoutEffort" xml:space="preserve">
+    <value>'{0}' rep-based without an effort target</value>
+  </data>
+  <data name="advisory.timedWithRir" xml:space="preserve">
+    <value>'{0}' timed with an RIR target instead of rpe or zone</value>
+  </data>
 </root>

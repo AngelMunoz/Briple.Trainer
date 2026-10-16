@@ -9,6 +9,7 @@ module Briple.Trainer.Components.NoteSection
 
 open System
 open System.Globalization
+open System.Threading
 
 open Avalonia.Controls
 
@@ -34,6 +35,8 @@ type Props = {
   /// surface and its id stamps plan-scoped memories.
   Plan: Plan
   PlanId: Guid
+  /// The page's token: leaving the review page cancels the reading.
+  Cancel: CancellationToken
 }
 
 /// What the last reading produced, rendered next to the field.

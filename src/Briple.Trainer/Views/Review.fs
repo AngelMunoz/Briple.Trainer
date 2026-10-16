@@ -41,14 +41,20 @@ type ReviewPageProps = {
 
 // --- page pieces as module functions ---
 
-let inline invalidBody(props: ReviewPageProps, error: ParseError) : Control =
+let inline invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
   StackPanel()
     .Margin(24.0)
     .Spacing(8.0)
     .Children(
       title(get(props.Culture, Keys.reviewTitle)),
       TextBlock()
-        .Text(getf(props.Culture, Keys.reviewInvalid, [ error.Message :> obj ]))
+        .Text(
+          getf(
+            props.Culture,
+            Keys.reviewInvalid,
+            [ Parse.describe failure :> obj ]
+          )
+        )
         .Foreground(errorBrush)
         .FontFamily(font)
     )
@@ -150,8 +156,15 @@ type ReviewPage(props: ReviewPageProps) as this =
   inherit UserControl()
 
   do
+    // the note reading cancels with the page: leaving the review stops it
+    let notesCts = new Threading.CancellationTokenSource()
+
+    this.DetachedFromVisualTree.Add(fun _ ->
+      notesCts.Cancel()
+      notesCts.Dispose())
+
     this.Content <-
-      match parsePlan props.Entity.Raw with
+      match Parse.parse props.Entity.Raw with
       | Error error -> invalidBody(props, error)
       | Ok parsed ->
         // the edits travel to the parent and back into the Raw on save
@@ -184,6 +197,7 @@ type ReviewPage(props: ReviewPageProps) as this =
               AthleteId = props.Entity.AthleteId
               Plan = parsed.Plan
               PlanId = props.Entity.Id
+              Cancel = notesCts.Token
             },
             ignore
           )

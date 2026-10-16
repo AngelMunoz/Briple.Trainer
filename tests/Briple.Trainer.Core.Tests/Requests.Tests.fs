@@ -15,8 +15,8 @@ open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Tests.TestSupport
 
 let private parseFixture name =
-  match readFixture name |> parsePlan with
-  | Error error -> failtest $"parse error at line {error.Line}: {error.Message}"
+  match readFixture name |> parse with
+  | Error error -> failtest $"parse error: {Parse.describe error}"
   | Ok parsed -> parsed
 
 let private confirmedMemory =
@@ -82,8 +82,13 @@ let tests =
     testCase "the adjustment inherits the previous counts it keeps" (fun () ->
       let month1 = parseFixture "training_plan_4w.txt"
 
-      let request =
-        adjustmentRequest man [ confirmedMemory ] 4 manBrief month1.Plan
+      let request = {
+        Athlete = man
+        Memories = [ confirmedMemory ]
+        Weeks = 4
+        Brief = manBrief
+        PreviousPlan = month1.Plan
+      }
 
       let parameters = parametersForAdjustment request
 
@@ -183,7 +188,13 @@ let tests =
 
     testCase "the new plan joins memories and brief without counts" (fun () ->
       let parameters =
-        newRequest man [ confirmedMemory ] 2 manBrief |> parametersForNew
+        {
+          Athlete = man
+          Memories = [ confirmedMemory ]
+          Weeks = 2
+          Brief = manBrief
+        }
+        |> parametersForNew
 
       Expect.contains
         parameters

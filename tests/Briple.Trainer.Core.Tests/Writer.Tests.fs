@@ -12,12 +12,11 @@ let tests =
   testList "Writer" [
     let roundTrip name =
       testCase $"round-trip of {name}" (fun () ->
-        match readFixture name |> parsePlan with
-        | Error error -> failtest $"parse error at line {error.Line}"
+        match readFixture name |> parse with
+        | Error error -> failtest $"parse error: {Parse.describe error}"
         | Ok first ->
-          match write first.Plan |> parsePlan with
-          | Error error ->
-            failtest $"re-parse error at line {error.Line}: {error.Message}"
+          match write first.Plan |> parse with
+          | Error error -> failtest $"re-parse error: {Parse.describe error}"
           | Ok second ->
             Expect.equal
               second.Plan

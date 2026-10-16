@@ -75,7 +75,12 @@ let tests =
     testCase
       "the new-plan prompt carries schema, fixed and forbidden"
       (fun () ->
-        let request = newRequest man [] 4 brief
+        let request = {
+          Athlete = man
+          Memories = []
+          Weeks = 4
+          Brief = brief
+        }
 
         let prompt = newPlanPrompt request
 
@@ -126,7 +131,15 @@ let tests =
           "the output instruction goes in the system")
 
     testCase "the athlete line carries the goals and no focus" (fun () ->
-      let prompt = newPlanPrompt(newRequest man [] 4 brief)
+      let prompt =
+        newPlanPrompt(
+          {
+            Athlete = man
+            Memories = []
+            Weeks = 4
+            Brief = brief
+          }
+        )
 
       Expect.stringContains prompt "Goals: strength." "the goals travel"
 
@@ -135,11 +148,27 @@ let tests =
     testCase "the emphasis travels when the brief picks it" (fun () ->
       let withEmphasis = { brief with Emphasis = [ Arms; Back ] }
 
-      let prompt = newPlanPrompt(newRequest man [] 4 withEmphasis)
+      let prompt =
+        newPlanPrompt(
+          {
+            Athlete = man
+            Memories = []
+            Weeks = 4
+            Brief = withEmphasis
+          }
+        )
 
       Expect.stringContains prompt "EMPHASIS: arms, back." "the emphasis"
 
-      let bare = newPlanPrompt(newRequest man [] 4 brief)
+      let bare =
+        newPlanPrompt(
+          {
+            Athlete = man
+            Memories = []
+            Weeks = 4
+            Brief = brief
+          }
+        )
 
       Expect.isFalse (bare.Contains "EMPHASIS") "nothing when empty")
 
@@ -173,7 +202,13 @@ let tests =
     testCase
       "the adjustment prompt carries the kept counts and the previous plan"
       (fun () ->
-        let request = adjustmentRequest man [] 4 brief tinyPlan
+        let request = {
+          Athlete = man
+          Memories = []
+          Weeks = 4
+          Brief = brief
+          PreviousPlan = tinyPlan
+        }
 
         let prompt = adjustmentPrompt request
 
@@ -204,7 +239,15 @@ let tests =
           |> consolidate
           |> confirm [ Load 5 ]
 
-        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief)
+        let prompt =
+          newPlanPrompt(
+            {
+              Athlete = man
+              Memories = [ memory ]
+              Weeks = 4
+              Brief = brief
+            }
+          )
 
         Expect.stringContains
           prompt
@@ -220,7 +263,15 @@ let tests =
             Technique = "Sentadilla con salto"
           }
 
-        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief)
+        let prompt =
+          newPlanPrompt(
+            {
+              Athlete = man
+              Memories = [ memory ]
+              Weeks = 4
+              Brief = brief
+            }
+          )
 
         Expect.stringContains
           prompt

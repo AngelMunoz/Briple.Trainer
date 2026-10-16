@@ -63,17 +63,21 @@ type IProvideCulture =
 
 type IProvideAgent =
   abstract AgentAvailable: bool
-  abstract GenerateNew: request: NewPlanRequest -> Task<Result<Run, exn>>
+
+  abstract GenerateNew:
+    request: NewPlanRequest * ct: CancellationToken -> Task<Result<Run, exn>>
 
   abstract GenerateAdjustment:
-    request: AdjustmentRequest -> Task<Result<Run, exn>>
+    request: AdjustmentRequest * ct: CancellationToken -> Task<Result<Run, exn>>
 
   abstract ConsolidateMarks:
-    marks: FeedbackMark list -> Task<Result<Memory list, exn>>
+    marks: FeedbackMark list * ct: CancellationToken ->
+      Task<Result<Memory list, exn>>
 
   /// Reads the trainer's note over the plan's closed vocabulary.
   abstract InterpretNote:
-    targets: Target list * note: string -> Task<Result<NoteInterpretation, exn>>
+    ask: NoteAsk * ct: CancellationToken ->
+      Task<Result<NoteInterpretation, exn>>
 
 type IProvideCredentials =
   abstract TokenInsecure: bool
@@ -82,6 +86,16 @@ type IProvideCredentials =
 
 type IProvideHost =
   abstract Host: Window voption
+
+/// The Core agent capabilities: one provider client plus the app's
+/// logger. One value per call; Core never sees the concrete app env.
+/// (The log type is qualified: `open Serilog` shadows `ILogger` here.)
+type AgentEnv(client: IChatClient, log: Microsoft.Extensions.Logging.ILogger) =
+  interface IProvideChat with
+    member _.Chat = client
+
+  interface IProvideLog with
+    member _.Log = log
 
 let clientOf(key: string) : IChatClient =
   createClient key {
@@ -166,10 +180,18 @@ type AppEnv
     | ValueSome settings -> clientOf settings.Key
     | ValueNone -> invalidOp "the agent was requested without a token"
 
-  let generate generateFn request =
+  // the Core agent capabilities over one provider client and the app's
+  // Serilog-bridged logger
+  let agentEnv() =
+    AgentEnv(
+      privateClient(),
+      loggerFactory.CreateLogger "Briple.Trainer.Core.Agent"
+    )
+
+  let generate generateFn ct request =
     guarded(fun () -> task {
-      let client = privateClient()
-      return! generateFn client request
+      let env = agentEnv()
+      return! generateFn (env, request) ct
     })
 
   interface IProvideStore with
@@ -190,21 +212,24 @@ type AppEnv
   interface IProvideAgent with
     member _.AgentAvailable = workingSettings.IsSome
 
-    member _.GenerateNew(request: NewPlanRequest) = generate generateNew request
+    member _.GenerateNew(request: NewPlanRequest, ct: CancellationToken) =
+      generate generateNew ct request
 
-    member _.GenerateAdjustment(request: AdjustmentRequest) =
-      generate generateAdjustment request
+    member _.GenerateAdjustment
+      (request: AdjustmentRequest, ct: CancellationToken)
+      =
+      generate generateAdjustment ct request
 
-    member _.ConsolidateMarks(marks: FeedbackMark list) =
+    member _.ConsolidateMarks(marks: FeedbackMark list, ct: CancellationToken) =
       guarded(fun () -> task {
-        let client = privateClient()
-        return! consolidateMarks client marks
+        let env = agentEnv()
+        return! consolidateMarks (env, marks) ct
       })
 
-    member _.InterpretNote(targets: Target list, note: string) =
+    member _.InterpretNote(ask: NoteAsk, ct: CancellationToken) =
       guarded(fun () -> task {
-        let client = privateClient()
-        return! interpretNote(client, targets, note)
+        let env = agentEnv()
+        return! interpretNote (env, ask) ct
       })
 
   interface IProvideCredentials with

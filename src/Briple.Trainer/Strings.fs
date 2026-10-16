@@ -374,3 +374,74 @@ module Keys =
 
   [<Literal>]
   let errorTitle = "error.title"
+
+  // --- wizard violations: typed cases to one user-facing line each ---
+
+  [<Literal>]
+  let violationGenderMismatch = "violation.genderMismatch"
+
+  [<Literal>]
+  let violationWeeks = "violation.weeks"
+
+  [<Literal>]
+  let violationVariants = "violation.variants"
+
+  [<Literal>]
+  let violationVariantWeeks = "violation.variantWeeks"
+
+  [<Literal>]
+  let violationFrequency = "violation.frequency"
+
+  [<Literal>]
+  let violationRir = "violation.rir"
+
+  [<Literal>]
+  let violationMissingRir = "violation.missingRir"
+
+  [<Literal>]
+  let violationCount = "violation.count"
+
+  [<Literal>]
+  let violationFormatWarning = "violation.formatWarning"
+
+  [<Literal>]
+  let dataUnreadableJson = "data.unreadableJson"
+
+  [<Literal>]
+  let dataBadGender = "data.badGender"
+
+  [<Literal>]
+  let dataMissingTitle = "data.missingTitle"
+
+  [<Literal>]
+  let dataBadWeeks = "data.badWeeks"
+
+  [<Literal>]
+  let dataEmptyVariantId = "data.emptyVariantId"
+
+  [<Literal>]
+  let dataMissingWeekNumber = "data.missingWeekNumber"
+
+  [<Literal>]
+  let dataMissingOrder = "data.missingOrder"
+
+  [<Literal>]
+  let dataUnknownDay = "data.unknownDay"
+
+  [<Literal>]
+  let dataEmptyExerciseName = "data.emptyExerciseName"
+
+  [<Literal>]
+  let advisoryNotPureRange = "advisory.notPureRange"
+
+  [<Literal>]
+  let advisoryUnknownUnit = "advisory.unknownUnit"
+
+  [<Literal>]
+  let advisoryMultipleExercises = "advisory.multipleExercises"
+
+  [<Literal>]
+  let advisoryRepsWithoutEffort = "advisory.repsWithoutEffort"
+
+  [<Literal>]
+  let advisoryTimedWithRir = "advisory.timedWithRir"

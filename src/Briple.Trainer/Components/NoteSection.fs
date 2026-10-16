@@ -2,6 +2,7 @@ module Briple.Trainer.Components.NoteSection
 
 open System
 open System.Globalization
+open System.Threading
 open System.Threading.Tasks
 
 open Avalonia.Controls
@@ -41,6 +42,8 @@ type Props = {
   /// surface and its id stamps plan-scoped memories.
   Plan: Plan
   PlanId: Guid
+  /// The page's token: leaving the review page cancels the reading.
+  Cancel: CancellationToken
 }
 
 /// What the last reading produced, rendered next to the field.
@@ -92,9 +95,15 @@ let read(props: Props, note: string) : Task<Reading> = task {
   if List.length live >= memoryCap then
     return SurfaceFull
   else
-    match! props.Agent.InterpretNote(vocabularyOfPlan props.Plan, note) with
-    | Ok interpretation -> return (Read interpretation)
-    | Error e -> return (Unreadable e)
+    let ask: NoteAsk = {
+      Targets = vocabularyOfPlan props.Plan
+      Note = note
+      Date = DateOnly.FromDateTime DateTime.Today
+    }
+
+    match! props.Agent.InterpretNote(ask, props.Cancel) with
+    | Ok interpretation -> return Read interpretation
+    | Error e -> return Unreadable e
 }
 
 /// Persists the confirmed memory; the local id travels so the update can
@@ -143,6 +152,7 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
         match rejection with
         | UnknownLabel token -> "etiqueta-desconocida", token
         | UnknownTarget text -> "objetivo-desconocido", text
+        | MissingField field -> "campo-faltante", field
         | OutsideProtocol detail -> "fuera-de-protocolo", detail
 
       Log.Information("nota rechazada: {Motivo} {Texto}", motive, text)

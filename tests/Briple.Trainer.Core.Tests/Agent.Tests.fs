@@ -6,12 +6,23 @@ module Briple.Trainer.Core.Tests.Agent.Tests
 // already declares load as percentage: the adornment is tolerated.
 
 open System
+open System.Threading
 open System.Threading.Tasks
 open Expecto
 open Microsoft.Extensions.AI
+open Microsoft.Extensions.Logging.Abstractions
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Prompts
+
+/// The test env: the fake client plus the null log, the two capabilities
+/// the agent flows name.
+type TestEnv(client: IChatClient) =
+  interface IProvideChat with
+    member _.Chat = client
+
+  interface IProvideLog with
+    member _.Log = NullLogger.Instance
 
 /// Always answers the same text, without touching the network.
 type FakeClient(answer: string) =
@@ -73,7 +84,9 @@ let private pressMark = {
 let private consolidateWith answer marks =
   use client = new FakeClient(answer)
 
-  consolidateMarks client marks |> Async.AwaitTask |> Async.RunSynchronously
+  consolidateMarks (TestEnv client, marks) CancellationToken.None
+  |> Async.AwaitTask
+  |> Async.RunSynchronously
 
 let tests =
   testList "Agent" [
@@ -163,7 +176,7 @@ let interpretationTests =
       | [ UnknownLabel "exhausted" ] -> ()
       | other -> failtest $"expected one unknown label, got %A{other}")
 
-    testCase "a missing label reads as unknown" (fun () ->
+    testCase "an absent label is a missing field, not unknown" (fun () ->
       let answer = """{"memories":[{"target":"Lunes","summary":"x"}]}"""
 
       let read = interpret answer
@@ -171,8 +184,9 @@ let interpretationTests =
       Expect.isEmpty read.Memories "nothing survives"
 
       match read.Rejections with
-      | [ UnknownLabel "" ] -> ()
-      | other -> failtest $"expected the empty label rejection, got %A{other}")
+      | [ MissingField "label" ] -> ()
+      | other ->
+        failtest $"expected the missing label rejection, got %A{other}")
 
     testCase "undecodable deltas drop silently" (fun () ->
       let answer =

@@ -178,27 +178,6 @@ let relevantMemories
     && (memory.Scope = Athlete || (memory.Scope = Plan && planId = activePlan)))
   |> List.map fst
 
-let newRequest athlete memories weeks brief : NewPlanRequest = {
-  Athlete = athlete
-  Memories = memories
-  Weeks = weeks
-  Brief = brief
-}
-
-let adjustmentRequest
-  athlete
-  memories
-  weeks
-  brief
-  previousPlan
-  : AdjustmentRequest = {
-  Athlete = athlete
-  Memories = memories
-  Weeks = weeks
-  Brief = brief
-  PreviousPlan = previousPlan
-}
-
 let ofBrief (weeks: int) (brief: Brief) : Parameter list = [
   PlanWeeks(weeks, TrainerBrief)
   AthleteVariants(variantTokens brief, TrainerBrief)

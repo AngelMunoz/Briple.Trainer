@@ -354,4 +354,73 @@
   <data name="error.title" xml:space="preserve">
     <value>Error</value>
   </data>
+  <data name="violation.genderMismatch" xml:space="preserve">
+    <value>se esperaba solo el bloque {0}, hubo {1}</value>
+  </data>
+  <data name="violation.weeks" xml:space="preserve">
+    <value>se esperaban {0} semanas, el plan declara {1}</value>
+  </data>
+  <data name="violation.variants" xml:space="preserve">
+    <value>variantes esperadas [{0}], el plan trae [{1}]</value>
+  </data>
+  <data name="violation.variantWeeks" xml:space="preserve">
+    <value>la opción {0} tiene las semanas {1}, se esperaba 1..{2}</value>
+  </data>
+  <data name="violation.frequency" xml:space="preserve">
+    <value>la opción {0} entrena {1} días en la semana {2}, se esperaban {3}</value>
+  </data>
+  <data name="violation.rir" xml:space="preserve">
+    <value>la semana {0} declara RIR {1}, se esperaba {2}</value>
+  </data>
+  <data name="violation.missingRir" xml:space="preserve">
+    <value>la semana {0} no declara RIR {1}</value>
+  </data>
+  <data name="violation.count" xml:space="preserve">
+    <value>la opción {0} debe conservar {1} ejercicios, tiene {2}</value>
+  </data>
+  <data name="violation.formatWarning" xml:space="preserve">
+    <value>línea {0}: {1}</value>
+  </data>
+  <data name="data.unreadableJson" xml:space="preserve">
+    <value>json ilegible: {0}</value>
+  </data>
+  <data name="data.badGender" xml:space="preserve">
+    <value>género: '{0}' no es male ni female</value>
+  </data>
+  <data name="data.missingTitle" xml:space="preserve">
+    <value>falta el título</value>
+  </data>
+  <data name="data.badWeeks" xml:space="preserve">
+    <value>semanas: {0} no es positivo</value>
+  </data>
+  <data name="data.emptyVariantId" xml:space="preserve">
+    <value>{0}: id de opción vacío</value>
+  </data>
+  <data name="data.missingWeekNumber" xml:space="preserve">
+    <value>{0}: falta el número de semana</value>
+  </data>
+  <data name="data.missingOrder" xml:space="preserve">
+    <value>{0}: falta el orden</value>
+  </data>
+  <data name="data.unknownDay" xml:space="preserve">
+    <value>{0}: día '{1}' no reconocido</value>
+  </data>
+  <data name="data.emptyExerciseName" xml:space="preserve">
+    <value>{0}: nombre vacío</value>
+  </data>
+  <data name="advisory.notPureRange" xml:space="preserve">
+    <value>reps no es un rango o duración pura: '{0}'</value>
+  </data>
+  <data name="advisory.unknownUnit" xml:space="preserve">
+    <value>unidad de duración desconocida: '{0}'</value>
+  </data>
+  <data name="advisory.multipleExercises" xml:space="preserve">
+    <value>'{0}' agrupa más de un ejercicio (las alternativas van en notas)</value>
+  </data>
+  <data name="advisory.repsWithoutEffort" xml:space="preserve">
+    <value>'{0}' por repeticiones sin objetivo de esfuerzo</value>
+  </data>
+  <data name="advisory.timedWithRir" xml:space="preserve">
+    <value>'{0}' por tiempo con RIR en vez de rpe o zona</value>
+  </data>
 </root>

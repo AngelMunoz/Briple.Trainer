@@ -1,8 +1,11 @@
 module Briple.Trainer.Core.Plan.Data
 
+#nowarn "3535"
+
 open System
 open System.Text.Json
 open System.Text.Json.Nodes
+open FsToolkit.ErrorHandling
 open JDeck
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
@@ -48,6 +51,10 @@ type PlanData = {
 }
 
 // --- decoders ------------------------------------------------------------------
+//
+// Every object decoder is a CollectErrorsDecoder composed with the
+// validation CE: a bad field does not hide the others, every DecodeError
+// comes back (the single-error readers lift into it directly).
 
 // tolerant integer: number or numeric text, null when missing
 let integer(element: JsonElement) : Result<int option, DecodeError> =
@@ -67,26 +74,27 @@ let integer(element: JsonElement) : Result<int option, DecodeError> =
   | JsonValueKind.Undefined -> Ok None
   | _ -> Error(DecodeError.ofError(element.Clone(), "not an integer"))
 
-let readString (key: string) (element: JsonElement) =
+/// An optional string field: absent, null and present all read.
+let inline readString(key: string, element: JsonElement) =
   element
   |> Optional.Property.get(key, Optional.string)
   |> Result.map Option.flatten
 
-let exerciseDecoder: Decoder<ExerciseData> =
-  fun element -> decode {
-    let! circuit = readString "circuit" element
-    let! laps = readString "laps" element
+let exerciseDecoder: CollectErrorsDecoder<ExerciseData> =
+  fun element -> validation {
+    let! circuit = readString("circuit", element)
+    and! laps = readString("laps", element)
 
-    let! order =
+    and! order =
       element
       |> Optional.Property.get("order", integer)
       |> Result.map Option.flatten
 
-    let! name = readString "name" element
-    let! reps = readString "reps" element
-    let! rir = readString "rir" element
-    let! rest = readString "rest" element
-    let! notes = readString "notes" element
+    and! name = readString("name", element)
+    and! reps = readString("reps", element)
+    and! rir = readString("rir", element)
+    and! rest = readString("rest", element)
+    and! notes = readString("notes", element)
 
     return {
       circuit = circuit
@@ -100,12 +108,12 @@ let exerciseDecoder: Decoder<ExerciseData> =
     }
   }
 
-let dayDecoder: Decoder<DayData> =
-  fun element -> decode {
-    let! id = readString "id" element
-    let! title = readString "title" element
+let dayDecoder: CollectErrorsDecoder<DayData> =
+  fun element -> validation {
+    let! id = readString("id", element)
+    and! title = readString("title", element)
 
-    let! exercises =
+    and! exercises =
       element |> Optional.Property.list("exercises", exerciseDecoder)
 
     return {
@@ -115,24 +123,24 @@ let dayDecoder: Decoder<DayData> =
     }
   }
 
-let weekDecoder: Decoder<WeekData> =
-  fun element -> decode {
+let weekDecoder: CollectErrorsDecoder<WeekData> =
+  fun element -> validation {
     let! number =
       element
       |> Optional.Property.get("number", integer)
       |> Result.map Option.flatten
 
-    let! days = element |> Optional.Property.list("days", dayDecoder)
+    and! days = element |> Optional.Property.list("days", dayDecoder)
 
     return { number = number; days = days }
   }
 
-let variantDecoder: Decoder<VariantData> =
-  fun element -> decode {
-    let! id = readString "id" element
-    let! title = readString "title" element
+let variantDecoder: CollectErrorsDecoder<VariantData> =
+  fun element -> validation {
+    let! id = readString("id", element)
+    and! title = readString("title", element)
 
-    let! weeks = element |> Optional.Property.list("weeks", weekDecoder)
+    and! weeks = element |> Optional.Property.list("weeks", weekDecoder)
 
     return {
       id = id
@@ -146,23 +154,23 @@ let extrasDecoder(element: JsonElement) =
   |> Optional.Property.list("extras", Optional.string)
   |> Result.map(Option.map(List.choose id))
 
-let planDecoder: Decoder<PlanData> =
-  fun element -> decode {
-    let! title = readString "title" element
+let planDecoder: CollectErrorsDecoder<PlanData> =
+  fun element -> validation {
+    let! title = readString("title", element)
 
-    let! weeks =
+    and! weeks =
       element
       |> Optional.Property.get("weeks", integer)
       |> Result.map Option.flatten
 
-    let! generated = readString "generated" element
-    let! origin = readString "origin" element
-    let! gender = readString "gender" element
+    and! generated = readString("generated", element)
+    and! origin = readString("origin", element)
+    and! gender = readString("gender", element)
 
-    let! variants =
+    and! variants =
       element |> Optional.Property.list("variants", variantDecoder)
 
-    let! extras = extrasDecoder element
+    and! extras = extrasDecoder element
 
     return {
       title = title
@@ -175,28 +183,27 @@ let planDecoder: Decoder<PlanData> =
     }
   }
 
-// some models wrap the answer in {"data": ...} with an object or with
-// text; both shapes unwrap before decoding
-let decode(json: string) : Result<PlanData, string> =
+/// The model's answer root: {"data": ...} wrappers (object or string)
+/// unwrapped, the raw root otherwise. The element is cloned, so the
+/// document it came from is closed.
+let answerRoot(json: string) : Result<JsonElement, string> =
   use document = JsonDocument.Parse(json)
 
   let root = document.RootElement
 
-  let plain element =
-    element |> planDecoder |> Result.mapError(fun error -> error.message)
+  let plain(element: JsonElement) = Ok(element.Clone())
 
   match root.ValueKind with
   | JsonValueKind.Object ->
     match root.TryGetProperty("data") with
-    | true, data when data.ValueKind = JsonValueKind.Object ->
-      plain(data.Clone())
+    | true, data when data.ValueKind = JsonValueKind.Object -> plain data
     | true, data when data.ValueKind = JsonValueKind.String ->
       match data.GetString() with
       | null -> plain root
       | text ->
         use inner = JsonDocument.Parse(text)
 
-        plain(inner.RootElement.Clone())
+        Ok(inner.RootElement.Clone())
     | _ -> plain root
   | _ -> plain root
 
@@ -211,23 +218,91 @@ let orDash(value: string option) =
       Some(text.Trim()))
   |> Option.defaultValue "-"
 
-let convert(data: PlanData) : Result<Plan, string list> =
-  let failures = ResizeArray<string>()
+let convert(data: PlanData) : Result<Plan, DataFailure list> =
+  let failures = ResizeArray<DataFailure>()
+
+  // each level reviews its own fields (accumulating every failure) and
+  // builds the domain value; a rejected build's defaults never survive
+  let exerciseOf(path: string, exercise: ExerciseData) : Exercise =
+    if exercise.name |> Option.forall(String.IsNullOrWhiteSpace) then
+      failures.Add(DataFailure.EmptyExerciseName path)
+
+    match exercise.order with
+    | Some _ -> ()
+    | None -> failures.Add(DataFailure.MissingOrder path)
+
+    {
+      Circuit = orDash exercise.circuit
+      Laps = orDash exercise.laps
+      Order = Option.defaultValue 0 exercise.order
+      Name = orDash exercise.name
+      Reps = orDash exercise.reps
+      Rir = orDash exercise.rir
+      Rest = orDash exercise.rest
+      Notes = orDash exercise.notes
+    }
+
+  let dayOf(path: string, day: DayData) : Day =
+    let dayId = orDash day.id
+
+    if tryDayOfWeek dayId |> Option.isNone then
+      failures.Add(DataFailure.UnknownDay(path, dayId))
+
+    {
+      Id = dayId
+      Title = day.title
+      Notes = []
+      Exercises =
+        day.exercises
+        |> Option.defaultValue []
+        |> List.mapi(fun index exercise ->
+          exerciseOf($"{path}.exercises[{index}]", exercise))
+    }
+
+  let weekOf(path: string, week: WeekData) : Week =
+    let number =
+      match week.number with
+      | Some number -> number
+      | None ->
+        failures.Add(DataFailure.MissingWeekNumber path)
+
+        0
+
+    {
+      Number = number
+      Days =
+        week.days
+        |> Option.defaultValue []
+        |> List.mapi(fun index day -> dayOf($"{path}.days[{index}]", day))
+    }
+
+  let variantOf(path: string, variant: VariantData) : Variant =
+    let id = orDash variant.id
+
+    if id = "-" then
+      failures.Add(DataFailure.EmptyVariantId path)
+
+    {
+      Id = (if id = "-" then "" else id)
+      Title = variant.title
+      Weeks =
+        variant.weeks
+        |> Option.defaultValue []
+        |> List.mapi(fun index week -> weekOf($"{path}.weeks[{index}]", week))
+    }
 
   let gender =
     match data.gender |> Option.bind Gender.tryProtocol with
     | Some gender -> Some gender
     | None ->
-      let received = Option.defaultValue "" data.gender
-
-      failures.Add $"gender: '{received}' is neither male nor female"
+      failures.Add(DataFailure.BadGender(Option.defaultValue "" data.gender))
 
       None
 
   let title =
     match orDash data.title with
     | "-" ->
-      failures.Add "title: empty"
+      failures.Add DataFailure.MissingTitle
 
       ""
     | title -> title
@@ -235,79 +310,15 @@ let convert(data: PlanData) : Result<Plan, string list> =
   let weeks = Option.defaultValue 0 data.weeks
 
   if weeks <= 0 then
-    failures.Add $"weeks: {weeks} is not positive"
+    failures.Add(DataFailure.BadWeeks weeks)
 
   let variants =
     data.variants
     |> Option.defaultValue []
-    |> List.mapi(fun variantIndex variant ->
-      let variantPath = $"variants[{variantIndex}]"
+    |> List.mapi(fun index variant -> variantOf($"variants[{index}]", variant))
 
-      let id = orDash variant.id
-
-      if id = "-" then
-        failures.Add $"{variantPath}: empty id"
-
-      let weeks =
-        variant.weeks
-        |> Option.defaultValue []
-        |> List.mapi(fun weekIndex week ->
-          let weekPath = $"{variantPath}.weeks[{weekIndex}]"
-
-          let days =
-            week.days
-            |> Option.defaultValue []
-            |> List.mapi(fun dayIndex day ->
-              let dayPath = $"{weekPath}.days[{dayIndex}]"
-
-              let dayId = orDash day.id
-
-              if tryDayOfWeek dayId |> Option.isNone then
-                failures.Add $"{dayPath}: day '{dayId}' not recognized"
-
-              day.exercises
-              |> Option.defaultValue []
-              |> List.iteri(fun exerciseIndex exercise ->
-                if
-                  exercise.name |> Option.forall(String.IsNullOrWhiteSpace)
-                then
-                  failures.Add
-                    $"{dayPath}.exercises[{exerciseIndex}]: empty name")
-
-              let exercises =
-                day.exercises
-                |> Option.defaultValue []
-                |> List.map(fun exercise -> {
-                  Circuit = orDash exercise.circuit
-                  Laps = orDash exercise.laps
-                  Order = Option.defaultValue 0 exercise.order
-                  Name = orDash exercise.name
-                  Reps = orDash exercise.reps
-                  Rir = orDash exercise.rir
-                  Rest = orDash exercise.rest
-                  Notes = orDash exercise.notes
-                })
-
-              {
-                Id = dayId
-                Title = day.title
-                Notes = []
-                Exercises = exercises
-              })
-
-          {
-            Number = Option.defaultValue 0 week.number
-            Days = days
-          })
-
-      {
-        Id = (if id = "-" then "" else id)
-        Title = variant.title
-        Weeks = weeks
-      })
-
-  match gender with
-  | Some gender when failures.Count = 0 ->
+  match gender, List.ofSeq failures with
+  | Some gender, [] ->
     Ok {
       Version = 1
       Title = title
@@ -320,24 +331,39 @@ let convert(data: PlanData) : Result<Plan, string list> =
         |> Option.defaultValue []
         |> List.map(fun extra -> extra.Trim())
     }
-  | _ -> Error(List.ofSeq failures)
+  | _, failures -> Error failures
 
 /// Converts the model's JSON into a domain Plan. Every invalid field
-/// accumulates a failure with its path; the day must carry a recognized
-/// name and the gender must be male or female.
-let fromJson(json: string) : Result<Plan, string list> =
+/// accumulates a DataFailure; the day must carry a recognized name and
+/// the gender must be male or female.
+let fromJson<'e when IPlanDataError<'e>>(json: string) : Result<Plan, 'e> =
   try
-    match decode json with
-    | Error reason -> Error [ reason ]
-    | Ok data -> convert data
-  with ex ->
-    Error [ $"unreadable json: {ex.Message}" ]
+    match answerRoot json with
+    | Error reason ->
+      Error('e.InvalidData [ DataFailure.UnreadableJson reason ])
+    | Ok root ->
+      match root |> planDecoder with
+      | Error errors ->
+        // the validation CE kept every bad field; each one becomes its
+        // own failure
+        Error(
+          'e
+            .InvalidData(
+              errors
+              |> List.map(fun error -> DataFailure.UnreadableJson error.message)
+            )
+        )
+      | Ok data ->
+        match convert data with
+        | Ok plan -> Ok plan
+        | Error failures -> Error('e.InvalidData failures)
+  with :? JsonException as ex ->
+    Error('e.InvalidData [ DataFailure.UnreadableJson ex.Message ])
 
-/// Serializes a Plan as the JSON the model receives as reference in the
-/// adjustment flow.
-let toJson(plan: Plan) : string =
-  let block = List.head plan.Blocks
-
+/// Serializes the plan's block of the given gender as the JSON the model
+/// receives as reference in the adjustment flow; None when the plan has
+/// no block for it.
+let toJson(gender: Gender, plan: Plan) : string option =
   // reflection serialization is disabled under Native AOT; the DOM writer
   // carries an optional field only when it exists, never as json null
   let field(name: string, value: string option) : (string * JsonNode) list =
@@ -377,15 +403,18 @@ let toJson(plan: Plan) : string =
       "weeks", Json.sequence(variant.Weeks, weekEntity)
     ]
 
-  let data =
-    Json.object [
-      "title", Encode.string plan.Title
-      "weeks", Encode.int plan.Weeks
-      "generated", Encode.string plan.Generated
-      "origin", Encode.string plan.Origin
-      "gender", Encode.string(Gender.toProtocol block.Gender)
-      "variants", Json.sequence(block.Variants, variantEntity)
-      "extras", Json.sequence(plan.Extras, Encode.string)
-    ]
+  plan.Blocks
+  |> List.tryFind(fun block -> block.Gender = gender)
+  |> Option.map(fun block ->
+    let data =
+      Json.object [
+        "title", Encode.string plan.Title
+        "weeks", Encode.int plan.Weeks
+        "generated", Encode.string plan.Generated
+        "origin", Encode.string plan.Origin
+        "gender", Encode.string(Gender.toProtocol block.Gender)
+        "variants", Json.sequence(block.Variants, variantEntity)
+        "extras", Json.sequence(plan.Extras, Encode.string)
+      ]
 
-  data.ToJsonString(JsonSerializerOptions(WriteIndented = true))
+    data.ToJsonString(JsonSerializerOptions(WriteIndented = true)))

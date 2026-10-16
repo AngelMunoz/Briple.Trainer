@@ -1,7 +1,10 @@
 module Briple.Trainer.Core.Prescription
 
+#nowarn "3535"
+
 open System
 open System.Text.RegularExpressions
+open Briple.Trainer.Core.Plan.Types
 
 /// How an exercise's dose is counted.
 type Dose =
@@ -15,7 +18,7 @@ type Effort =
   | Rpe of lo: int * hi: int
   | Zone of text: string
 
-let private group (matchResult: Match) (index: int) =
+let inline group (matchResult: Match) (index: int) =
   let value = matchResult.Groups.[index].Value
 
   if value = "" then None else Some value
@@ -24,7 +27,7 @@ let private group (matchResult: Match) (index: int) =
 /// ("30-45 s", "20 min"). Qualifiers fail by design ("8-12 reps por
 /// ronda", "30-45 s por lado"): rounds come from the laps and sides go
 /// in notes.
-let tryParseDose(text: string) : Result<Dose, string> =
+let tryParseDose<'e when IDoseError<'e>>(text: string) : Result<Dose, 'e> =
   let clean = text.Trim().ToLowerInvariant()
 
   let rangeMatch =
@@ -34,7 +37,7 @@ let tryParseDose(text: string) : Result<Dose, string> =
     )
 
   if not rangeMatch.Success then
-    Error $"reps is not a pure range or duration: '{text.Trim()}'"
+    Error('e.NotPureRange(text.Trim()))
   else
     let lo = int rangeMatch.Groups.[1].Value
 
@@ -50,15 +53,15 @@ let tryParseDose(text: string) : Result<Dose, string> =
     | Some "segundos" -> Ok(Timed(lo, hi))
     | Some "min"
     | Some "minutos" -> Ok(Timed(lo * 60, hi * 60))
-    | Some unit -> Error $"unknown duration unit: '{unit}'"
+    | Some unit -> Error('e.UnknownUnit unit)
 
 /// Parses an effort target: "-" is ValueNone; "1-2" and "2" are Rir;
 /// "rpe 6-7" is Rpe; any other text is a zone description ("zona 2").
-let tryParseEffort(text: string) : Result<Effort voption, string> =
+let tryParseEffort(text: string) : Effort voption =
   let clean = text.Trim().ToLowerInvariant()
 
   if clean = "" || clean = "-" then
-    Ok ValueNone
+    ValueNone
   else
     let rpeMatch = Regex.Match(clean, @"^rpe\s*(\d+)(?:\s*-\s*(\d+))?$")
 
@@ -70,7 +73,7 @@ let tryParseEffort(text: string) : Result<Effort voption, string> =
         | Some hi -> int hi
         | None -> lo
 
-      Ok(ValueSome(Rpe(lo, hi)))
+      ValueSome(Rpe(lo, hi))
     else
       let rangeMatch = Regex.Match(clean, @"^(\d+)(?:\s*-\s*(\d+))?$")
 
@@ -82,6 +85,6 @@ let tryParseEffort(text: string) : Result<Effort voption, string> =
           | Some hi -> int hi
           | None -> lo
 
-        Ok(ValueSome(Rir(lo, hi)))
+        ValueSome(Rir(lo, hi))
       else
-        Ok(ValueSome(Zone(text.Trim())))
+        ValueSome(Zone(text.Trim()))

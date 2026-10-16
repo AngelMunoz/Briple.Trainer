@@ -8,9 +8,6 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Requests
 
-/// One violated rule, with the human-readable detail.
-type Violation = { Rule: string; Detail: string }
-
 /// The verdict on an agent output. Prescription advisories travel with
 /// a valid verdict and never reject it.
 type Verdict =

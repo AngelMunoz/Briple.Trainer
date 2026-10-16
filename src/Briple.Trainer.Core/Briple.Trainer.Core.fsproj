@@ -53,6 +53,9 @@
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="OpenAI" />
+    <PackageReference Include="FsToolkit.ErrorHandling" />
+    <!-- ILogger for the agent boundary; Serilog plugs in at the app -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
 </Project>

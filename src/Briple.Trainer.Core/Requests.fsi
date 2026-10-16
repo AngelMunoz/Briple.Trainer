@@ -116,21 +116,6 @@ val relevantMemories:
   confirmed: (Memory * Guid voption) list * activePlan: Guid voption ->
     Memory list
 
-val newRequest:
-  athlete: Athlete ->
-  memories: Memory list ->
-  weeks: int ->
-  brief: Brief ->
-    NewPlanRequest
-
-val adjustmentRequest:
-  athlete: Athlete ->
-  memories: Memory list ->
-  weeks: int ->
-  brief: Brief ->
-  previousPlan: Plan ->
-    AdjustmentRequest
-
 /// The traced parameters of a new plan: profile, confirmed memories and
 /// brief, plus the derived RIR progression.
 val parametersForNew: request: NewPlanRequest -> Parameter list

@@ -7,6 +7,7 @@ module Briple.Trainer.Env
 
 open System
 open System.Globalization
+open System.Threading
 open System.Threading.Tasks
 open Avalonia.Controls
 open Microsoft.Extensions.AI
@@ -59,17 +60,20 @@ type IProvideCulture =
 type IProvideAgent =
   abstract AgentAvailable: bool
 
-  abstract GenerateNew: request: NewPlanRequest -> Task<Result<Run, exn>>
+  abstract GenerateNew:
+    request: NewPlanRequest * ct: CancellationToken -> Task<Result<Run, exn>>
 
   abstract GenerateAdjustment:
-    request: AdjustmentRequest -> Task<Result<Run, exn>>
+    request: AdjustmentRequest * ct: CancellationToken -> Task<Result<Run, exn>>
 
   abstract ConsolidateMarks:
-    marks: FeedbackMark list -> Task<Result<Memory list, exn>>
+    marks: FeedbackMark list * ct: CancellationToken ->
+      Task<Result<Memory list, exn>>
 
   /// Reads the trainer's note over the plan's closed vocabulary.
   abstract InterpretNote:
-    targets: Target list * note: string -> Task<Result<NoteInterpretation, exn>>
+    ask: NoteAsk * ct: CancellationToken ->
+      Task<Result<NoteInterpretation, exn>>
 
 type IProvideCredentials =
   /// True when the working token came from the plain settings field, not
@@ -80,6 +84,14 @@ type IProvideCredentials =
 
 type IProvideHost =
   abstract Host: Window voption
+
+/// The Core agent capabilities: one provider client plus the app's
+/// logger. One value per call; Core never sees the concrete app env.
+type AgentEnv =
+  interface IProvideChat
+  interface IProvideLog
+
+  new: client: IChatClient * log: ILogger -> AgentEnv
 
 /// The production environment. The language and the host window change
 /// after construction (the toggle and the shell), hence the setters.

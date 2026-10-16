@@ -373,3 +373,74 @@ module Keys =
 
   [<Literal>]
   val errorTitle: string = "error.title"
+
+  // --- wizard violations: typed cases to one localized line each ---
+
+  [<Literal>]
+  val violationGenderMismatch: string = "violation.genderMismatch"
+
+  [<Literal>]
+  val violationWeeks: string = "violation.weeks"
+
+  [<Literal>]
+  val violationVariants: string = "violation.variants"
+
+  [<Literal>]
+  val violationVariantWeeks: string = "violation.variantWeeks"
+
+  [<Literal>]
+  val violationFrequency: string = "violation.frequency"
+
+  [<Literal>]
+  val violationRir: string = "violation.rir"
+
+  [<Literal>]
+  val violationMissingRir: string = "violation.missingRir"
+
+  [<Literal>]
+  val violationCount: string = "violation.count"
+
+  [<Literal>]
+  val violationFormatWarning: string = "violation.formatWarning"
+
+  [<Literal>]
+  val dataUnreadableJson: string = "data.unreadableJson"
+
+  [<Literal>]
+  val dataBadGender: string = "data.badGender"
+
+  [<Literal>]
+  val dataMissingTitle: string = "data.missingTitle"
+
+  [<Literal>]
+  val dataBadWeeks: string = "data.badWeeks"
+
+  [<Literal>]
+  val dataEmptyVariantId: string = "data.emptyVariantId"
+
+  [<Literal>]
+  val dataMissingWeekNumber: string = "data.missingWeekNumber"
+
+  [<Literal>]
+  val dataMissingOrder: string = "data.missingOrder"
+
+  [<Literal>]
+  val dataUnknownDay: string = "data.unknownDay"
+
+  [<Literal>]
+  val dataEmptyExerciseName: string = "data.emptyExerciseName"
+
+  [<Literal>]
+  val advisoryNotPureRange: string = "advisory.notPureRange"
+
+  [<Literal>]
+  val advisoryUnknownUnit: string = "advisory.unknownUnit"
+
+  [<Literal>]
+  val advisoryMultipleExercises: string = "advisory.multipleExercises"
+
+  [<Literal>]
+  val advisoryRepsWithoutEffort: string = "advisory.repsWithoutEffort"
+
+  [<Literal>]
+  val advisoryTimedWithRir: string = "advisory.timedWithRir"

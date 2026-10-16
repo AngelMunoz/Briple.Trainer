@@ -7,13 +7,9 @@ open Briple.Trainer.Core.Prescription
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Requests
 
-type Violation = { Rule: string; Detail: string }
-
 type Verdict =
   | Valid of plan: Plan * advisories: Violation list
   | Rejected of Violation list
-
-let violation rule detail = { Rule = rule; Detail = detail }
 
 /// Checks a plan already converted to the domain against the parameters
 /// of the request: gender, the brief's frequency, the weeks and the
@@ -28,17 +24,10 @@ let checkParameters
 
   match plan.Blocks with
   | [ block ] when block.Gender = athlete.Gender -> ()
-  | _ ->
-    violations.Add(
-      violation
-        "gender"
-        $"expected only the {Gender.toProtocol athlete.Gender} block, found {plan.Blocks.Length}"
-    )
+  | _ -> violations.Add(GenderMismatch(athlete.Gender, plan.Blocks.Length))
 
   if plan.Weeks <> weeks then
-    violations.Add(
-      violation "weeks" $"expected {weeks}, the plan declares {plan.Weeks}"
-    )
+    violations.Add(WrongWeeks(weeks, plan.Weeks))
 
   let variants =
     plan.Blocks
@@ -49,9 +38,7 @@ let checkParameters
   let actual = variants |> List.map(fun variant -> variant.Id) |> List.sort
 
   if expected <> actual then
-    violations.Add(
-      violation "variants" $"expected {expected}, the plan has {actual}"
-    )
+    violations.Add(WrongVariants(expected, actual))
 
   let days = VariantFrequency.daysPerWeek brief.Frequency
 
@@ -59,33 +46,19 @@ let checkParameters
     let numbers = variant.Weeks |> List.map(fun week -> week.Number)
 
     if numbers <> [ 1..weeks ] then
-      violations.Add(
-        violation
-          "variant-weeks"
-          $"the variant {variant.Id} has weeks {numbers}, expected 1..{weeks}"
-      )
+      violations.Add(BadVariantWeeks(variant.Id, numbers, weeks))
 
     for week in variant.Weeks do
       if week.Days.Length <> days then
         violations.Add(
-          violation
-            "frequency"
-            $"the variant {variant.Id} trains {week.Days.Length} days in week {week.Number}, expected {days}"
+          WrongFrequency(variant.Id, week.Number, week.Days.Length, days)
         )
 
   for week, target in derivedRirPerWeek weeks do
     match tryMesocycleRir plan week with
     | Some actual when actual = target -> ()
-    | Some actual ->
-      violations.Add(
-        violation
-          "rir"
-          $"week {week} must declare RIR {target}, declares {actual}"
-      )
-    | None ->
-      violations.Add(
-        violation "rir" $"week {week} does not declare RIR {target}"
-      )
+    | Some actual -> violations.Add(WrongRir(week, actual, target))
+    | None -> violations.Add(MissingRir(week, target))
 
   List.ofSeq violations
 
@@ -103,13 +76,30 @@ let checkAdjustmentCounts
   |> List.choose(fun (variant, total) ->
     match Map.tryFind variant kept with
     | Some actual when actual = total -> None
-    | Some actual ->
-      Some(
-        violation
-          "count"
-          $"the variant {variant} must keep {total} #ej, has {actual}"
-      )
+    | Some actual -> Some(CountChanged(variant, total, actual))
     | None -> None)
+
+/// The prescription findings of one row: a compound name, a dose that is
+/// not a pure range or duration, and an effort target inconsistent with
+/// the dose. One row can carry more than one.
+let advisoriesOf(exercise: Exercise) : PrescriptionAdvisory list = [
+  if exercise.Name.Contains "/" then
+    MultipleExercises exercise.Name
+
+  match tryParseDose exercise.Reps: Result<_, PrescriptionAdvisory> with
+  | Error advisory -> advisory
+  | Ok dose ->
+    match tryParseEffort exercise.Rir with
+    | ValueNone ->
+      match dose with
+      | Reps _ -> RepsWithoutEffort exercise.Name
+      | Timed _ -> ()
+    | ValueSome(Rir _) ->
+      match dose with
+      | Timed _ -> TimedWithRir exercise.Name
+      | Reps _ -> ()
+    | ValueSome _ -> ()
+]
 
 /// Reviews the prescription of every exercise row: one exercise per
 /// name, a pure dose, and an effort target consistent with the dose.
@@ -117,56 +107,18 @@ let checkAdjustmentCounts
 /// source plans carry these patterns and the adjustment flow inherits
 /// them.
 let checkPrescription(plan: Plan) : Violation list =
-  let advisories = ResizeArray<Violation>()
-
-  for block in plan.Blocks do
-    for variant in block.Variants do
-      for week in variant.Weeks do
-        for day in week.Days do
-          for exercise in day.Exercises do
-            if exercise.Name.Contains "/" then
-              advisories.Add(
-                violation
-                  "prescription"
-                  $"the name holds more than one exercise: '{exercise.Name}' (alternatives go in notes)"
-              )
-
-            match tryParseDose exercise.Reps with
-            | Error detail -> advisories.Add(violation "prescription" detail)
-            | Ok dose ->
-              match tryParseEffort exercise.Rir with
-              | Error detail -> advisories.Add(violation "prescription" detail)
-              | Ok ValueNone ->
-                match dose with
-                | Reps _ ->
-                  advisories.Add(
-                    violation
-                      "prescription"
-                      $"rep-based exercise without an effort target: '{exercise.Name}'"
-                  )
-                | Timed _ -> ()
-              | Ok(ValueSome(Rir _)) ->
-                match dose with
-                | Timed _ ->
-                  advisories.Add(
-                    violation
-                      "prescription"
-                      $"timed exercise with an RIR target instead of rpe or zone: '{exercise.Name}'"
-                  )
-                | Reps _ -> ()
-              | Ok(ValueSome _) -> ()
-
-  List.ofSeq advisories
+  plan
+  |> Tree.exercisesOf
+  |> Seq.collect advisoriesOf
+  |> Seq.map Prescription
+  |> List.ofSeq
 
 let validateNew (request: NewPlanRequest) (output: string) =
-  match parsePlan output with
-  | Error error ->
-    Rejected [ violation "format" $"line {error.Line}: {error.Message}" ]
+  match parsePlan output: Result<_, Violation> with
+  | Error failure -> Rejected [ failure ]
   | Ok parsed ->
     let formatViolations =
-      parsed.Warnings
-      |> List.map(fun warning ->
-        violation "format" $"line {warning.Line}: {warning.Message}")
+      parsed.Warnings |> List.map(fun warning -> FormatWarning warning)
 
     let parameterViolations =
       checkParameters request.Athlete request.Weeks request.Brief parsed.Plan

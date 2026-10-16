@@ -23,4 +23,5 @@ let main args =
       Prompts.Tests.tests
       Agent.Tests.tests
       Agent.Tests.interpretationTests
+      Agent.Cancellation.Tests.tests
     ])

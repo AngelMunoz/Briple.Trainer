@@ -193,7 +193,7 @@ let tests =
 
     testCase "the plan reads first and edits by row"
     <| fun () ->
-      match Briple.Trainer.Core.Plan.Parser.parsePlan sampleRaw with
+      match Briple.Trainer.Core.Plan.Parser.Parse.parse sampleRaw with
       | Error e -> failtest $"the sample plan does not parse: {e}"
       | Ok parsed ->
         let events = ResizeArray<Briple.Trainer.Components.PlanReview.Event>()
@@ -351,11 +351,11 @@ type private FakeAgent(reading: NoteInterpretation) =
   interface Briple.Trainer.Env.IProvideAgent with
     member _.AgentAvailable = true
 
-    member _.GenerateNew _ = failwith "not used in this flow"
+    member _.GenerateNew(_, _) = failwith "not used in this flow"
 
-    member _.GenerateAdjustment _ = failwith "not used in this flow"
+    member _.GenerateAdjustment(_, _) = failwith "not used in this flow"
 
-    member _.ConsolidateMarks _ = failwith "not used in this flow"
+    member _.ConsolidateMarks(_, _) = failwith "not used in this flow"
 
     member _.InterpretNote(_, _) = Task.FromResult(Ok reading)
 
@@ -376,9 +376,10 @@ let noteTests =
         | Error e -> failtest $"add failed: {e}"
 
       let plan =
-        match parsePlan sampleRaw with
+        match Parse.parse sampleRaw with
         | Ok parsed -> parsed.Plan
-        | Error error -> failtest $"the sample plan broke: {error.Message}"
+        | Error error ->
+          failtest $"the sample plan broke: {Parse.describe error}"
 
       let planId = Guid.NewGuid()
 
@@ -410,6 +411,7 @@ let noteTests =
               AthleteId = athleteId
               Plan = plan
               PlanId = planId
+              Cancel = System.Threading.CancellationToken.None
             },
             ignore
           ))

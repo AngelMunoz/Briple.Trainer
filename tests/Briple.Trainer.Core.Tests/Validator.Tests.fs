@@ -89,8 +89,8 @@ let private outputOf(perWeek, perDay) = write(planOf perWeek perDay)
 /// The man's fixture output carries two variants.
 let private manOutput() =
   let month1 =
-    match readFixture "training_plan_4w.txt" |> parsePlan with
-    | Error error -> failtest $"parse error at line {error.Line}"
+    match readFixture "training_plan_4w.txt" |> parse with
+    | Error error -> failtest $"parse error: {Parse.describe error}"
     | Ok parsed -> parsed
 
   write {
@@ -98,19 +98,23 @@ let private manOutput() =
         Blocks = month1.Plan.Blocks |> List.filter(fun b -> b.Gender = Male)
   }
 
-let private expectRule rule verdict =
+/// One case predicate per expectation: the violations are a typed union,
+/// so the test names the exact case it expects.
+let private expectViolation isCase name verdict =
   match verdict with
-  | Valid _ -> failtest $"expected Rejected by {rule}"
+  | Valid _ -> failtest $"expected Rejected by {name}"
   | Rejected violations ->
-    Expect.exists
-      violations
-      (fun violation -> violation.Rule = rule)
-      $"a {rule} violation is present"
+    Expect.exists violations isCase $"a {name} violation is present"
 
 let tests =
   testList "Validator" [
     testCase "the synthetic output validates as a new plan" (fun () ->
-      let request = newRequest man [] 4 brief
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+      }
 
       match validateNew request (outputOf(3, 2)) with
       | Valid(plan, _) ->
@@ -183,68 +187,157 @@ let tests =
 
         Expect.isTrue
           (advisories
-           |> List.forall(fun violation -> violation.Rule = "prescription"))
-          "every advisory carries the prescription rule")
+           |> List.forall(function
+             | Prescription _ -> true
+             | _ -> false))
+          "every advisory is a prescription finding")
 
     testCase "an output with two blocks is rejected by gender" (fun () ->
-      let request = newRequest man [] 4 brief
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+      }
 
       let month1 =
-        match readFixture "training_plan_4w.txt" |> parsePlan with
-        | Error error -> failtest $"parse error at line {error.Line}"
+        match readFixture "training_plan_4w.txt" |> parse with
+        | Error error -> failtest $"parse error: {Parse.describe error}"
         | Ok parsed -> parsed
 
       // the full file also carries the woman's block
-      expectRule "gender" (validateNew request (write month1.Plan)))
+      expectViolation
+        (function
+        | GenderMismatch _ -> true
+        | _ -> false)
+        "gender"
+        (validateNew request (write month1.Plan)))
 
     testCase "weeks other than the asked ones are rejected" (fun () ->
-      let request = newRequest man [] 5 brief
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 5
+        Brief = brief
+      }
 
-      expectRule "weeks" (validateNew request (outputOf(3, 2))))
+      expectViolation
+        (function
+        | WrongWeeks _ -> true
+        | _ -> false)
+        "weeks"
+        (validateNew request (outputOf(3, 2))))
 
     testCase "a variant that was not asked is rejected" (fun () ->
-      let request = newRequest man [] 4 brief
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+      }
 
       // the fixture carries 3dias and 5dias, the brief asks for 3dias
-      expectRule "variants" (validateNew request (manOutput())))
+      expectViolation
+        (function
+        | WrongVariants _ -> true
+        | _ -> false)
+        "variants"
+        (validateNew request (manOutput())))
 
     testCase "a week with the wrong day count is rejected" (fun () ->
-      let request = newRequest man [] 4 brief
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+      }
 
       // four days per week against a three-day frequency
-      expectRule "frequency" (validateNew request (outputOf(4, 2))))
+      expectViolation
+        (function
+        | WrongFrequency _ -> true
+        | _ -> false)
+        "frequency"
+        (validateNew request (outputOf(4, 2))))
 
     testCase
       "a mesocycle that does not match the derivation is rejected"
       (fun () ->
-        let request = newRequest man [] 4 brief
+        let request = {
+          Athlete = man
+          Memories = []
+          Weeks = 4
+          Brief = brief
+        }
 
         let wrong = (outputOf(3, 2)).Replace("RIR 3", "RIR 0")
 
-        expectRule "rir" (validateNew request wrong))
+        expectViolation
+          (function
+          | WrongRir _ -> true
+          | _ -> false)
+          "rir"
+          (validateNew request wrong))
 
     testCase "an output that is not in the format is rejected" (fun () ->
-      let request = newRequest man [] 4 brief
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+      }
 
-      expectRule "format" (validateNew request "this is not a plan"))
+      expectViolation
+        (function
+        | BrokenFormat _ -> true
+        | _ -> false)
+        "broken format"
+        (validateNew request "this is not a plan"))
 
     testCase "an output with format warnings is rejected" (fun () ->
-      let request = newRequest man [] 4 brief
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+      }
 
       // unknown meta inside the plan: it parses with a warning
       let withWarning =
         (outputOf(3, 2)).Replace("#meta titulo ", "#meta titulox ")
 
-      expectRule "format" (validateNew request withWarning))
+      expectViolation
+        (function
+        | FormatWarning _ -> true
+        | _ -> false)
+        "format warning"
+        (validateNew request withWarning))
 
     testCase "the adjustment keeps the previous counts" (fun () ->
       let previous = planOf 3 2 // 3 days x 4 weeks x 2 = 24 #ej
 
-      let shrunk = adjustmentRequest man [] 4 brief previous
+      let shrunk = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+        PreviousPlan = previous
+      }
 
-      expectRule "count" (validateAdjustment shrunk (outputOf(3, 1)))
+      expectViolation
+        (function
+        | CountChanged _ -> true
+        | _ -> false)
+        "count"
+        (validateAdjustment shrunk (outputOf(3, 1)))
 
-      let kept = adjustmentRequest man [] 4 brief previous
+      let kept = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+        PreviousPlan = previous
+      }
 
       match validateAdjustment kept (outputOf(3, 2)) with
       | Valid _ -> ()
@@ -257,7 +350,13 @@ let tests =
 
       let movedBrief = { brief with Frequency = CincoDias }
 
-      let request = adjustmentRequest man [] 4 movedBrief previous
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = movedBrief
+        PreviousPlan = previous
+      }
 
       match validateAdjustment request (outputOf(5, 2)) with
       | Valid _ -> ()
