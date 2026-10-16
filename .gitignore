@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 spike/output-*.txt
 spike/output-*.json
 spike/prompt-*.txt
+
+# local databases (migrondi dev connection points next to the project)
+*.db

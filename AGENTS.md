@@ -18,6 +18,13 @@ providers (DeepSeek, Meta Muse), all OpenAI-compatible.
 9. **No `private` in files with an `.fsi`.** The signature already hides anything it does not export; `private` there is noise.
 10. Report to me only in ASD-STE100 Simplified Technical English, or plain Spanish when I write in Spanish.
 11. For non-reports, do not use LLM jargon, phrases that are textual noise without actual value. Speak simple plain, concise and direct english.
+12. **No more than 3 parameters.** A function with 4 or more takes a contextual object: a `[<Struct>]` record for short-lived values, a class (or a record over a ref) when the value outlives the call.
+13. **Tupled parameter form.** Write `Fields.button("Guardar", onClick)`, not `button "Guardar" onClick`. Curried functions exist only where partial application is the point.
+14. **No deep parameter threading.** When a value or control must cross several layers to reach one leaf, use content projection: pass a `unit -> Control` (or `unit -> value`) callback that works as the hole where the leaf places it.
+15. **UI code is fluent-heavy (NXUI).** Compose controls as chained fluent expressions; extract helpers when a chain stops reading, not to avoid the style.
+16. **Threading: `asyncEx` always.** Work that must run where it is triggered uses `asyncEx { ... } |> Async.StartImmediate` (UI event handlers, navigation); background work uses `asyncEx { ... } |> Async.Start`. Controls are built on the UI thread (`Dispatcher.UIThread.InvokeAsync` when the pipeline left the calling thread). Never `Async.RunSynchronously`, `.Result`, or `Post` where `StartImmediate` is the correct lifetime.
+17. **Lean pages, module helpers.** View classes wire state and events only; layout and pure logic live in module functions (marked `let inline` when trivially small). Not everything goes inside a class.
+18. **Use the tools that exist.** JSON payloads go through JDeck encoders/decoders; schema changes go through Migrondi (generate files with the CLI, never hand-write them); no bespoke writers, no ad-hoc SQL schema lists. Build control arrays directly, no list-to-array conversions, no `yield` where a comprehension arrow suffices.
 
 ## Commands
 

@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="app.title" xml:space="preserve">
+    <value>Briple Trainer</value>
+  </data>
+  <data name="nav.athletes" xml:space="preserve">
+    <value>Atletas</value>
+  </data>
+  <data name="nav.language" xml:space="preserve">
+    <value>English</value>
+  </data>
+  <data name="athletes.title" xml:space="preserve">
+    <value>Atletas</value>
+  </data>
+  <data name="athletes.empty" xml:space="preserve">
+    <value>Sin atletas todavía. Registra el primero.</value>
+  </data>
+  <data name="athletes.new" xml:space="preserve">
+    <value>Nuevo atleta</value>
+  </data>
+  <data name="athlete.name" xml:space="preserve">
+    <value>Nombre</value>
+  </data>
+  <data name="athlete.gender" xml:space="preserve">
+    <value>Género</value>
+  </data>
+  <data name="athlete.variants" xml:space="preserve">
+    <value>Variantes (ej. 3dias, 5dias)</value>
+  </data>
+  <data name="athlete.goals" xml:space="preserve">
+    <value>Objetivos</value>
+  </data>
+  <data name="athlete.focus" xml:space="preserve">
+    <value>Énfasis (separado por comas)</value>
+  </data>
+  <data name="athlete.save" xml:space="preserve">
+    <value>Guardar</value>
+  </data>
+  <data name="athlete.cancel" xml:space="preserve">
+    <value>Cancelar</value>
+  </data>
+  <data name="gender.male" xml:space="preserve">
+    <value>Hombre</value>
+  </data>
+  <data name="gender.female" xml:space="preserve">
+    <value>Mujer</value>
+  </data>
+  <data name="goal.hypertrophy" xml:space="preserve">
+    <value>Hipertrofia</value>
+  </data>
+  <data name="goal.weightloss" xml:space="preserve">
+    <value>Pérdida de peso</value>
+  </data>
+  <data name="goal.cardio" xml:space="preserve">
+    <value>Salud cardiovascular</value>
+  </data>
+  <data name="goal.activation" xml:space="preserve">
+    <value>Activación corporal básica</value>
+  </data>
+  <data name="goal.strength" xml:space="preserve">
+    <value>Fuerza</value>
+  </data>
+  <data name="memories.title" xml:space="preserve">
+    <value>Memorias</value>
+  </data>
+  <data name="memories.empty" xml:space="preserve">
+    <value>Sin memorias para este atleta.</value>
+  </data>
+  <data name="memories.confirm" xml:space="preserve">
+    <value>Confirmar</value>
+  </data>
+  <data name="memories.discard" xml:space="preserve">
+    <value>Descartar</value>
+  </data>
+  <data name="memories.addMark" xml:space="preserve">
+    <value>Registrar marca</value>
+  </data>
+  <data name="memories.consolidateAgent" xml:space="preserve">
+    <value>Consolidar con el agente</value>
+  </data>
+  <data name="mark.target" xml:space="preserve">
+    <value>Ejercicio o día</value>
+  </data>
+  <data name="mark.text" xml:space="preserve">
+    <value>Marcó «{0}» como {1} el {2}</value>
+  </data>
+  <data name="exemption.text" xml:space="preserve">
+    <value>Prescripción del entrenador: {0} sobre «{1}»</value>
+  </data>
+  <data name="label.light" xml:space="preserve">
+    <value>leve</value>
+  </data>
+  <data name="label.heavy" xml:space="preserve">
+    <value>pesado</value>
+  </data>
+  <data name="label.pain" xml:space="preserve">
+    <value>dolor</value>
+  </data>
+  <data name="label.noequipment" xml:space="preserve">
+    <value>sin equipo</value>
+  </data>
+  <data name="plans.title" xml:space="preserve">
+    <value>Planes</value>
+  </data>
+  <data name="plans.generate" xml:space="preserve">
+    <value>Generar plan</value>
+  </data>
+  <data name="plans.review" xml:space="preserve">
+    <value>Revisar</value>
+  </data>
+  <data name="plans.open" xml:space="preserve">
+    <value>Abrir</value>
+  </data>
+  <data name="wizard.title" xml:space="preserve">
+    <value>Generar plan</value>
+  </data>
+  <data name="wizard.step.memories" xml:space="preserve">
+    <value>1. Memorias</value>
+  </data>
+  <data name="wizard.step.brief" xml:space="preserve">
+    <value>2. Pedido</value>
+  </data>
+  <data name="wizard.next" xml:space="preserve">
+    <value>Siguiente</value>
+  </data>
+  <data name="wizard.back" xml:space="preserve">
+    <value>Atrás</value>
+  </data>
+  <data name="wizard.weeks" xml:space="preserve">
+    <value>Semanas</value>
+  </data>
+  <data name="wizard.goal" xml:space="preserve">
+    <value>Objetivo</value>
+  </data>
+  <data name="wizard.focus" xml:space="preserve">
+    <value>Énfasis (separado por comas)</value>
+  </data>
+  <data name="wizard.rir" xml:space="preserve">
+    <value>RIR por semana (ej. 1:3, 2:2.5)</value>
+  </data>
+  <data name="wizard.counts" xml:space="preserve">
+    <value>Conteos por variante (#ej)</value>
+  </data>
+  <data name="wizard.generating" xml:space="preserve">
+    <value>Generando… puede tardar uno o dos minutos.</value>
+  </data>
+  <data name="wizard.generate" xml:space="preserve">
+    <value>Generar</value>
+  </data>
+  <data name="wizard.confirm" xml:space="preserve">
+    <value>Confirmar plan</value>
+  </data>
+  <data name="wizard.discard" xml:space="preserve">
+    <value>Descartar</value>
+  </data>
+  <data name="review.title" xml:space="preserve">
+    <value>Revisión del plan</value>
+  </data>
+  <data name="review.save" xml:space="preserve">
+    <value>Guardar cambios</value>
+  </data>
+  <data name="review.export" xml:space="preserve">
+    <value>Exportar .briple</value>
+  </data>
+  <data name="review.saved" xml:space="preserve">
+    <value>Cambios guardados</value>
+  </data>
+  <data name="review.exported" xml:space="preserve">
+    <value>Exportado a {0}</value>
+  </data>
+  <data name="review.invalid" xml:space="preserve">
+    <value>El plan no parsea: {0}</value>
+  </data>
+  <data name="plan.guide" xml:space="preserve">
+    <value>Guía</value>
+  </data>
+  <data name="plan.laps" xml:space="preserve">
+    <value>vueltas</value>
+  </data>
+  <data name="plan.week" xml:space="preserve">
+    <value>Semana {0}</value>
+  </data>
+  <data name="plan.reps" xml:space="preserve">
+    <value>Reps</value>
+  </data>
+  <data name="plan.rir" xml:space="preserve">
+    <value>RIR</value>
+  </data>
+  <data name="plan.rest" xml:space="preserve">
+    <value>Descanso</value>
+  </data>
+  <data name="plan.notes" xml:space="preserve">
+    <value>Notas</value>
+  </data>
+  <data name="settings.missing" xml:space="preserve">
+    <value>Falta el archivo settings.json con la clave del proveedor (BYOK).</value>
+  </data>
+  <data name="login.title" xml:space="preserve">
+    <value>Conectar DeepSeek</value>
+  </data>
+  <data name="login.token" xml:space="preserve">
+    <value>Token de DeepSeek</value>
+  </data>
+  <data name="login.save" xml:space="preserve">
+    <value>Guardar y continuar</value>
+  </data>
+  <data name="login.saved" xml:space="preserve">
+    <value>Token guardado en el almacén del sistema.</value>
+  </data>
+  <data name="login.insecureTitle" xml:space="preserve">
+    <value>ADVERTENCIA: el token NO quedó cifrado</value>
+  </data>
+  <data name="login.insecureBody" xml:space="preserve">
+    <value>El almacén del sistema falló, así que el token se guardó como TEXTO PLANO en settings.json. Cualquiera con acceso a tu carpeta de usuario puede leerlo. Causa del fallo: {0}</value>
+  </data>
+  <data name="login.failed" xml:space="preserve">
+    <value>No se pudo guardar: {0}</value>
+  </data>
+  <data name="error.title" xml:space="preserve">
+    <value>Error</value>
+  </data>
+</root>

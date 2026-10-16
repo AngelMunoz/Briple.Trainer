@@ -7,18 +7,21 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Program.fs" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- UI: sin ventanas todavia, solo referencias -->
+    <!-- UI: Metro estricto sobre SimpleTheme, NXUI para autoria en codigo -->
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Simple" />
     <PackageReference Include="NXUI" />
     <PackageReference Include="NXUI.Desktop" />
     <PackageReference Include="Navs.Avalonia" />
+    <PackageReference Include="MVUish.Avalonia" />
 
     <!-- Datos -->
     <PackageReference Include="Donald" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Migrondi.Core" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
 
     <!-- Utilidades core -->
     <PackageReference Include="FsToolkit.ErrorHandling" />
@@ -30,5 +33,48 @@
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="OpenAI" />
     <PackageReference Include="AgentNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Theme.fsi" />
+    <Compile Include="Theme.fs" />
+    <Compile Include="Strings.fsi" />
+    <Compile Include="Strings.fs" />
+    <Compile Include="Persistence.fsi" />
+    <Compile Include="Persistence.fs" />
+    <Compile Include="Secrets.fsi" />
+    <Compile Include="Secrets.fs" />
+    <Compile Include="Env.fsi" />
+    <Compile Include="Env.fs" />
+    <Compile Include="Components\Fields.fsi" />
+    <Compile Include="Components\Fields.fs" />
+    <Compile Include="Components\AppBar.fsi" />
+    <Compile Include="Components\AppBar.fs" />
+    <Compile Include="Components\AthleteList.fsi" />
+    <Compile Include="Components\AthleteList.fs" />
+    <Compile Include="Components\NewAthleteForm.fsi" />
+    <Compile Include="Components\NewAthleteForm.fs" />
+    <Compile Include="Components\MemoryReview.fsi" />
+    <Compile Include="Components\MemoryReview.fs" />
+    <Compile Include="Components\WizardBrief.fsi" />
+    <Compile Include="Components\WizardBrief.fs" />
+    <Compile Include="Components\PlanReview.fsi" />
+    <Compile Include="Components\PlanReview.fs" />
+    <Compile Include="Views\Athletes.fsi" />
+    <Compile Include="Views\Athletes.fs" />
+    <Compile Include="Views\Generate.fsi" />
+    <Compile Include="Views\Generate.fs" />
+    <Compile Include="Views\Login.fsi" />
+    <Compile Include="Views\Login.fs" />
+    <Compile Include="Views\Review.fsi" />
+    <Compile Include="Views\Review.fs" />
+    <Compile Include="Views\Routes.fsi" />
+    <Compile Include="Views\Routes.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Briple.Trainer.Core\Briple.Trainer.Core.fsproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="migrations/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
