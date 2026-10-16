@@ -46,16 +46,23 @@ type MemoryStatus =
   | Confirmed
   | Discarded
 
+/// How long a memory lives: the plan it was observed on, or the athlete.
+type MemoryScope =
+  | Plan
+  | Athlete
+
 /// A relevant fact that persists between plans. `Deltas` empty means the
 /// label has no automatic adjustment and the trainer picks one of the
 /// predefined ones by hand. `Summary` is authored by the model in the
 /// consolidation flow; local consolidation leaves it empty and the UI
-/// renders the fact from `Origin`.
+/// renders the fact from `Origin`. `Scope` decides how far the confirmed
+/// memory travels.
 type Memory = {
   Summary: string
   Deltas: Delta list
   Origin: MemoryOrigin
   Status: MemoryStatus
+  Scope: MemoryScope
 }
 
 /// The automatic adjustment of each label: light raises load, heavy
@@ -68,13 +75,15 @@ let automaticAdjustments(label: Label) : Delta list =
   | NoEquipment -> []
 
 /// Consolidates a mark into the proposed memory with its automatic
-/// adjustment. No summary prose here: the summary is the UI's or the
-/// model's job, never the domain's.
+/// adjustment. Marks are situational: the scope starts at the plan. No
+/// summary prose here: the summary is the UI's or the model's job, never
+/// the domain's.
 let consolidate(mark: FeedbackMark) : Memory = {
   Summary = ""
   Deltas = automaticAdjustments mark.Label
   Origin = Mark mark
   Status = Proposed
+  Scope = Plan
 }
 
 /// Confirms the memory with the adjustments the trainer accepted or
@@ -89,10 +98,12 @@ let confirm (deltas: Delta list) (memory: Memory) : Memory = {
 let discard(memory: Memory) : Memory = { memory with Status = Discarded }
 
 /// The memory of a trainer exemption: born confirmed, with the prescribed
-/// technique as the pattern variant.
+/// technique as the pattern variant. A prescription describes how the
+/// trainer wants this athlete trained, so it outlives plans.
 let memoryOfExemption(exemption: Exemption) : Memory = {
   Summary = ""
   Deltas = [ PatternVariant exemption.Technique ]
   Origin = Exemption exemption
   Status = Confirmed
+  Scope = Athlete
 }

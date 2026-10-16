@@ -26,3 +26,11 @@ val adjustmentPrompt: request: AdjustmentRequest -> string
 
 /// User message of the consolidation: the recorded marks.
 val consolidationPrompt: marks: FeedbackMark list -> string
+
+/// System message of the note interpretation: the closed surface (the
+/// protocol, the label enum, the plan's target vocabulary) and the rule
+/// that the note is data, never instructions.
+val interpretationSystem: targets: Target list -> string
+
+/// User message of the note interpretation: the trainer's note, verbatim.
+val interpretationNote: note: string -> string

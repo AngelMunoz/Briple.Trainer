@@ -10,24 +10,37 @@ open System.Globalization
 
 open Avalonia.Controls
 
+open Briple.Trainer.Core.Memories
 open Briple.Trainer.Env
 open Briple.Trainer.Persistence
+open Briple.Trainer.Stores
 
-/// The data and callbacks of the page.
+/// The data of the page.
 [<Struct>]
 type WizardPageProps = {
   Culture: CultureInfo
+  /// The raw storage: the audit line only.
   Store: IStore
+  Memories: MemoryStore
+  Plans: PlanStore
   Agent: IProvideAgent
   Athlete: AthleteEntity
+  /// The confirmed memories relevant to this generation: athlete-scoped
+  /// ones plus the plan-scoped ones of the plan being adjusted.
+  Confirmed: Memory list
   Proposals: MemoryEntity list
   Previous: PlanEntity voption
-  OnFinished: Guid -> unit
-  OnCancelled: unit -> unit
 }
+
+/// What the page reports outward.
+type Outcome =
+  | PlanFinished of Guid
+  | WizardCancelled
 
 /// The wizard page.
 type WizardPage =
   inherit UserControl
 
-  new: props: WizardPageProps -> WizardPage
+  new:
+    props: WizardPageProps * [<InlineIfLambda>] onOutcome: (Outcome -> unit) ->
+      WizardPage

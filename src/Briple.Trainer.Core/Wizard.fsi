@@ -23,7 +23,7 @@ type Step =
   /// 3. Input: the athlete. Output: the period in weeks (1 to 4).
   | ChoosePeriod of athlete: Athlete
   /// 4. Input: athlete, confirmed memories and weeks. Output: the
-  /// brief (adjustments, focus, RIR, variants).
+  /// brief (goal, frequency, emphasis).
   | DefineBrief of athlete: Athlete * confirmed: Memory list * weeks: int
   /// 5. Input: the assembled request. Output: the candidate plan and the
   /// validator result.

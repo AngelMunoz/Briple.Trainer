@@ -1,10 +1,9 @@
 module Briple.Trainer.Views.Review
 
 // The review page for a stored plan: the PlanReview component for field
-// edits, save back into the Raw (the source of truth) and the .briple
-// export through a file picker on the host window. The latest edit and
-// the status line are subjects the controls bind to; nothing mutates
-// children by hand.
+// edits, save back into the Raw (the source of truth), the .briple
+// export, and the note section — the trainer writes what they observed
+// and the agent maps it to the closed surface of this plan.
 
 open System
 open System.Globalization
@@ -18,18 +17,24 @@ open NXUI.Extensions
 
 open IcedTasks
 
+open Serilog
+
 open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Env
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
+open Briple.Trainer.Stores
 open Briple.Trainer.Theme
 
 [<Struct>]
 type ReviewPageProps = {
   Culture: CultureInfo
-  Store: IStore
+  Plans: PlanStore
+  Memories: MemoryStore
+  Agent: IProvideAgent
   Host: Window voption
   Entity: PlanEntity
 }
@@ -63,17 +68,22 @@ let inline saveButton
   ) : Control =
   primaryButton(
     get(props.Culture, Keys.reviewSave),
-    (fun () ->
+    fun () ->
       latest.Value
       |> Option.iter(fun _ ->
         asyncEx {
           let raw = rawOf(latest.Value, props.Entity)
 
-          match! props.Store.UpdatePlanRaw(props.Entity.Id, raw) with
+          match! props.Plans.UpdateRaw(props.Entity.Id, raw) with
           | Ok() -> status.OnNext(get(props.Culture, Keys.reviewSaved))
-          | Error e -> eprintfn $"plan update failed: %O{e}"
+          | Error e ->
+            Log.Error(e, "plan update failed")
+
+            status.OnNext(
+              getf(props.Culture, Keys.reviewSaveFailed, [ e.Message :> obj ])
+            )
         }
-        |> Async.StartImmediate))
+        |> Async.StartImmediate)
   )
 
 let inline exportButton
@@ -88,29 +98,47 @@ let inline exportButton
 
     let pick() =
       asyncEx {
-        let options =
-          FilePickerSaveOptions(
-            Title = t Keys.reviewExport,
-            SuggestedFileName = $"{props.Entity.Title}.briple",
-            DefaultExtension = "briple"
+        try
+          let options =
+            FilePickerSaveOptions(
+              Title = t Keys.reviewExport,
+              SuggestedFileName = $"{props.Entity.Title}.briple",
+              DefaultExtension = "briple"
+            )
+
+          let! picked = host.StorageProvider.SaveFilePickerAsync(options)
+
+          match Option.ofObj picked with
+          | None -> ()
+          | Some file ->
+            match
+              exportBriple(
+                file.Path.LocalPath,
+                rawOf(latest.Value, props.Entity)
+              )
+            with
+            | Ok path ->
+              status.OnNext(
+                getf(props.Culture, Keys.reviewExported, [ path :> obj ])
+              )
+            | Error e ->
+              Log.Error(e, "export failed")
+
+              status.OnNext(
+                getf(
+                  props.Culture,
+                  Keys.reviewExportFailed,
+                  [ e.Message :> obj ]
+                )
+              )
+        with e ->
+          // the picker runs fire-and-forget: an unhandled throw here dies
+          // on a thread-pool thread and takes the process with it
+          Log.Error(e, "export picker failed")
+
+          status.OnNext(
+            getf(props.Culture, Keys.reviewExportFailed, [ e.Message :> obj ])
           )
-
-        let! picked = host.StorageProvider.SaveFilePickerAsync(options)
-
-        match Option.ofObj picked with
-        | None -> ()
-        | Some file ->
-          match
-            exportBriple(
-              file.Path.LocalPath,
-              rawOf(latest.Value, props.Entity)
-            )
-          with
-          | Ok path ->
-            status.OnNext(
-              getf(props.Culture, Keys.reviewExported, [ path :> obj ])
-            )
-          | Error e -> eprintfn $"export failed: %O{e}"
       }
       |> Async.Start
 
@@ -126,6 +154,7 @@ type ReviewPage(props: ReviewPageProps) as this =
       match parsePlan props.Entity.Raw with
       | Error error -> invalidBody(props, error)
       | Ok parsed ->
+        // the edits travel to the parent and back into the Raw on save
         let latest = new BehaviorSubject<Plan option>(None)
 
         let status = new BehaviorSubject<string>("")
@@ -146,6 +175,18 @@ type ReviewPage(props: ReviewPageProps) as this =
           exportButton(props, latest, status)
           |> ValueOption.fold (fun _ picker -> [| save; picker |]) [| save |]
 
+        let notes =
+          NoteSection.NoteSection(
+            {
+              Culture = props.Culture
+              Agent = props.Agent
+              Memories = props.Memories
+              AthleteId = props.Entity.AthleteId
+              Plan = parsed.Plan
+              PlanId = props.Entity.Id
+            },
+            ignore
+          )
 
         ScrollViewer()
           .Content(
@@ -159,6 +200,7 @@ type ReviewPage(props: ReviewPageProps) as this =
                   .Spacing(8.0)
                   .Children(actions),
                 TextBlock().Text(status).Foreground(muted).FontFamily(font),
-                review
+                review,
+                notes
               )
           )

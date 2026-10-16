@@ -4,10 +4,12 @@ open System
 open System.Globalization
 
 open Avalonia.Controls
+open Avalonia.Controls.Templates
 open Avalonia.Layout
 open NXUI.Extensions
 
 open MVUish.Avalonia
+open MVUish.Avalonia.Collections
 
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Athletes
@@ -15,32 +17,27 @@ open Briple.Trainer.Core.Requests
 open Briple.Trainer.Strings
 
 type Event =
-  | Submitted of weeks: int * brief: Brief * counts: (string * int) list
+  | Submitted of weeks: int * brief: Brief
   | Cancelled
 
 [<Struct>]
 type Props = {
   Culture: CultureInfo
   Athlete: Athlete
-  PreviousCounts: (string * int) list
 }
 
 type Model = {
   Weeks: int
   Goal: PlanGoal
-  Variants: string list
-  FocusDraft: string
-  RirDraft: string
-  Counts: Map<string, int>
+  Frequency: VariantFrequency
+  Emphasis: Emphasis list
 }
 
 type Msg =
   | SetWeeks of int
   | SetGoal of PlanGoal
-  | ToggleVariant of string
-  | SetFocus of string
-  | SetRir of string
-  | SetCount of variant: string * count: string
+  | SetFrequency of VariantFrequency
+  | ToggleEmphasis of Emphasis
   | Submit
   | Cancel
 
@@ -52,91 +49,48 @@ let goalOptions = [
   Strength, Keys.goalStrength
 ]
 
-let inline previousCount props variant =
-  props.PreviousCounts
-  |> List.tryPick(fun (candidate, count) ->
-    if candidate = variant then Some count else None)
+let emphasisOptions = [
+  Arms, Keys.emphasisArms
+  Shoulders, Keys.emphasisShoulders
+  Chest, Keys.emphasisChest
+  Back, Keys.emphasisBack
+  Legs, Keys.emphasisLegs
+  Glutes, Keys.emphasisGlutes
+  CoreWork, Keys.emphasisCore
+  FullBody, Keys.emphasisFullBody
+  Squat, Keys.emphasisSquat
+  Deadlift, Keys.emphasisDeadlift
+  BenchPress, Keys.emphasisBenchPress
+  OverheadPress, Keys.emphasisOverheadPress
+  OlympicLifts, Keys.emphasisOlympicLifts
+  Push, Keys.emphasisPush
+  Pull, Keys.emphasisPull
+  FullBodyCircuit, Keys.emphasisFullBodyCircuit
+  Hiit, Keys.emphasisHiit
+  StrengthCardio, Keys.emphasisStrengthCardio
+  ContinuousZone2, Keys.emphasisContinuousZone2
+  IntervalHiit, Keys.emphasisIntervalHiit
+  Mixed, Keys.emphasisMixed
+  Mobility, Keys.emphasisMobility
+  Stability, Keys.emphasisStability
+  MovementPatterns, Keys.emphasisMovementPatterns
+]
 
-let rirPerWeek(draft: string) : (int * string) list option =
-  if System.String.IsNullOrWhiteSpace draft then
-    Some []
-  else
-    let pairs =
-      draft.Split(',') |> Array.toList |> List.map(fun part -> part.Split(':'))
-
-    let parsed =
-      pairs
-      |> List.map(fun pair ->
-        match pair with
-        | [| week; target |] ->
-          Int32.TryParse week
-          |> function
-            | true, weekNumber when weekNumber > 0 ->
-              Some(weekNumber, target.Trim())
-            | _ -> None
-        | _ -> None)
-
-    if List.contains None parsed then
-      None
-    else
-      parsed |> List.choose id |> Some
-
-/// The brief built from the model, when everything parses.
-let tryBrief
-  (props: Props)
-  (model: Model)
-  : (Brief * (string * int) list) option =
-  let selected =
-    props.Athlete.Variants
-    |> List.filter(fun variant -> List.contains variant model.Variants)
-
-  let counts =
-    selected
-    |> List.choose(fun variant ->
-      model.Counts
-      |> Map.tryFind variant
-      |> Option.filter(fun count -> count > 0)
-      |> Option.map(fun count -> variant, count))
-
-  let complete =
-    not(List.isEmpty selected) && List.length counts = List.length selected
-
-  rirPerWeek model.RirDraft
-  |> Option.bind(fun rir ->
-    if complete then
-      Some(
-        {
-          Goal = model.Goal
-          Adjustments = []
-          Focus =
-            model.FocusDraft.Split(',')
-            |> Array.toList
-            |> List.map(fun part -> part.Trim())
-            |> List.filter(fun part ->
-              not(System.String.IsNullOrWhiteSpace part))
-          RirPerWeek = rir
-          Variants = selected
-        },
-        counts
-      )
-    else
-      None)
+let frequencyOptions = [
+  DosDias, Keys.freq2
+  TresDias, Keys.freq3
+  CuatroDias, Keys.freq4
+  CincoDias, Keys.freq5
+  SeisDias, Keys.freq6
+]
 
 let init(props: Props) =
-  let counts =
-    props.Athlete.Variants
-    |> List.map(fun variant ->
-      variant, previousCount props variant |> Option.defaultValue 0)
-    |> Map.ofList
-
   {
     Weeks = 4
     Goal =
       props.Athlete.Goals |> List.tryHead |> Option.defaultValue Hypertrophy
-    Variants = props.Athlete.Variants
-    FocusDraft = String.concat ", " props.Athlete.Focus
-    RirDraft = ""
-    Counts = counts
+    Frequency = TresDias
+    Emphasis = []
   },
   Cmd.none
 
@@ -145,41 +99,42 @@ let init(props: Props) =
 let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
   match msg with
   | SetWeeks weeks -> { model with Weeks = weeks }, Cmd.none
-  | SetGoal goal -> { model with Goal = goal }, Cmd.none
 
-  | ToggleVariant variant ->
-    let variants =
-      if List.contains variant model.Variants then
-        List.except [ variant ] model.Variants
+  | SetGoal goal ->
+    // the emphasis catalog is per goal: a goal change resets the picks
+    {
+      model with
+          Goal = goal
+          Emphasis = []
+    },
+    Cmd.none
+
+  | SetFrequency frequency -> { model with Frequency = frequency }, Cmd.none
+
+  | ToggleEmphasis emphasis ->
+    let picked =
+      if List.contains emphasis model.Emphasis then
+        List.except [ emphasis ] model.Emphasis
       else
-        model.Variants @ [ variant ]
+        model.Emphasis @ [ emphasis ]
 
-    { model with Variants = variants }, Cmd.none
+    { model with Emphasis = picked }, Cmd.none
 
-  | SetFocus focus -> { model with FocusDraft = focus }, Cmd.none
-  | SetRir draft -> { model with RirDraft = draft }, Cmd.none
+  | Submit ->
+    onEvent(
+      Event.Submitted(
+        model.Weeks,
+        {
+          Goal = model.Goal
+          Frequency = model.Frequency
+          Emphasis = model.Emphasis
+          Adjustments = []
+        }
+      )
+    )
 
-  | SetCount(variant, count) ->
-    let parsed =
-      Int32.TryParse count
-      |> function
-        | true, number when number >= 0 -> Some number
-        | _ -> None
-
-    let counts =
-      match parsed with
-      | Some number -> Map.add variant number model.Counts
-      | None -> Map.remove variant model.Counts
-
-    { model with Counts = counts }, Cmd.none
-
-  | Submit when tryBrief props model |> Option.isSome ->
-    let brief, counts = tryBrief props model |> Option.get
-
-    onEvent(Event.Submitted(model.Weeks, brief, counts))
     model, Cmd.none
 
-  | Submit -> model, Cmd.none
   | Cancel ->
     onEvent Event.Cancelled
     model, Cmd.none
@@ -200,65 +155,98 @@ type WizardBrief(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as thi
     |> List.tryPick(fun (candidate, key) ->
       if t key = picked then Some candidate else None)
 
+  let emphasisName emphasis =
+    emphasisOptions
+    |> List.tryPick(fun (candidate, key) ->
+      if candidate = emphasis then Some(t key) else None)
+    |> Option.defaultValue ""
+
+  let emphasisByName picked =
+    emphasisOptions
+    |> List.tryPick(fun (candidate, key) ->
+      if t key = picked then Some candidate else None)
+
+  let frequencyName frequency =
+    frequencyOptions
+    |> List.tryPick(fun (candidate, key) ->
+      if candidate = frequency then Some(t key) else None)
+    |> Option.defaultValue ""
+
+  let frequencyByName picked =
+    frequencyOptions
+    |> List.tryPick(fun (candidate, key) ->
+      if t key = picked then Some candidate else None)
+
   do
 
     let view (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
-      let weeks = model |> Observable.map(fun m -> string m.Weeks)
+      // the goal radio is built from the athlete's own goals; the same
+      // default the init model carries
+      let athleteGoals =
+        if List.isEmpty props.Athlete.Goals then
+          [ Hypertrophy ]
+        else
+          props.Athlete.Goals
 
-      let goalText = model |> Observable.map(fun m -> goalName m.Goal)
-
-      let variantSelection = model |> Observable.map(fun m -> m.Variants)
-
-      let submitEnabled =
-        model |> Observable.map(fun m -> tryBrief props m |> Option.isSome)
-
-      let countEntry(variant: string) =
-        let countInput =
-          entry(
-            "0",
-            (previousCount props variant |> Option.defaultValue 0 |> string),
-            (fun text -> dispatch(SetCount(variant, text)))
-          )
-
-        field(variant, (fun () -> countInput :> Control))
+      let initialGoal =
+        athleteGoals |> List.tryHead |> Option.defaultValue Hypertrophy
 
       let weeksChips =
-        reactiveChoiceChips(
-          [ "1"; "2"; "3"; "4" ],
-          weeks,
-          (fun picked -> dispatch(SetWeeks(Int32.Parse picked)))
+        radioRow(
+          [ for week in 1..4 -> $"{week}" ],
+          "brief-weeks",
+          "4",
+          fun picked -> dispatch(SetWeeks(Int32.Parse picked))
         )
 
       let goalChips =
-        reactiveChoiceChips(
-          (goalOptions |> List.map(fun (_, key) -> t key)),
-          goalText,
-          (fun picked -> goalByName picked |> Option.iter(SetGoal >> dispatch))
+        radioRow(
+          athleteGoals |> List.map goalName,
+          "brief-goal",
+          goalName initialGoal,
+          fun picked -> goalByName picked |> Option.iter(SetGoal >> dispatch)
         )
 
-      let variantChips =
-        reactiveMultiChips(
-          props.Athlete.Variants,
-          variantSelection,
-          (ToggleVariant >> dispatch)
+      let frequencyChips =
+        radioRow(
+          frequencyOptions |> List.map fst |> List.map frequencyName,
+          "brief-frequency",
+          frequencyName TresDias,
+          fun picked ->
+            frequencyByName picked |> Option.iter(SetFrequency >> dispatch)
         )
 
-      let countsSection =
-        StackPanel()
-          .Spacing(4.0)
-          .Children(
-            [| for variant in props.Athlete.Variants -> countEntry variant |]
-          )
+      // the emphasis catalog follows the picked goal: the keyed binding
+      // diffs the snapshots, so rows survive a goal change and only the
+      // catalog's own deltas apply
+      let emphasisRow(emphasis: Emphasis) : Control =
+        let isOn =
+          model
+          |> Observable.map(fun current ->
+            List.contains emphasis current.Emphasis)
 
-      let focusEntry = entry("", "", SetFocus >> dispatch)
+        checkRow(
+          emphasisName emphasis,
+          isOn,
+          fun () -> dispatch(ToggleEmphasis emphasis)
+        )
 
-      let rirEntry = entry("", "", SetRir >> dispatch)
+      let emphasisTemplate =
+        FuncDataTemplate<Emphasis>(
+          (fun emphasis _ -> emphasisRow emphasis),
+          false
+        )
+
+      let emphasisSection =
+        let items = model |> Observable.map(fun m -> Emphasis.optionsFor m.Goal)
+
+        let list = ItemsControl().ItemTemplate(emphasisTemplate)
+
+        list.BindItemsSource(items, id) |> ignore
+        list
 
       let generateButton =
-        let primary =
-          primaryButton(t Keys.wizardGenerate, (fun () -> dispatch Submit))
-
-        primary.IsEnabled(submitEnabled)
+        primaryButton(t Keys.wizardGenerate, (fun () -> dispatch Submit))
 
       let cancelButton =
         button(t Keys.athleteCancel, (fun () -> dispatch Cancel))
@@ -268,10 +256,8 @@ type WizardBrief(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as thi
         .Children(
           field(t Keys.wizardWeeks, (fun () -> weeksChips)),
           field(t Keys.wizardGoal, (fun () -> goalChips)),
-          field(t Keys.athleteVariants, (fun () -> variantChips)),
-          field(t Keys.wizardCounts, (fun () -> countsSection :> Control)),
-          field(t Keys.wizardFocus, (fun () -> focusEntry :> Control)),
-          field(t Keys.wizardRir, (fun () -> rirEntry :> Control)),
+          field(t Keys.wizardFrequency, (fun () -> frequencyChips)),
+          field(t Keys.wizardEmphasis, (fun () -> emphasisSection)),
           StackPanel()
             .Orientation(Orientation.Horizontal)
             .Spacing(8.0)

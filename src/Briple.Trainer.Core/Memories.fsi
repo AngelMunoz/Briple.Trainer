@@ -52,16 +52,24 @@ type MemoryStatus =
   | Confirmed
   | Discarded
 
+/// How long a memory lives: the plan it was observed on, or the athlete.
+type MemoryScope =
+  | Plan
+  | Athlete
+
 /// A relevant fact that persists between plans. `Deltas` empty means the
 /// label has no automatic adjustment and the trainer picks one of the
 /// predefined ones by hand. `Summary` carries only model-authored text
 /// from the consolidation flow; the UI renders local memories from
-/// `Origin` so no prose is fixed in the domain.
+/// `Origin` so no prose is fixed in the domain. `Scope` decides how far
+/// the confirmed memory travels: plan-scoped ones serve the plan they
+/// were observed on, athlete-scoped ones every future plan.
 type Memory = {
   Summary: string
   Deltas: Delta list
   Origin: MemoryOrigin
   Status: MemoryStatus
+  Scope: MemoryScope
 }
 
 /// The automatic adjustment of each label: light raises load, heavy

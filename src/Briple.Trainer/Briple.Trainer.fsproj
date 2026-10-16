@@ -7,14 +7,20 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <!-- UI: Metro estricto sobre SimpleTheme, NXUI para autoria en codigo -->
+    <!-- UI: Fluent base (como viene), NXUI para autoria en codigo -->
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Themes.Simple" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="NXUI" />
     <PackageReference Include="NXUI.Desktop" />
     <PackageReference Include="Navs.Avalonia" />
     <PackageReference Include="MVUish.Avalonia" />
+
+    <!-- Logging (patron MigrondiUI) -->
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
 
     <!-- Datos -->
     <PackageReference Include="Donald" />
@@ -41,6 +47,8 @@
     <Compile Include="Strings.fs" />
     <Compile Include="Persistence.fsi" />
     <Compile Include="Persistence.fs" />
+    <Compile Include="Stores.fsi" />
+    <Compile Include="Stores.fs" />
     <Compile Include="Secrets.fsi" />
     <Compile Include="Secrets.fs" />
     <Compile Include="Env.fsi" />
@@ -55,6 +63,8 @@
     <Compile Include="Components\NewAthleteForm.fs" />
     <Compile Include="Components\MemoryReview.fsi" />
     <Compile Include="Components\MemoryReview.fs" />
+    <Compile Include="Components\NoteSection.fsi" />
+    <Compile Include="Components\NoteSection.fs" />
     <Compile Include="Components\WizardBrief.fsi" />
     <Compile Include="Components\WizardBrief.fs" />
     <Compile Include="Components\PlanReview.fsi" />

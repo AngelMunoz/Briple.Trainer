@@ -1,10 +1,14 @@
 module Briple.Trainer.UI.Tests.Components
 
-// The wizard and review components through their public surface: props in,
-// events out, driven with synthetic clicks and property writes.
+// The wizard, review and note components through their public surface:
+// props in, events out, driven with synthetic clicks and property
+// writes. The note flow runs against a fake agent and a real store over
+// a throwaway database.
 
 open System
 open System.Globalization
+open System.IO
+open System.Threading.Tasks
 
 open Avalonia.Controls
 open Avalonia.VisualTree
@@ -13,11 +17,14 @@ open Expecto
 
 open Briple.Trainer.Strings
 
+open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Requests
+open Briple.Trainer.Persistence
+open Briple.Trainer.Stores
 open Briple.Trainer.UI.Tests.Harness
 
 let private es = Language.toCulture Es
@@ -25,9 +32,7 @@ let private es = Language.toCulture Es
 let private sampleAthlete: Athlete = {
   Name = "Pepe"
   Gender = Male
-  Variants = [ "3dias" ]
-  Goals = [ Hypertrophy ]
-  Focus = []
+  Goals = [ Hypertrophy; Strength ]
 }
 
 let private sampleRaw =
@@ -186,7 +191,7 @@ let tests =
 
       Expect.isTrue reported "the discard event reached the parent"
 
-    testCase "plan review edits flow back as the full plan tree"
+    testCase "the plan reads first and edits by row"
     <| fun () ->
       match Briple.Trainer.Core.Plan.Parser.parsePlan sampleRaw with
       | Error e -> failtest $"the sample plan does not parse: {e}"
@@ -207,39 +212,92 @@ let tests =
           (List.ofSeq events)
           "the initial plan arrives as an event"
 
-        // the reps entry is the first 90-wide TextBox of the row
+        // reading first: the exercise renders as a text line, no entries
+        let readable =
+          waitFor(
+            2000,
+            (fun () -> review),
+            fun root -> hasText(root, "1. Press de banca · 8-10 · RIR 2 · 120s")
+          )
+
+        Expect.isTrue readable "the exercise line did not render"
+
+        Expect.isEmpty
+          (probeUi(fun () -> textBoxes review))
+          "no entries before the explicit edit"
+
+        // the explicit edit opens the row's entries
+        let editButton =
+          match
+            probeUi(fun () -> buttonWithText(review, get(es, Keys.planEdit)))
+          with
+          | Some button -> button
+          | None -> failtest "the edit button did not render"
+
+        onUi(fun () -> click editButton)
+
+        let opened =
+          waitFor(
+            2000,
+            (fun () -> textBoxes review),
+            fun entries ->
+              entries |> List.exists(fun entry -> entry.Width = 90.0)
+          )
+
+        Expect.isTrue opened "the row entries did not open"
+
         let repsEntry =
           probeUi(fun () ->
-            textBoxes review
-            |> List.tryFind(fun textBox -> textBox.Width = 90.0))
+            textBoxes review |> List.find(fun textBox -> textBox.Width = 90.0))
 
-        match repsEntry with
-        | None -> failtest "the reps entry did not render"
-        | Some entry ->
-          onUi(fun () -> entry.Text <- "6-8")
+        onUi(fun () -> repsEntry.Text <- "6-8")
 
-          settle()
+        settle()
 
-          let lastPlan =
-            events
-            |> Seq.choose(function
-              | Briple.Trainer.Components.PlanReview.Event.PlanChanged plan ->
-                Some plan)
-            |> Seq.last
+        let lastPlan =
+          events
+          |> Seq.choose(function
+            | Briple.Trainer.Components.PlanReview.Event.PlanChanged plan ->
+              Some plan)
+          |> Seq.last
 
-          let exercise =
-            lastPlan.Blocks
-            |> List.collect _.Variants
-            |> List.collect _.Weeks
-            |> List.collect _.Days
-            |> List.collect _.Exercises
-            |> List.find(fun exercise -> exercise.Name = "Press de banca")
+        let repsOf(plan: Plan) =
+          plan.Blocks
+          |> List.collect _.Variants
+          |> List.collect _.Weeks
+          |> List.collect _.Days
+          |> List.collect _.Exercises
+          |> List.find(fun exercise -> exercise.Name = "Press de banca")
+          |> fun exercise -> exercise.Reps
 
-          Expect.equal exercise.Reps "6-8" "the edit lands in the tree"
+        Expect.equal (repsOf lastPlan) "6-8" "the edit lands in the tree"
 
-          Expect.equal exercise.Rir "2" "the other fields stay verbatim"
+        // the revert restores the last snapshot and closes the row
+        let revertButton =
+          match
+            probeUi(fun () -> buttonWithText(review, get(es, Keys.planRevert)))
+          with
+          | Some button -> button
+          | None -> failtest "the revert button did not render"
 
-    testCase "wizard brief submits weeks, brief and counts"
+        onUi(fun () -> click revertButton)
+
+        settle()
+
+        let restored =
+          events
+          |> Seq.choose(function
+            | Briple.Trainer.Components.PlanReview.Event.PlanChanged plan ->
+              Some plan)
+          |> Seq.last
+
+        Expect.equal (repsOf restored) "8-10" "the snapshot comes back"
+
+        Expect.isEmpty
+          (probeUi(fun () -> textBoxes review))
+          "the row closes after the revert"
+
+    testCase "wizard brief submits the period and the brief"
     <| fun () ->
       let events = ResizeArray<Briple.Trainer.Components.WizardBrief.Event>()
 
@@ -249,20 +307,11 @@ let tests =
             {
               Culture = es
               Athlete = sampleAthlete
-              PreviousCounts = []
             },
             events.Add
           ))
 
       mount brief
-      settle()
-
-      // the counts entry for "3dias" is the first TextBox of the form
-      onUi(fun () ->
-        match textBoxes brief with
-        | count :: _ -> count.Text <- "10"
-        | [] -> failtest "the counts entry did not render")
-
       settle()
 
       onUi(fun () -> clickText(brief, get(es, Keys.wizardGenerate)))
@@ -281,15 +330,142 @@ let tests =
       Expect.isTrue reported "the submit event reached the parent"
 
       match List.ofSeq events with
-      | Briple.Trainer.Components.WizardBrief.Event.Submitted(weeks,
-                                                              brief,
-                                                              counts) :: _ ->
+      | Briple.Trainer.Components.WizardBrief.Event.Submitted(weeks, brief) :: _ ->
         Expect.equal weeks 4 "the default period"
 
-        Expect.equal brief.Goal Hypertrophy "the default goal"
+        Expect.equal brief.Goal Hypertrophy "the athlete's first goal"
 
-        Expect.equal brief.Variants [ "3dias" ] "the preselected variants"
+        Expect.equal brief.Frequency TresDias "the default frequency"
 
-        Expect.equal counts [ "3dias", 10 ] "the counts"
+        Expect.equal brief.Emphasis [] "no emphasis by default"
       | _ -> failtest "no submission"
+  ]
+
+// --- the note section --------------------------------------------------------
+
+let private wait(task: Task<Result<'a, exn>>) : Result<'a, exn> =
+  task.GetAwaiter().GetResult()
+
+/// Answers the same reading every time, without touching the network.
+type private FakeAgent(reading: NoteInterpretation) =
+  interface Briple.Trainer.Env.IProvideAgent with
+    member _.AgentAvailable = true
+
+    member _.GenerateNew _ = failwith "not used in this flow"
+
+    member _.GenerateAdjustment _ = failwith "not used in this flow"
+
+    member _.ConsolidateMarks _ = failwith "not used in this flow"
+
+    member _.InterpretNote(_, _) = Task.FromResult(Ok reading)
+
+let noteTests =
+  testList "note section" [
+    testCase "a note becomes a proposal and the confirmation persists it"
+    <| fun () ->
+      let db =
+        Path.Combine(Path.GetTempPath(), $"briple-note-{Guid.NewGuid():N}.db")
+
+      migrate db |> ignore
+
+      let stores = createStores(sqliteStore db, ignore)
+
+      let athleteId =
+        match wait(stores.Athletes.Add sampleAthlete) with
+        | Ok entity -> entity.Id
+        | Error e -> failtest $"add failed: {e}"
+
+      let plan =
+        match parsePlan sampleRaw with
+        | Ok parsed -> parsed.Plan
+        | Error error -> failtest $"the sample plan broke: {error.Message}"
+
+      let planId = Guid.NewGuid()
+
+      let reading: NoteInterpretation = {
+        Memories = [
+          {
+            Summary = ""
+            Deltas = [ Load 5 ]
+            Origin =
+              Mark {
+                Target = Exercise "Press de banca"
+                Label = Light
+                Date = DateOnly(2026, 10, 15)
+              }
+            Status = Proposed
+            Scope = Plan
+          }
+        ]
+        Rejections = []
+      }
+
+      let section =
+        probeUi(fun () ->
+          Briple.Trainer.Components.NoteSection.NoteSection(
+            {
+              Culture = es
+              Agent = FakeAgent(reading)
+              Memories = stores.Memories
+              AthleteId = athleteId
+              Plan = plan
+              PlanId = planId
+            },
+            ignore
+          ))
+
+      mount section
+      settle()
+
+      // the note entry is the section's only TextBox
+      onUi(fun () ->
+        match textBoxes section with
+        | note :: _ -> note.Text <- "el press quedó liviano"
+        | [] -> failtest "the note entry did not render")
+
+      settle()
+
+      onUi(fun () -> clickText(section, get(es, Keys.reviewNoteInterpret)))
+
+      // the reading lands as a confirm/discard card
+      let card =
+        waitFor(
+          2000,
+          (fun () -> section),
+          fun root ->
+            buttonWithText(root, get(es, Keys.memoriesConfirm)) |> Option.isSome
+        )
+
+      Expect.isTrue card "the proposal card did not render"
+
+      settle()
+
+      let confirm =
+        match
+          probeUi(fun () ->
+            buttonWithText(section, get(es, Keys.memoriesConfirm)))
+        with
+        | Some button -> button
+        | None -> failtest "the confirm button vanished"
+
+      onUi(fun () -> click confirm)
+
+      let persisted =
+        waitFor(
+          2000,
+          (fun () -> stores.Memories.Snapshot athleteId),
+          fun entities ->
+            entities
+            |> List.exists(fun entity -> entity.Memory.Status = Confirmed)
+        )
+
+      Expect.isTrue persisted "the confirmation reached the store"
+
+      let stored =
+        stores.Memories.Snapshot athleteId
+        |> List.find(fun entity -> entity.Memory.Status = Confirmed)
+
+      Expect.equal stored.PlanId (ValueSome planId) "the plan id rides"
+
+      Expect.equal stored.Memory.Scope Plan "the situational scope rides"
   ]

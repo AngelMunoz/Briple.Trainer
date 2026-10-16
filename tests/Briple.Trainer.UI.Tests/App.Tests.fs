@@ -6,6 +6,7 @@ module Briple.Trainer.UI.Tests.App
 open System
 open System.Globalization
 open System.IO
+open System.Reactive.Subjects
 
 open Avalonia.Controls
 open Avalonia.VisualTree
@@ -20,8 +21,6 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
 open Briple.Trainer.UI.Tests.Harness
-
-let private listView props = view props
 
 let private es = Language.toCulture Es
 
@@ -65,12 +64,13 @@ let tests =
       test "the empty page renders the empty-state text" {
         let control =
           probeUi(fun () ->
-            listView {
-              Culture = es
-              Athletes = []
-              OnNew = ignore
-              OnOpen = ignore
-            })
+            AthleteList(
+              {
+                Culture = es
+                Athletes = new BehaviorSubject<AthleteEntity list>([])
+              },
+              ignore
+            ))
 
         mount control
 
@@ -92,20 +92,22 @@ let tests =
           Profile = {
             Name = "Ana"
             Gender = Female
-            Variants = [ "5dias" ]
             Goals = [ Strength ]
-            Focus = []
           }
         }
 
         let control =
           probeUi(fun () ->
-            listView {
-              Culture = es
-              Athletes = [ entity ]
-              OnNew = ignore
-              OnOpen = fun id -> opened.Value <- Some id
-            })
+            AthleteList(
+              {
+                Culture = es
+                Athletes = new BehaviorSubject<AthleteEntity list>([ entity ])
+              },
+              fun event ->
+                match event with
+                | OpenRequested id -> opened.Value <- Some id
+                | NewRequested -> ()
+            ))
 
         mount control
 
@@ -113,7 +115,7 @@ let tests =
           waitFor(
             2000,
             (fun () -> control),
-            (fun (c: Control) -> buttonWithText(c, "Ana") |> Option.isSome)
+            (fun c -> buttonWithText(c, "Ana") |> Option.isSome)
           )
 
         Expect.isTrue rendered "the athlete row did not render"
@@ -143,7 +145,7 @@ let tests =
 
         mount form
 
-        // the name entry is the first TextBox; setting the property
+        // the name entry is the only TextBox; setting the property
         // raises TextChanged, which the form subscribed through NXUI
         onUi(fun () ->
           match textBoxes form with
@@ -152,6 +154,7 @@ let tests =
 
         settle()
 
+        // the gender is a radio row; the goals ship with one checked
         let genderRendered =
           waitFor(
             2000,
@@ -159,45 +162,23 @@ let tests =
             (fun f -> buttonWithText(f, "Hombre") |> Option.isSome)
           )
 
-        Expect.isTrue genderRendered "the gender chips did not render"
+        Expect.isTrue genderRendered "the gender radios did not render"
 
         settle()
 
-        let genderButton =
+        let genderRadio =
           match probeUi(fun () -> buttonWithText(form, "Hombre")) with
           | Some button -> button
-          | None -> failtest "the gender chip vanished"
+          | None -> failtest "the gender radio vanished"
 
-        onUi(fun () -> click genderButton)
-
-        settle()
-
-        onUi(fun () ->
-          match textBoxes form with
-          | _ :: draft :: _ -> draft.Text <- "3dias"
-          | _ -> failtest "the variant draft did not render"
-
-          buttons form
-          |> List.tryFind(fun button -> string button.Content = "+")
-          |> Option.iter click)
-
-        settle()
-
-        let saveRendered =
-          waitFor(
-            2000,
-            (fun () -> form),
-            (fun f -> buttonWithText(f, "Guardar") |> Option.isSome)
-          )
-
-        Expect.isTrue saveRendered "the save button did not render"
+        onUi(fun () -> click genderRadio)
 
         settle()
 
         let saveButton =
           match probeUi(fun () -> buttonWithText(form, "Guardar")) with
           | Some button -> button
-          | None -> failtest "the save button vanished"
+          | None -> failtest "the save button did not render"
 
         onUi(fun () -> click saveButton)
 
@@ -226,7 +207,7 @@ let tests =
 
           Expect.equal athlete.Gender Male "gender"
 
-          Expect.equal athlete.Variants [ "3dias" ] "variants"
+          Expect.equal athlete.Goals [ Hypertrophy ] "the default goal rides"
         | None -> failtest "no saved profile"
       }
     ]
@@ -247,8 +228,11 @@ let tests =
     }
 
     testList "shell boot" [
-      // no settings and no token: the shell opens on the login page
-      test "the shell boots over a temp database and opens the login" {
+      // The first page follows the token: the login when there is no
+      // working token, the athletes list when the machine has one (the
+      // env reads the real user settings, so both worlds must pass).
+      test
+        "the shell boots over a temp database and opens on the right first page" {
         let db =
           Path.Combine(Path.GetTempPath(), $"briple-boot-{Guid.NewGuid():N}.db")
 
@@ -261,9 +245,11 @@ let tests =
           | Ok env -> env
           | Error e -> failtest $"boot failed: {e}"
 
-        Expect.isFalse
-          (env :> Briple.Trainer.Env.IProvideAgent).AgentAvailable
-          "no settings means no agent"
+        let firstPage =
+          if (env :> Briple.Trainer.Env.IProvideAgent).AgentAvailable then
+            get(es, Keys.athletesTitle)
+          else
+            get(es, Keys.loginTitle)
 
         let shell =
           probeUi(fun () ->
@@ -282,13 +268,9 @@ let tests =
             window)
 
         let rendered =
-          waitFor(
-            5000,
-            (fun () -> shell),
-            (fun c -> hasText(c, get(es, Keys.loginTitle)))
-          )
+          waitFor(5000, (fun () -> shell), (fun c -> hasText(c, firstPage)))
 
-        Expect.isTrue rendered "the login page did not render on boot"
+        Expect.isTrue rendered "the first page did not render on boot"
       }
     ]
   ]

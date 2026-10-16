@@ -11,6 +11,7 @@ open System
 open System.Threading.Tasks
 open Microsoft.Extensions.AI
 open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Validator
 
@@ -49,3 +50,38 @@ val generateAdjustment:
 /// sign and percentage (load +5% reads as load 5).
 val consolidateMarks:
   client: IChatClient -> marks: FeedbackMark list -> Task<Memory list>
+
+// --- note interpretation -----------------------------------------------------
+
+/// Why a part of a trainer's note did not become a memory. Structured
+/// data only: the UI maps each case to localized prose and the app logs
+/// them to track uncovered surfaces.
+type Rejection =
+  | UnknownLabel of token: string
+  | UnknownTarget of text: string
+  | OutsideProtocol of detail: string
+
+/// The reading of one trainer's note: the memories that mapped to the
+/// closed surface, and the parts that did not (with the reason).
+type NoteInterpretation = {
+  Memories: Memory list
+  Rejections: Rejection list
+}
+
+/// The closed target vocabulary of a plan: its exercise names and day
+/// ids. A note can only produce targets from this list.
+val vocabularyOfPlan: plan: Plan -> Target list
+
+/// The pure reading of an interpretation response: tolerant JSON
+/// decoding, labels from the closed enum, targets matched against the
+/// vocabulary, deltas through the existing parser, at most ten
+/// memories. Everything outside the surface lands as a Rejection.
+val interpretationOf:
+  targets: Target list * date: DateOnly * response: string -> NoteInterpretation
+
+/// The agent reads the trainer's free-text note and answers with the
+/// memories it maps to the closed surface. The note travels alone in
+/// the user message; the system message carries the surface.
+val interpretNote:
+  client: IChatClient * targets: Target list * note: string ->
+    Task<NoteInterpretation>

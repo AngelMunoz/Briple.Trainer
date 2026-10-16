@@ -1,232 +1,125 @@
 module Briple.Trainer.Views.Athletes
 
-// The athlete detail page as an MVUish component: the memories and plans
-// sections are bound to the model stream, and every store write asks for
-// a refresh through a Cmd. No page rebuilds, no manual child mutations.
+// The athlete detail page: the profile and the plan history. The plans
+// section is a store subscription with keyed rows; writes go through the
+// store and the emissions land as refresh messages. Memories belong to
+// the plan context, so they are written and reviewed from the plan
+// review page.
 
 open System
 open System.Globalization
 
 open Avalonia.Controls
+open Avalonia.Controls.Templates
 open Avalonia.Layout
 open Avalonia.Media
 open NXUI.Extensions
-open IcedTasks
-open MVUish.Avalonia
 
-open Briple.Trainer.Components
+open MVUish.Avalonia
+open MVUish.Avalonia.Collections
+
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Athletes
-open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
+open Briple.Trainer.Stores
 open Briple.Trainer.Theme
 
 [<Struct>]
 type DetailPageProps = {
   Culture: CultureInfo
-  Store: IStore
+  Plans: PlanStore
   Athlete: AthleteEntity
-  Memories: MemoryEntity list
-  Plans: PlanEntity list
-  OnGenerate: unit -> unit
-  OnReview: Guid -> unit
 }
+
+/// What the page reports to its host.
+[<Struct>]
+type Event =
+  | GenerateRequested
+  | ReviewRequested of planId: Guid
 
 // --- the page state ---
 
-type Model = {
-  Memories: MemoryEntity list
-  Plans: PlanEntity list
-}
+type Model = { Plans: PlanEntity list }
 
-type Msg =
-  | MarkAdded of target: string * label: Label
-  | MemoryDecided of MemoryReview.Event
-  | Refreshed of Model
-  /// A store write the page does not need to react to.
-  | Recorded
+type Msg = PlansRefreshed of PlanEntity list
 
-let init(props: DetailPageProps) =
-  {
-    Memories = props.Memories
-    Plans = props.Plans
-  },
-  Cmd.none
+let init(_: DetailPageProps) = { Plans = [] }, Cmd.none
 
-let refresh(props: DetailPageProps) : Cmd<Msg> =
-  let load() = asyncEx {
-    let! memories = props.Store.ListMemories props.Athlete.Id
-    let! plans = props.Store.ListPlans props.Athlete.Id
-
-    let empty =
-      function
-      | Ok xs -> xs
-      | Error _ -> []
-
-    return {
-      Memories = empty memories
-      Plans = empty plans
-    }
-  }
-
-  Cmd.OfAsync.perform load () Refreshed
-
-let update (props: DetailPageProps) (msg: Msg) (model: Model) =
+let update (msg: Msg) (model: Model) =
   match msg with
-  | MarkAdded(target, label) ->
-    let mark = {
-      Target = Exercise target
-      Label = label
-      Date = DateOnly.FromDateTime(DateTime.Today)
-    }
-
-    let record =
-      Cmd.OfTask.perform
-        (fun () -> props.Store.AddMemory(props.Athlete.Id, consolidate mark))
-        ()
-        (fun _ -> Recorded)
-
-    model, Cmd.batch [ record; refresh props ]
-
-  | MemoryDecided event ->
-    let idOf =
-      function
-      | MemoryReview.Confirmed(id, _)
-      | MemoryReview.Discarded id -> id
-
-    let persist =
-      model.Memories
-      |> List.tryFind(fun entity -> entity.Id = idOf event)
-      |> Option.map(fun entity ->
-        let decided =
-          match event with
-          | MemoryReview.Confirmed(_, memory) ->
-            confirm memory.Deltas entity.Memory
-          | MemoryReview.Discarded _ -> discard entity.Memory
-
-        Cmd.OfTask.perform
-          (fun () -> props.Store.UpdateMemory { entity with Memory = decided })
-          ()
-          (fun _ -> Recorded))
-      |> Option.defaultValue Cmd.none
-
-    model, Cmd.batch [ persist; refresh props ]
-
-  | Refreshed fresh -> fresh, Cmd.none
-
-  | Recorded -> model, Cmd.none
+  | PlansRefreshed plans -> { model with Plans = plans }, Cmd.none
 
 // --- page pieces as module functions ---
 
-/// The quick-mark form: a target name and the four labels; the mark
-/// itself is dated today and decided by the update.
-let markForm(props: DetailPageProps, dispatch: Dispatch<Msg>) : Control =
-  let t key = get(props.Culture, key)
-
-  let targetRef = ref ""
-
-  let labelRef = ref Light
-
-  let labelFrom(picked: string) =
-    match picked with
-    | _ when picked = t Keys.labelHeavy -> Heavy
-    | _ when picked = t Keys.labelPain -> Pain
-    | _ when picked = t Keys.labelNoEquipment -> NoEquipment
-    | _ -> Light
-
-  let targetInput =
-    entry(t Keys.markTarget, "", (fun text -> targetRef.Value <- text))
-
-  let labelChips =
-    multiChips(
-      [
-        t Keys.labelLight
-        t Keys.labelHeavy
-        t Keys.labelPain
-        t Keys.labelNoEquipment
-      ],
-      [ t Keys.labelLight ],
-      (fun picked -> labelRef.Value <- labelFrom picked)
+/// One plan row: the title and its metadata; the whole row opens the
+/// review.
+let planRow
+  (props: DetailPageProps, onReview: Guid -> unit, entity: PlanEntity)
+  : Control =
+  button(entity.Title, (fun () -> onReview entity.Id))
+    .HorizontalContentAlignment(HorizontalAlignment.Left)
+    .Margin(0.0, 0.0, 0.0, 6.0)
+    .Content(
+      StackPanel()
+        .Spacing(2.0)
+        .Children(
+          TextBlock()
+            .Text(entity.Title)
+            .FontSize(14.0)
+            .FontWeight(FontWeight.Bold),
+          TextBlock()
+            .Text($"{entity.Kind} · {entity.CreatedAt.ToLocalTime():g}")
+            .Foreground(muted)
+            .FontFamily(font)
+        )
     )
+  :> Control
 
-  let add() =
-    dispatch(MarkAdded(targetRef.Value.Trim(), labelRef.Value))
-
-  let form =
-    StackPanel()
-      .Spacing(6.0)
-      .Children(targetInput, labelChips, button(t Keys.memoriesAddMark, add))
-
-  field(t Keys.memoriesAddMark, (fun () -> form))
-
-let memorySection
-  (props: DetailPageProps, model: IObservable<Model>, dispatch: Dispatch<Msg>)
+let planSection
+  (props: DetailPageProps, model: IObservable<Model>, onReview: Guid -> unit)
   : Control =
   let t key = get(props.Culture, key)
 
-  let render(m: Model) : Control =
-    let cards: Control array = [|
-      for entity in m.Memories do
-        if entity.Memory.Status = Proposed then
-          MemoryReview.MemoryReview(
-            {
-              Culture = props.Culture
-              Id = entity.Id
-              Memory = entity.Memory
-            },
-            MemoryDecided >> dispatch
-          )
-    |]
+  // the keyed binding diffs the store emissions: rows survive
+  let rows =
+    let template =
+      FuncDataTemplate<PlanEntity>(
+        (fun entity _ -> planRow(props, onReview, entity)),
+        false
+      )
 
-    if Array.isEmpty cards then
-      label(t Keys.memoriesEmpty)
-    else
-      StackPanel().Spacing(4.0).Children cards
+    let list = ItemsControl().ItemTemplate(template)
 
-  ContentControl().Content(model |> Observable.map(render >> box))
+    list.BindItemsSource(
+      model |> Observable.map(fun m -> m.Plans),
+      fun entity -> entity.Id
+    )
+    |> ignore
 
-let planSection(props: DetailPageProps, model: IObservable<Model>) : Control =
-  let t key = get(props.Culture, key)
+    list
 
-  let render(m: Model) : Control =
-    let rows: Control array = [|
-      for entity in m.Plans ->
-        button(entity.Title, (fun () -> props.OnReview entity.Id))
-          .HorizontalContentAlignment(HorizontalAlignment.Left)
-          .Content(
-            StackPanel()
-              .Spacing(2.0)
-              .Children(
-                TextBlock()
-                  .Text(entity.Title)
-                  .FontSize(14.0)
-                  .FontWeight(FontWeight.Bold),
-                TextBlock()
-                  .Text($"{entity.Kind} · {entity.CreatedAt.ToLocalTime():g}")
-                  .Foreground(muted)
-                  .FontFamily(font)
-              )
-          )
-    |]
+  let emptyState =
+    label(t Keys.athletesEmpty)
+      .IsVisible(model |> Observable.map(fun m -> List.isEmpty m.Plans))
 
-    if Array.isEmpty rows then
-      label(t Keys.athletesEmpty)
-    else
-      StackPanel().Spacing(6.0).Children rows
+  StackPanel().Spacing(8.0).Children(emptyState, rows)
 
-  ContentControl().Content(model |> Observable.map(render >> box))
+let profileLine(culture: CultureInfo, athlete: Athlete) : Control =
+  let goalText goal =
+    match goal with
+    | Hypertrophy -> get(culture, Keys.goalHypertrophy)
+    | WeightLoss -> get(culture, Keys.goalWeightLoss)
+    | CardioVascularHealth -> get(culture, Keys.goalCardio)
+    | BasicBodyActivation -> get(culture, Keys.goalActivation)
+    | Strength -> get(culture, Keys.goalStrength)
 
-let profileLine(athlete: Athlete) : Control =
+  let goals = athlete.Goals |> List.map goalText |> String.concat ", "
+
   TextBlock()
     .Text(
-      [
-        athlete.Gender |> Gender.toFileToken
-        String.concat ", " athlete.Variants
-        String.concat ", " athlete.Focus
-      ]
-      |> String.concat " · "
+      [ athlete.Gender |> Gender.toFileToken; goals ] |> String.concat " · "
     )
     .Foreground(muted)
     .FontFamily(font)
@@ -235,10 +128,13 @@ let profileLine(athlete: Athlete) : Control =
 
 let view
   (props: DetailPageProps)
+  (onEvent: Event -> unit)
   (model: IObservable<Model>)
-  (dispatch: Dispatch<Msg>)
+  (_: Dispatch<Msg>)
   : Control =
   let t key = get(props.Culture, key)
+
+  let onReview id = onEvent(Event.ReviewRequested id)
 
   ScrollViewer()
     .Content(
@@ -247,21 +143,31 @@ let view
         .Spacing(8.0)
         .Children(
           title props.Athlete.Profile.Name,
-          profileLine props.Athlete.Profile,
-          primaryButton(t Keys.plansGenerate, props.OnGenerate)
+          profileLine(props.Culture, props.Athlete.Profile),
+          primaryButton(
+            t Keys.plansGenerate,
+            (fun () -> onEvent Event.GenerateRequested)
+          )
             .HorizontalAlignment(HorizontalAlignment.Left),
-          title(t Keys.memoriesTitle),
-          markForm(props, dispatch),
-          memorySection(props, model, dispatch),
           title(t Keys.plansTitle),
-          planSection(props, model)
+          planSection(props, model, onReview)
         )
     )
 
-type AthleteDetailPage(props: DetailPageProps) as this =
+type AthleteDetailPage
+  (props: DetailPageProps, [<InlineIfLambda>] onEvent: Event -> unit) as this =
   inherit UserControl()
 
+  // the plan store in: the BehaviorSubject replay fills the model at
+  // once and every later write lands as a refresh
+  let subscribe(props: DetailPageProps) : Sub<Msg> =
+    fun dispatch ->
+      props.Plans.Observe props.Athlete.Id
+      |> Observable.subscribe(PlansRefreshed >> dispatch)
+
   do
-    let program = Program.mkProgram init (update props) (view props)
+    let program =
+      Program.mkProgram init update (view props onEvent)
+      |> Program.withSubscription(fun _ -> subscribe props)
 
     this.Content <- Program.runWith props program

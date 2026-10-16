@@ -16,9 +16,7 @@ open Briple.Trainer.Core.Tests.TestSupport
 let private athlete = {
   Name = "hombre"
   Gender = Male
-  Variants = [ "3dias"; "5dias" ]
   Goals = []
-  Focus = []
 }
 
 let private mark = {
@@ -33,10 +31,9 @@ let private confirmed = proposal |> confirm [ Load 5 ]
 
 let private brief = {
   Goal = Hypertrophy
+  Frequency = TresDias
+  Emphasis = []
   Adjustments = []
-  Focus = []
-  RirPerWeek = [ (1, "3") ]
-  Variants = [ "3dias"; "5dias" ]
 }
 
 let tests =
@@ -53,7 +50,7 @@ let tests =
       let step4 = DefineBrief(athlete, [ confirmed ], 4)
 
       // 4: output the brief; 5: input the assembled request
-      let request = newRequest athlete [ confirmed ] 4 brief []
+      let request = newRequest athlete [ confirmed ] 4 brief
       let step5 = Generate(NewPlan request)
 
       // 5: output the validated candidate; 6: input candidate + warnings
@@ -90,8 +87,7 @@ let tests =
         | Error error -> failtest $"parse error at line {error.Line}"
         | Ok parsed -> parsed.Plan
 
-      let request =
-        adjustmentRequest athlete [] 4 brief month1 [ ("3dias", 68) ]
+      let request = adjustmentRequest athlete [] 4 brief month1
 
       let step = Generate(PlanAdjustment request)
 

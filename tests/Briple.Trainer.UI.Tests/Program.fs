@@ -9,8 +9,10 @@ let main argv =
   let tests =
     testList "briple trainer ui" [
       Persistence.tests
+      Stores.tests
       App.tests
       Components.tests
+      Components.noteTests
     ]
 
   runTestsWithCLIArgs [] argv tests

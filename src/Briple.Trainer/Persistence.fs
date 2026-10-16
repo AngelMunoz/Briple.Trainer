@@ -5,6 +5,8 @@ open System.Data.Common
 open System.IO
 open System.Text.Json
 open System.Threading.Tasks
+open IcedTasks
+open IcedTasks.Polyfill.Task.Tasks
 open Microsoft.Data.Sqlite
 open Donald
 open JDeck
@@ -20,6 +22,9 @@ type MemoryEntity = {
   Id: Guid
   AthleteId: Guid
   Memory: Memory
+  /// The plan a plan-scoped memory was observed on; ValueNone for
+  /// athlete-scoped memories.
+  PlanId: Guid voption
   CreatedAt: DateTime
 }
 
@@ -48,7 +53,8 @@ type IStore =
   abstract ListMemories: athleteId: Guid -> Task<Result<MemoryEntity list, exn>>
 
   abstract AddMemory:
-    athleteId: Guid * memory: Memory -> Task<Result<MemoryEntity, exn>>
+    athleteId: Guid * memory: Memory * planId: Guid voption ->
+      Task<Result<MemoryEntity, exn>>
 
   abstract UpdateMemory: entity: MemoryEntity -> Task<Result<unit, exn>>
   abstract ListPlans: athleteId: Guid -> Task<Result<PlanEntity list, exn>>
@@ -122,6 +128,17 @@ module Codec =
     | "proposed" -> Some Proposed
     | "confirmed" -> Some Confirmed
     | "discarded" -> Some Discarded
+    | _ -> None
+
+  let scopeToken(scope: MemoryScope) =
+    match scope with
+    | Plan -> "plan"
+    | Athlete -> "athlete"
+
+  let (|ScopeToken|_|)(token: string) =
+    match token with
+    | "plan" -> Some Plan
+    | "athlete" -> Some Athlete
     | _ -> None
 
   let labelToken label =
@@ -361,13 +378,7 @@ type SqliteStore(dbPath: string) =
         rd.ReadString("gender")
         |> Gender.tryFileToken
         |> Option.defaultValue Male
-      Variants =
-        rd.ReadString("variants")
-        |> Codec.tryStringList
-        |> Result.defaultValue []
       Goals = rd.ReadString("goals") |> Codec.tryGoals |> Result.defaultValue []
-      Focus =
-        rd.ReadString("focus") |> Codec.tryStringList |> Result.defaultValue []
     }
   }
 
@@ -381,14 +392,33 @@ type SqliteStore(dbPath: string) =
         | Codec.StatusToken status -> status
         | _ -> Proposed
       Origin =
+        // the origin column is app-written; an undecodable row degrades
+        // to an empty mark like every other column degrades to its
+        // default, instead of failing the whole list
         rd.ReadString("origin")
         |> Codec.tryOrigin
-        |> function
-          | Ok origin -> origin
-          | Error e -> failwith $"undecodable origin: {e.Message}"
+        |> Result.defaultValue(
+          Mark {
+            Target = Exercise ""
+            Label = Light
+            Date = DateOnly.MinValue
+          }
+        )
       Deltas =
         rd.ReadString("deltas") |> Codec.tryDeltas |> Result.defaultValue []
+      Scope =
+        match rd.ReadString("scope") with
+        | Codec.ScopeToken scope -> scope
+        | _ -> Plan
     }
+    PlanId =
+      match rd.ReadString("plan_id") with
+      | null
+      | "" -> ValueNone
+      | token ->
+        match Guid.TryParse token with
+        | true, id -> ValueSome id
+        | _ -> ValueNone
     CreatedAt = rd.ReadString("created_at") |> DateTime.Parse
   }
 
@@ -426,14 +456,12 @@ type SqliteStore(dbPath: string) =
         do!
           conn
           |> Db.newCommand
-            "INSERT INTO athletes (id, name, gender, variants, goals, focus, created_at) VALUES ($id, $name, $gender, $variants, $goals, $focus, $created_at)"
+            "INSERT INTO athletes (id, name, gender, goals, created_at) VALUES ($id, $name, $gender, $goals, $created_at)"
           |> Db.setParams [
             "$id", sqlString(string entity.Id)
             "$name", sqlString profile.Name
             "$gender", sqlString(Gender.toFileToken profile.Gender)
-            "$variants", sqlString(Codec.stringList profile.Variants)
             "$goals", sqlString(Codec.goals profile.Goals)
-            "$focus", sqlString(Codec.stringList profile.Focus)
             "$created_at", sqlString(timestamp())
           ]
           |> Db.Async.exec
@@ -464,19 +492,25 @@ type SqliteStore(dbPath: string) =
         return Ok memories
       })
 
-    member _.AddMemory(athleteId: Guid, memory: Memory) =
+    member _.AddMemory(athleteId: Guid, memory: Memory, planId: Guid voption) =
       withConn(fun conn -> task {
         let entity = {
           Id = Guid.NewGuid()
           AthleteId = athleteId
           Memory = memory
+          PlanId = if memory.Scope = Athlete then ValueNone else planId
           CreatedAt = DateTime.UtcNow
         }
+
+        let planSql =
+          entity.PlanId
+          |> ValueOption.map(fun id -> SqlType.String(string id))
+          |> ValueOption.defaultValue SqlType.Null
 
         do!
           conn
           |> Db.newCommand
-            "INSERT INTO memories (id, athlete_id, summary, status, origin, deltas, created_at) VALUES ($id, $athlete_id, $summary, $status, $origin, $deltas, $created_at)"
+            "INSERT INTO memories (id, athlete_id, summary, status, origin, deltas, scope, plan_id, created_at) VALUES ($id, $athlete_id, $summary, $status, $origin, $deltas, $scope, $plan_id, $created_at)"
           |> Db.setParams [
             "$id", sqlString(string entity.Id)
             "$athlete_id", sqlString(string athleteId)
@@ -484,6 +518,8 @@ type SqliteStore(dbPath: string) =
             "$status", sqlString(Codec.statusToken memory.Status)
             "$origin", sqlString(Codec.origin memory.Origin)
             "$deltas", sqlString(Codec.deltas memory.Deltas)
+            "$scope", sqlString(Codec.scopeToken memory.Scope)
+            "$plan_id", planSql
             "$created_at", sqlString(timestamp())
           ]
           |> Db.Async.exec
@@ -493,15 +529,30 @@ type SqliteStore(dbPath: string) =
 
     member _.UpdateMemory(entity: MemoryEntity) =
       withConn(fun conn -> task {
+        // the scope decides the association: an athlete-scoped memory
+        // belongs to no plan
+        let planId =
+          if entity.Memory.Scope = Athlete then
+            ValueNone
+          else
+            entity.PlanId
+
+        let planSql =
+          planId
+          |> ValueOption.map(fun id -> SqlType.String(string id))
+          |> ValueOption.defaultValue SqlType.Null
+
         do!
           conn
           |> Db.newCommand
-            "UPDATE memories SET summary = $summary, status = $status, deltas = $deltas WHERE id = $id"
+            "UPDATE memories SET summary = $summary, status = $status, deltas = $deltas, scope = $scope, plan_id = $plan_id WHERE id = $id"
           |> Db.setParams [
             "$id", sqlString(string entity.Id)
             "$summary", sqlString entity.Memory.Summary
             "$status", sqlString(Codec.statusToken entity.Memory.Status)
             "$deltas", sqlString(Codec.deltas entity.Memory.Deltas)
+            "$scope", sqlString(Codec.scopeToken entity.Memory.Scope)
+            "$plan_id", planSql
           ]
           |> Db.Async.exec
 

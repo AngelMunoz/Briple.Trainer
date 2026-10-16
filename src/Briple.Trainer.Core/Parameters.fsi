@@ -16,6 +16,7 @@ type OriginClass =
   | FromPreviousPlan
   | FromBrief
   | FromAgent
+  | FromDerived
 
 /// Traceable origin of a parameter: the class plus, when it applies, the
 /// concrete fact that produced it.
@@ -25,6 +26,7 @@ type Origin =
   | PreviousPlan
   | TrainerBrief
   | Agent
+  | Derived
 
 /// A value of the request with its traced origin.
 type Parameter =
@@ -65,9 +67,6 @@ val fields: Field list
 
 /// The class of a traced origin.
 val classOf: origin: Origin -> OriginClass
-
-/// What the athlete profile fixes: their variants.
-val ofProfile: athlete: Athlete -> Parameter list
 
 /// The adjustments confirmed memories bring into the next request;
 /// proposed and discarded ones contribute nothing.

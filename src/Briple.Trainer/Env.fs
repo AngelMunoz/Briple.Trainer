@@ -7,13 +7,19 @@ open System.Text.Json
 open System.Threading
 open System.Threading.Tasks
 open Avalonia.Controls
+open IcedTasks
+open IcedTasks.Polyfill.Task.Tasks
 open Microsoft.Extensions.AI
+open Microsoft.Extensions.Logging
+
+open Serilog
 
 open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Persistence
 open Briple.Trainer.Secrets
+open Briple.Trainer.Stores
 open Briple.Trainer.Strings
 
 type AppSettings = {
@@ -44,6 +50,11 @@ type CredentialSave =
 type IProvideStore =
   abstract Store: IStore
 
+/// The live data layer: one observable store per aggregate over the raw
+/// storage.
+type IProvideStores =
+  abstract Stores: DataStores
+
 type IProvideLanguage =
   abstract Language: Language
 
@@ -59,6 +70,10 @@ type IProvideAgent =
 
   abstract ConsolidateMarks:
     marks: FeedbackMark list -> Task<Result<Memory list, exn>>
+
+  /// Reads the trainer's note over the plan's closed vocabulary.
+  abstract InterpretNote:
+    targets: Target list * note: string -> Task<Result<NoteInterpretation, exn>>
 
 type IProvideCredentials =
   abstract TokenInsecure: bool
@@ -127,14 +142,18 @@ let writeSettings(settings: AppSettings) : Result<unit, string> =
   with e ->
     Error $"settings.json: {e.Message}"
 
-type AppEnv(store: IStore, vault: ISecureStorage, settings: AppSettings voption)
-  =
+type AppEnv
+  (stores: DataStores, vault: ISecureStorage, settings: AppSettings voption) =
 
   let mutable currentLanguage = Es
   let mutable host = ValueNone
 
   let mutable workingSettings =
     settings |> ValueOption.filter(fun s -> s.Key <> "")
+
+  // the Serilog bridge, built once: typed loggers over the logger
+  // Program configured before the env exists
+  let loggerFactory = (new LoggerFactory()).AddSerilog Log.Logger
 
   // the env is insecure only when the plain field carried the token
   let mutable tokenInsecure =
@@ -154,7 +173,10 @@ type AppEnv(store: IStore, vault: ISecureStorage, settings: AppSettings voption)
     })
 
   interface IProvideStore with
-    member _.Store = store
+    member _.Store = stores.Raw
+
+  interface IProvideStores with
+    member _.Stores = stores
 
   interface IProvideLanguage with
     member _.Language = currentLanguage
@@ -177,6 +199,12 @@ type AppEnv(store: IStore, vault: ISecureStorage, settings: AppSettings voption)
       guarded(fun () -> task {
         let client = privateClient()
         return! consolidateMarks client marks
+      })
+
+    member _.InterpretNote(targets: Target list, note: string) =
+      guarded(fun () -> task {
+        let client = privateClient()
+        return! interpretNote(client, targets, note)
       })
 
   interface IProvideCredentials with
@@ -215,6 +243,12 @@ type AppEnv(store: IStore, vault: ISecureStorage, settings: AppSettings voption)
   member _.SetHost(window: Window) = host <- ValueSome window
 
   member _.Settings = workingSettings
+
+  /// The live data layer, reachable without a cast.
+  member _.Stores = stores
+
+  /// The Serilog bridge for typed `ILogger<T>` categories.
+  member _.LoggerFactory = loggerFactory
 
   /// The culture of the current language, reachable without a cast.
   member this.Culture = (this :> IProvideCulture).Culture
@@ -270,4 +304,10 @@ let create(dbPath: string) : Result<AppEnv, exn> =
                   Key = key
             }
 
-      AppEnv(sqliteStore dbPath, vault, ValueSome settings)))
+      let stores =
+        createStores(
+          sqliteStore dbPath,
+          fun (context, e) -> Log.Error(e, "{Contexto}", context)
+        )
+
+      AppEnv(stores, vault, ValueSome settings)))

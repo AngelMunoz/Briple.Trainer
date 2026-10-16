@@ -1,38 +1,73 @@
 module Briple.Trainer.Core.Tests.Prompts.Tests
 
-// The prompt render: the format, the fixed part (weeks, variants,
-// counts, RIR), the forbidden part, and the previous plan in the
-// adjustment.
+// The prompt render: the schema, the fixed part (weeks, the frequency
+// variant, the derived RIR, the kept counts of the adjustment), the
+// emphasis and the forbidden part.
 
 open System
 open Expecto
 open Briple.Trainer.Core.Plan.Types
-open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Prompts
-open Briple.Trainer.Core.Tests.TestSupport
-
-let private parse name =
-  match readFixture name |> parsePlan with
-  | Error error -> failtest $"parse error at line {error.Line}"
-  | Ok parsed -> parsed
 
 let private man = {
   Name = "Pepe"
   Gender = Male
-  Variants = [ "3dias"; "5dias" ]
   Goals = [ Strength ]
-  Focus = [ "gluteo" ]
 }
 
 let private brief = {
   Goal = Hypertrophy
+  Frequency = TresDias
+  Emphasis = []
   Adjustments = []
-  Focus = []
-  RirPerWeek = [ (1, "3"); (2, "2-3"); (4, "1") ]
-  Variants = [ "3dias"; "5dias" ]
+}
+
+/// One male block, variant 3dias, one week, one exercise.
+let private tinyPlan: Plan = {
+  Version = 1
+  Title = "anterior"
+  Weeks = 1
+  Generated = ""
+  Origin = ""
+  Blocks = [
+    {
+      Gender = Male
+      Variants = [
+        {
+          Id = "3dias"
+          Title = None
+          Weeks = [
+            {
+              Number = 1
+              Days = [
+                {
+                  Id = "Lunes"
+                  Title = None
+                  Notes = []
+                  Exercises = [
+                    {
+                      Circuit = "A"
+                      Laps = "3"
+                      Order = 1
+                      Name = "Press de banca"
+                      Reps = "6-8"
+                      Rir = "1-2"
+                      Rest = "3 min"
+                      Notes = "-"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+  Extras = []
 }
 
 let tests =
@@ -40,8 +75,7 @@ let tests =
     testCase
       "the new-plan prompt carries schema, fixed and forbidden"
       (fun () ->
-        let request =
-          newRequest man [] 4 brief [ ("3dias", 72); ("5dias", 72) ]
+        let request = newRequest man [] 4 brief
 
         let prompt = newPlanPrompt request
 
@@ -52,18 +86,17 @@ let tests =
 
         Expect.stringContains
           prompt
-          "- the plan has one option per variant: 3dias, 5dias"
-          "the variants get fixed"
+          "- the plan has one option per variant: 3dias"
+          "the frequency variant gets fixed"
 
         Expect.stringContains
           prompt
-          "- week 2 targets RIR 2-3 (added automatically, do not write it)"
-          "the RIR gets fixed"
+          "- week 1 targets RIR 3 (added automatically, do not write it)"
+          "the derived RIR gets fixed"
 
-        Expect.stringContains
-          prompt
-          "- option 3dias has exactly 72 exercises in total"
-          "the counts get fixed"
+        Expect.isFalse
+          (prompt.Contains "exercises in total")
+          "a new plan fixes no counts"
 
         Expect.stringContains prompt "FORBIDDEN" "the prohibitions travel"
 
@@ -89,13 +122,26 @@ let tests =
 
         Expect.stringContains
           (system Hypertrophy)
-          "an exercise name never repeats in the same day of the following week"
-          "the rotation is between consecutive weeks"
-
-        Expect.stringContains
-          (system Hypertrophy)
           "Respond with the JSON only"
           "the output instruction goes in the system")
+
+    testCase "the athlete line carries the goals and no focus" (fun () ->
+      let prompt = newPlanPrompt(newRequest man [] 4 brief)
+
+      Expect.stringContains prompt "Goals: strength." "the goals travel"
+
+      Expect.isFalse (prompt.Contains "Focus:") "the focus is gone")
+
+    testCase "the emphasis travels when the brief picks it" (fun () ->
+      let withEmphasis = { brief with Emphasis = [ Arms; Back ] }
+
+      let prompt = newPlanPrompt(newRequest man [] 4 withEmphasis)
+
+      Expect.stringContains prompt "EMPHASIS: arms, back." "the emphasis"
+
+      let bare = newPlanPrompt(newRequest man [] 4 brief)
+
+      Expect.isFalse (bare.Contains "EMPHASIS") "nothing when empty")
 
     testCase "the goal selects the evidence block" (fun () ->
       Expect.stringContains
@@ -125,27 +171,16 @@ let tests =
         "goals do not mix")
 
     testCase
-      "the adjustment prompt carries the counts and the previous plan"
+      "the adjustment prompt carries the kept counts and the previous plan"
       (fun () ->
-        let month1 = parse "training_plan_4w.txt"
-
-        let request =
-          adjustmentRequest man [] 4 brief month1.Plan [
-            ("3dias", 68)
-            ("5dias", 104)
-          ]
+        let request = adjustmentRequest man [] 4 brief tinyPlan
 
         let prompt = adjustmentPrompt request
 
         Expect.stringContains
           prompt
-          "- option 3dias has exactly 68 exercises in total"
-          "count 68"
-
-        Expect.stringContains
-          prompt
-          "- option 5dias has exactly 104 exercises in total"
-          "count 104"
+          "- option 3dias has exactly 1 exercises in total"
+          "the kept count"
 
         Expect.stringContains
           prompt
@@ -154,7 +189,7 @@ let tests =
 
         Expect.stringContains
           prompt
-          "Sentadilla con barra"
+          "Press de banca"
           "the previous plan travels complete in the same schema")
 
     testCase
@@ -169,7 +204,7 @@ let tests =
           |> consolidate
           |> confirm [ Load 5 ]
 
-        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief [])
+        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief)
 
         Expect.stringContains
           prompt
@@ -185,7 +220,7 @@ let tests =
             Technique = "Sentadilla con salto"
           }
 
-        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief [])
+        let prompt = newPlanPrompt(newRequest man [ memory ] 4 brief)
 
         Expect.stringContains
           prompt

@@ -10,6 +10,7 @@
   <ItemGroup>
     <Compile Include="Harness.fs" />
     <Compile Include="Persistence.Tests.fs" />
+    <Compile Include="Stores.Tests.fs" />
     <Compile Include="App.Tests.fs" />
     <Compile Include="Component.Tests.fs" />
     <Compile Include="Program.fs" />

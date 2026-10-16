@@ -9,6 +9,7 @@ type OriginClass =
   | FromPreviousPlan
   | FromBrief
   | FromAgent
+  | FromDerived
 
 type Origin =
   | AthleteProfile
@@ -16,6 +17,7 @@ type Origin =
   | PreviousPlan
   | TrainerBrief
   | Agent
+  | Derived
 
 type Parameter =
   | PlanWeeks of weeks: int * origin: Origin
@@ -54,7 +56,7 @@ let originsFor(field: Field) : OriginClass list =
   | Variants -> [ FromProfile; FromBrief ]
   | VariantTitle -> [ FromAgent ]
   | VariantWeeks -> [ FromPreviousPlan; FromBrief ]
-  | Days -> [ FromProfile; FromPreviousPlan; FromBrief ]
+  | Days -> [ FromProfile; FromPreviousPlan; FromBrief; FromDerived ]
   | DayTitle -> [ FromAgent ]
   | DayNotes -> [ FromAgent; FromBrief ]
   | Circuit -> [ FromPreviousPlan; FromAgent ]
@@ -62,10 +64,16 @@ let originsFor(field: Field) : OriginClass list =
   | Order -> [ FromPreviousPlan; FromAgent ]
   | Name -> [ FromPreviousPlan; FromAgent; FromConfirmedMemory; FromBrief ]
   | Reps -> [ FromPreviousPlan; FromAgent; FromConfirmedMemory; FromBrief ]
-  | Rir -> [ FromPreviousPlan; FromAgent; FromConfirmedMemory; FromBrief ]
+  | Rir -> [
+      FromPreviousPlan
+      FromAgent
+      FromConfirmedMemory
+      FromBrief
+      FromDerived
+    ]
   | Rest -> [ FromPreviousPlan; FromAgent; FromBrief ]
   | Notes -> [ FromPreviousPlan; FromAgent; FromConfirmedMemory; FromBrief ]
-  | Extras -> [ FromPreviousPlan; FromAgent; FromBrief ]
+  | Extras -> [ FromPreviousPlan; FromAgent; FromBrief; FromDerived ]
 
 let fields: Field list = [
   Title
@@ -96,10 +104,7 @@ let classOf(origin: Origin) : OriginClass =
   | PreviousPlan -> FromPreviousPlan
   | TrainerBrief -> FromBrief
   | Agent -> FromAgent
-
-let ofProfile(athlete: Athlete) : Parameter list = [
-  AthleteVariants(athlete.Variants, AthleteProfile)
-]
+  | Derived -> FromDerived
 
 let ofConfirmedMemories(memories: Memory list) : Parameter list =
   memories

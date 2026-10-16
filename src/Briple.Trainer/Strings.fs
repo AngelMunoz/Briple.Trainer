@@ -58,13 +58,7 @@ module Keys =
   let athleteGender = "athlete.gender"
 
   [<Literal>]
-  let athleteVariants = "athlete.variants"
-
-  [<Literal>]
   let athleteGoals = "athlete.goals"
-
-  [<Literal>]
-  let athleteFocus = "athlete.focus"
 
   [<Literal>]
   let athleteSave = "athlete.save"
@@ -110,6 +104,12 @@ module Keys =
 
   [<Literal>]
   let memoriesConsolidateAgent = "memories.consolidateAgent"
+
+  [<Literal>]
+  let memoryScopePlan = "memory.scope.plan"
+
+  [<Literal>]
+  let memoryScopeAthlete = "memory.scope.athlete"
 
   [<Literal>]
   let markTarget = "mark.target"
@@ -163,13 +163,97 @@ module Keys =
   let wizardGoal = "wizard.goal"
 
   [<Literal>]
-  let wizardFocus = "wizard.focus"
+  let wizardFrequency = "wizard.frequency"
 
   [<Literal>]
-  let wizardRir = "wizard.rir"
+  let wizardEmphasis = "wizard.emphasis"
 
   [<Literal>]
-  let wizardCounts = "wizard.counts"
+  let freq2 = "freq.2"
+
+  [<Literal>]
+  let freq3 = "freq.3"
+
+  [<Literal>]
+  let freq4 = "freq.4"
+
+  [<Literal>]
+  let freq5 = "freq.5"
+
+  [<Literal>]
+  let freq6 = "freq.6"
+
+  [<Literal>]
+  let emphasisArms = "emphasis.arms"
+
+  [<Literal>]
+  let emphasisShoulders = "emphasis.shoulders"
+
+  [<Literal>]
+  let emphasisChest = "emphasis.chest"
+
+  [<Literal>]
+  let emphasisBack = "emphasis.back"
+
+  [<Literal>]
+  let emphasisLegs = "emphasis.legs"
+
+  [<Literal>]
+  let emphasisGlutes = "emphasis.glutes"
+
+  [<Literal>]
+  let emphasisCore = "emphasis.core"
+
+  [<Literal>]
+  let emphasisFullBody = "emphasis.fullBody"
+
+  [<Literal>]
+  let emphasisSquat = "emphasis.squat"
+
+  [<Literal>]
+  let emphasisDeadlift = "emphasis.deadlift"
+
+  [<Literal>]
+  let emphasisBenchPress = "emphasis.benchPress"
+
+  [<Literal>]
+  let emphasisOverheadPress = "emphasis.overheadPress"
+
+  [<Literal>]
+  let emphasisOlympicLifts = "emphasis.olympicLifts"
+
+  [<Literal>]
+  let emphasisPush = "emphasis.push"
+
+  [<Literal>]
+  let emphasisPull = "emphasis.pull"
+
+  [<Literal>]
+  let emphasisFullBodyCircuit = "emphasis.fullBodyCircuit"
+
+  [<Literal>]
+  let emphasisHiit = "emphasis.hiit"
+
+  [<Literal>]
+  let emphasisStrengthCardio = "emphasis.strengthCardio"
+
+  [<Literal>]
+  let emphasisContinuousZone2 = "emphasis.continuousZone2"
+
+  [<Literal>]
+  let emphasisIntervalHiit = "emphasis.intervalHiit"
+
+  [<Literal>]
+  let emphasisMixed = "emphasis.mixed"
+
+  [<Literal>]
+  let emphasisMobility = "emphasis.mobility"
+
+  [<Literal>]
+  let emphasisStability = "emphasis.stability"
+
+  [<Literal>]
+  let emphasisMovementPatterns = "emphasis.movementPatterns"
 
   [<Literal>]
   let wizardGenerating = "wizard.generating"
@@ -199,10 +283,37 @@ module Keys =
   let reviewSaved = "review.saved"
 
   [<Literal>]
+  let reviewSaveFailed = "review.saveFailed"
+
+  [<Literal>]
+  let reviewExportFailed = "review.exportFailed"
+
+  [<Literal>]
   let reviewExported = "review.exported"
 
   [<Literal>]
   let reviewInvalid = "review.invalid"
+
+  [<Literal>]
+  let reviewNoteTitle = "review.noteTitle"
+
+  [<Literal>]
+  let reviewNotePlaceholder = "review.notePlaceholder"
+
+  [<Literal>]
+  let reviewNoteInterpret = "review.noteInterpret"
+
+  [<Literal>]
+  let reviewNoteSurface = "review.noteSurface"
+
+  [<Literal>]
+  let reviewNoteRejected = "review.noteRejected"
+
+  [<Literal>]
+  let reviewNoteFailed = "review.noteFailed"
+
+  [<Literal>]
+  let reviewNoteFull = "review.noteFull"
 
   [<Literal>]
   let planGuide = "plan.guide"
@@ -224,6 +335,15 @@ module Keys =
 
   [<Literal>]
   let planNotes = "plan.notes"
+
+  [<Literal>]
+  let planEdit = "plan.edit"
+
+  [<Literal>]
+  let planDone = "plan.done"
+
+  [<Literal>]
+  let planRevert = "plan.revert"
 
   [<Literal>]
   let settingsMissing = "settings.missing"
@@ -248,6 +368,9 @@ module Keys =
 
   [<Literal>]
   let loginFailed = "login.failed"
+
+  [<Literal>]
+  let loginContinue = "login.continue"
 
   [<Literal>]
   let errorTitle = "error.title"

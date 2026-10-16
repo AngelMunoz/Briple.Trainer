@@ -1,9 +1,10 @@
 module Briple.Trainer.Components.WizardBrief
 
-// Step 4 of the wizard as an MVUish component: props in (the culture, the
-// athlete and the previous plan's counts), events out (Submitted carries
-// the period, the brief and the target counts; Cancelled closes). The
-// submit button renders disabled until the form parses as a whole.
+// Step 2 of the wizard as an MVUish component: props in (the culture and
+// the athlete), events out (Submitted carries the period and the brief).
+// Weeks, goal, frequency and emphasis are all closed selections with
+// standard controls; nothing is typed by hand and nothing derived (RIR,
+// counts) is asked.
 
 open System
 open System.Globalization
@@ -15,7 +16,7 @@ open Briple.Trainer.Core.Requests
 
 /// What the form reports to its parent.
 type Event =
-  | Submitted of weeks: int * brief: Brief * counts: (string * int) list
+  | Submitted of weeks: int * brief: Brief
   | Cancelled
 
 /// The form inputs.
@@ -23,25 +24,20 @@ type Event =
 type Props = {
   Culture: CultureInfo
   Athlete: Athlete
-  PreviousCounts: (string * int) list
 }
 
 type Model = {
   Weeks: int
   Goal: PlanGoal
-  Variants: string list
-  FocusDraft: string
-  RirDraft: string
-  Counts: Map<string, int>
+  Frequency: VariantFrequency
+  Emphasis: Emphasis list
 }
 
 type Msg =
   | SetWeeks of int
   | SetGoal of PlanGoal
-  | ToggleVariant of string
-  | SetFocus of string
-  | SetRir of string
-  | SetCount of variant: string * count: string
+  | SetFrequency of VariantFrequency
+  | ToggleEmphasis of Emphasis
   | Submit
   | Cancel
 

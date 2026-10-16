@@ -21,11 +21,15 @@ let agentFields: Field list =
 let forNew(request: NewPlanRequest) : Instructions = {
   Fix = parametersForNew request
   Ask = agentFields
-  Forbid = [ ChangeCounts; OutsideVariants; LeaveFormat ]
+  // no ChangeCounts here: the agent owns the exercise volume of a new
+  // plan; the frequency and the derived RIR are what stay fixed
+  Forbid = [ OutsideVariants; LeaveFormat ]
 }
 
 let forAdjustment(request: AdjustmentRequest) : Instructions = {
   Fix = parametersForAdjustment request
   Ask = agentFields
+  // the adjustment keeps the previous plan's counts on the variant it
+  // adjusts
   Forbid = [ ChangeCounts; OutsideVariants; LeaveFormat ]
 }

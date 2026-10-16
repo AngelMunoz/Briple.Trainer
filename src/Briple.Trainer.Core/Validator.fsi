@@ -18,14 +18,10 @@ type Verdict =
   | Rejected of Violation list
 
 /// Checks a plan of the domain against the parameters of the request:
-/// gender, variants, weeks, counts and RIR.
+/// gender, the brief's frequency (one variant, its days per week), the
+/// weeks and the derived RIR.
 val checkParameters:
-  athlete: Athlete ->
-  weeks: int ->
-  brief: Brief ->
-  counts: (string * int) list ->
-  plan: Plan ->
-    Violation list
+  athlete: Athlete -> weeks: int -> brief: Brief -> plan: Plan -> Violation list
 
 /// Reviews the prescription of every exercise row: one exercise per
 /// name, a pure dose, and an effort target consistent with the dose.
@@ -35,10 +31,10 @@ val checkParameters:
 val checkPrescription: plan: Plan -> Violation list
 
 /// Validates the output of a new plan: clean format, one block of the
-/// athlete's gender, their variants, the weeks, the counts and the
-/// brief's RIR.
+/// athlete's gender, one variant of the brief's frequency with its days
+/// per week, the weeks and the derived RIR.
 val validateNew: request: NewPlanRequest -> output: string -> Verdict
 
-/// Validates the output of an adjustment: the same over the adjustment
-/// request, whose previous plan travels as reference.
+/// Validates the output of an adjustment: the same, plus the counts of
+/// the previous plan on the variant the adjustment keeps.
 val validateAdjustment: request: AdjustmentRequest -> output: string -> Verdict

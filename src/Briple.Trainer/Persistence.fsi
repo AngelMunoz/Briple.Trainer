@@ -19,6 +19,9 @@ type MemoryEntity = {
   Id: Guid
   AthleteId: Guid
   Memory: Memory
+  /// The plan a plan-scoped memory was observed on; ValueNone for
+  /// athlete-scoped memories.
+  PlanId: Guid voption
   CreatedAt: DateTime
 }
 
@@ -50,7 +53,8 @@ type IStore =
   abstract ListMemories: athleteId: Guid -> Task<Result<MemoryEntity list, exn>>
 
   abstract AddMemory:
-    athleteId: Guid * memory: Memory -> Task<Result<MemoryEntity, exn>>
+    athleteId: Guid * memory: Memory * planId: Guid voption ->
+      Task<Result<MemoryEntity, exn>>
 
   abstract UpdateMemory: entity: MemoryEntity -> Task<Result<unit, exn>>
   abstract ListPlans: athleteId: Guid -> Task<Result<PlanEntity list, exn>>

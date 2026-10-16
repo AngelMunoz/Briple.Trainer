@@ -65,5 +65,22 @@ val inline entry:
   [<InlineIfLambda>] onChanged: (string -> unit) ->
     TextBox
 
+/// A single-choice row of radio buttons; the control owns the visual
+/// state, so the selection is never ambiguous.
+val inline radioRow:
+  options: string list *
+  group: string *
+  initial: string *
+  [<InlineIfLambda>] onPick: (string -> unit) ->
+    Control
+
+/// One checkbox whose checked state follows an observable; the
+/// subscription is disposed when the control detaches.
+val inline checkRow:
+  text: string *
+  isOn: IObservable<bool> *
+  [<InlineIfLambda>] onToggle: (unit -> unit) ->
+    Control
+
 /// A page shell: title over scrolling content.
 val inline page: titleText: string * content: Control -> Control

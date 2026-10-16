@@ -1,8 +1,9 @@
 module Briple.Trainer.Views.Athletes
 
-// The athlete detail page: profile, the quick-mark form, the proposed
-// memories with their confirm/discard cards and the plan history. Store
-// writes reload the page in place; the callbacks navigate.
+// The athlete detail page: the profile and the plan history. The plans
+// section is a store subscription with keyed rows, so every write
+// anywhere shows up without navigation and the rows survive. Memories
+// live in the plan context (the review page), not in the profile.
 
 open System
 open System.Globalization
@@ -10,21 +11,26 @@ open System.Globalization
 open Avalonia.Controls
 
 open Briple.Trainer.Persistence
+open Briple.Trainer.Stores
 
-/// The data and callbacks of the page.
+/// The data of the page.
 [<Struct>]
 type DetailPageProps = {
   Culture: CultureInfo
-  Store: IStore
+  Plans: PlanStore
   Athlete: AthleteEntity
-  Memories: MemoryEntity list
-  Plans: PlanEntity list
-  OnGenerate: unit -> unit
-  OnReview: Guid -> unit
 }
 
-/// The detail page; store writes reload it in place.
+/// What the page reports to its host.
+[<Struct>]
+type Event =
+  | GenerateRequested
+  | ReviewRequested of planId: Guid
+
+/// The detail page; live over the plan store.
 type AthleteDetailPage =
   inherit UserControl
 
-  new: props: DetailPageProps -> AthleteDetailPage
+  new:
+    props: DetailPageProps * [<InlineIfLambda>] onEvent: (Event -> unit) ->
+      AthleteDetailPage

@@ -23,9 +23,7 @@ let private tempDb() : string =
 let private sampleAthlete: Athlete = {
   Name = "Pepe"
   Gender = Male
-  Variants = [ "3dias" ]
   Goals = [ Hypertrophy ]
-  Focus = [ "espalda" ]
 }
 
 let private samplePlan: Plan = {
@@ -92,8 +90,6 @@ let tests =
         | Error e -> failtest $"find failed: {e}"
         | Ok ValueNone -> failtest "the athlete vanished"
         | Ok(ValueSome loaded) ->
-          Expect.equal loaded.Profile.Variants [ "3dias" ] "variants"
-
           Expect.equal loaded.Profile.Goals [ Hypertrophy ] "goals"
     }
 
@@ -115,10 +111,19 @@ let tests =
         Date = DateOnly(2026, 10, 6)
       }
 
-      match wait(store.AddMemory(athleteId, consolidate mark)) with
+      let planId = Guid.NewGuid()
+
+      match
+        wait(store.AddMemory(athleteId, consolidate mark, ValueSome planId))
+      with
       | Error e -> failtest $"add memory failed: {e}"
       | Ok memoryEntity ->
         Expect.equal memoryEntity.Memory.Status Proposed "born proposed"
+
+        Expect.equal memoryEntity.Memory.Scope Plan "a mark is situational"
+
+        Expect.equal memoryEntity.PlanId (ValueSome planId) "the plan rides"
+
 
         Expect.notEqual memoryEntity.Memory.Deltas [] "light carries a delta"
 

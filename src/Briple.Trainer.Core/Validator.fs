@@ -16,12 +16,12 @@ type Verdict =
 let violation rule detail = { Rule = rule; Detail = detail }
 
 /// Checks a plan already converted to the domain against the parameters
-/// of the request: gender, variants, weeks, counts and RIR.
+/// of the request: gender, the brief's frequency, the weeks and the
+/// derived RIR.
 let checkParameters
   (athlete: Athlete)
   (weeks: int)
   (brief: Brief)
-  (counts: (string * int) list)
   (plan: Plan)
   : Violation list =
   let violations = ResizeArray<Violation>()
@@ -45,13 +45,15 @@ let checkParameters
     |> List.filter(fun block -> block.Gender = athlete.Gender)
     |> List.collect(fun block -> block.Variants)
 
-  let expected = List.sort brief.Variants
+  let expected = List.sort(variantTokens brief)
   let actual = variants |> List.map(fun variant -> variant.Id) |> List.sort
 
   if expected <> actual then
     violations.Add(
       violation "variants" $"expected {expected}, the plan has {actual}"
     )
+
+  let days = VariantFrequency.daysPerWeek brief.Frequency
 
   for variant in variants do
     let numbers = variant.Weeks |> List.map(fun week -> week.Number)
@@ -63,23 +65,15 @@ let checkParameters
           $"the variant {variant.Id} has weeks {numbers}, expected 1..{weeks}"
       )
 
-  let actualCounts = planCounts athlete plan |> Map.ofList
+    for week in variant.Weeks do
+      if week.Days.Length <> days then
+        violations.Add(
+          violation
+            "frequency"
+            $"the variant {variant.Id} trains {week.Days.Length} days in week {week.Number}, expected {days}"
+        )
 
-  for variant, total in counts do
-    match Map.tryFind variant actualCounts with
-    | Some actual when actual = total -> ()
-    | Some actual ->
-      violations.Add(
-        violation
-          "count"
-          $"the variant {variant} must have {total} #ej, has {actual}"
-      )
-    | None ->
-      violations.Add(
-        violation "count" $"the variant {variant} does not exist in the output"
-      )
-
-  for week, target in brief.RirPerWeek do
+  for week, target in derivedRirPerWeek weeks do
     match tryMesocycleRir plan week with
     | Some actual when actual = target -> ()
     | Some actual ->
@@ -94,6 +88,28 @@ let checkParameters
       )
 
   List.ofSeq violations
+
+/// The adjustment keeps the previous plan's exercise counts on the
+/// variant it adjusts.
+let checkAdjustmentCounts
+  (athlete: Athlete)
+  (previousPlan: Plan)
+  (plan: Plan)
+  : Violation list =
+  let kept = planCounts athlete plan |> Map.ofList
+
+  planCounts athlete previousPlan
+  |> List.filter(fun (variant, _) -> Map.containsKey variant kept)
+  |> List.choose(fun (variant, total) ->
+    match Map.tryFind variant kept with
+    | Some actual when actual = total -> None
+    | Some actual ->
+      Some(
+        violation
+          "count"
+          $"the variant {variant} must keep {total} #ej, has {actual}"
+      )
+    | None -> None)
 
 /// Reviews the prescription of every exercise row: one exercise per
 /// name, a pure dose, and an effort target consistent with the dose.
@@ -142,7 +158,7 @@ let checkPrescription(plan: Plan) : Violation list =
 
   List.ofSeq advisories
 
-let validateCommon athlete weeks brief counts (output: string) =
+let validateNew (request: NewPlanRequest) (output: string) =
   match parsePlan output with
   | Error error ->
     Rejected [ violation "format" $"line {error.Line}: {error.Message}" ]
@@ -153,29 +169,25 @@ let validateCommon athlete weeks brief counts (output: string) =
         violation "format" $"line {warning.Line}: {warning.Message}")
 
     let parameterViolations =
-      checkParameters athlete weeks brief counts parsed.Plan
+      checkParameters request.Athlete request.Weeks request.Brief parsed.Plan
 
     match formatViolations @ parameterViolations with
     | [] -> Valid(parsed.Plan, checkPrescription parsed.Plan)
     | violations -> Rejected violations
 
-/// Validates the output of a new plan: clean format, one block of the
-/// athlete's gender, their variants, the weeks, the counts and the
-/// brief's RIR.
-let validateNew (request: NewPlanRequest) (output: string) =
-  validateCommon
-    request.Athlete
-    request.Weeks
-    request.Brief
-    request.Counts
-    output
-
-/// Validates the output of an adjustment: the same over the adjustment
-/// request, whose previous plan travels as reference.
+/// Validates the output of an adjustment: the same, plus the counts of
+/// the previous plan on the variant the adjustment keeps.
 let validateAdjustment (request: AdjustmentRequest) (output: string) =
-  validateCommon
-    request.Athlete
-    request.Weeks
-    request.Brief
-    request.Counts
-    output
+  let asNew = {
+    Athlete = request.Athlete
+    Memories = request.Memories
+    Weeks = request.Weeks
+    Brief = request.Brief
+  }
+
+  match validateNew asNew output with
+  | Rejected violations -> Rejected violations
+  | Valid(plan, advisories) ->
+    match checkAdjustmentCounts request.Athlete request.PreviousPlan plan with
+    | [] -> Valid(plan, advisories)
+    | violations -> Rejected violations

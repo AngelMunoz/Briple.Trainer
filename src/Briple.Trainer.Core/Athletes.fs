@@ -13,9 +13,7 @@ type PlanGoal =
 type Athlete = {
   Name: string
   Gender: Gender
-  Variants: string list
   Goals: PlanGoal list
-  Focus: string list
 }
 
 let athletesOfPlan(plan: Plan) : Athlete list =
@@ -23,7 +21,5 @@ let athletesOfPlan(plan: Plan) : Athlete list =
   |> List.map(fun block -> {
     Name = Gender.toFileToken block.Gender
     Gender = block.Gender
-    Variants = block.Variants |> List.map(fun variant -> variant.Id)
     Goals = []
-    Focus = []
   })

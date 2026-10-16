@@ -9,8 +9,10 @@ open System.ClientModel
 open System.ClientModel.Primitives
 open System.Net.Http
 open System.Text
+open System.Text.Json
 open System.Threading
 open System.Threading.Tasks
+open JDeck
 open Microsoft.Extensions.AI
 open OpenAI
 open Briple.Trainer.Core.Memories
@@ -154,12 +156,8 @@ let generateNew (client: IChatClient) (request: NewPlanRequest) : Task<Run> =
 
     return
       run
-        request.Brief.RirPerWeek
-        (checkParameters
-          request.Athlete
-          request.Weeks
-          request.Brief
-          request.Counts)
+        (derivedRirPerWeek request.Weeks)
+        (checkParameters request.Athlete request.Weeks request.Brief)
         response
   }
 
@@ -173,12 +171,8 @@ let generateAdjustment
 
   return
     run
-      request.Brief.RirPerWeek
-      (checkParameters
-        request.Athlete
-        request.Weeks
-        request.Brief
-        request.Counts)
+      (derivedRirPerWeek request.Weeks)
+      (checkParameters request.Athlete request.Weeks request.Brief)
       response
 }
 
@@ -241,6 +235,7 @@ let memoryOf (marks: FeedbackMark list) (line: string) =
           Deltas = deltas
           Origin = Mark mark
           Status = Proposed
+          Scope = Plan
         })
   | _ -> None
 
@@ -257,3 +252,176 @@ let consolidateMarks
     |> Array.choose(fun line -> memoryOf marks line)
     |> Array.toList
 }
+
+// --- note interpretation ------------------------------------------------------
+
+/// The closed target vocabulary of a plan: its exercise names and day
+/// ids.
+let vocabularyOfPlan(plan: Plan) : Target list = [
+  for block in plan.Blocks do
+    for variant in block.Variants do
+      for week in variant.Weeks do
+        for day in week.Days do
+          Day day.Id
+
+          for exercise in day.Exercises do
+            Exercise exercise.Name
+]
+
+// the tolerant decode mirrors Plan.Data: optional fields, a {"data":...}
+// wrapper unwrapped before reading
+
+/// Why a part of a trainer's note did not become a memory: structured
+/// data only, the UI maps each case to localized prose.
+type Rejection =
+  | UnknownLabel of token: string
+  | UnknownTarget of text: string
+  | OutsideProtocol of detail: string
+
+/// The reading of one trainer's note: the memories that mapped to the
+/// closed surface, and the parts that did not (with the reason).
+type NoteInterpretation = {
+  Memories: Memory list
+  Rejections: Rejection list
+}
+
+type MemoryData = {
+  target: string option
+  label: string option
+  scope: string option
+  summary: string option
+  deltas: string list option
+}
+
+let inline readString (key: string) (element: JsonElement) =
+  element
+  |> Optional.Property.get(key, Optional.string)
+  |> Result.map Option.flatten
+
+let memoryDecoder: Decoder<MemoryData> =
+  fun element -> decode {
+    let! target = readString "target" element
+    let! label = readString "label" element
+    let! scope = readString "scope" element
+    let! summary = readString "summary" element
+
+    let! deltaItems =
+      element |> Optional.Property.list("deltas", Optional.string)
+
+    let deltas = deltaItems |> Option.map(List.choose id)
+
+    return {
+      target = target
+      label = label
+      scope = scope
+      summary = summary
+      deltas = deltas
+    }
+  }
+
+let decodeMemories(json: string) : Result<MemoryData list, string> =
+  try
+    use document = JsonDocument.Parse json
+
+    let root = document.RootElement
+
+    let plain element =
+      element
+      |> Optional.Property.list("memories", memoryDecoder)
+      |> Result.map(fun items -> items |> Option.defaultValue [])
+      |> Result.mapError(fun error -> error.message)
+
+    match root.ValueKind with
+    | JsonValueKind.Object ->
+      match root.TryGetProperty("data") with
+      | true, data when data.ValueKind = JsonValueKind.Object ->
+        plain(data.Clone())
+      | true, data when data.ValueKind = JsonValueKind.String ->
+        match data.GetString() with
+        | null -> plain root
+        | text ->
+          use inner = JsonDocument.Parse text
+
+          plain(inner.RootElement.Clone())
+      | _ -> plain root
+    | _ -> plain root
+  with ex ->
+    Error $"unreadable json: {ex.Message}"
+
+let inline scopeOf(text: string option) =
+  match text with
+  | Some "athlete" -> Athlete
+  | _ -> Plan
+
+let inline findTarget (targets: Target list) (text: string) =
+  targets |> List.tryFind(fun target -> targetMatches text target)
+
+/// The pure reading of an interpretation response.
+let interpretationOf
+  (targets: Target list, date: DateOnly, response: string)
+  : NoteInterpretation =
+  match decodeMemories response with
+  | Error detail -> {
+      Memories = []
+      Rejections = [ OutsideProtocol detail ]
+    }
+  | Ok items ->
+    let read(item: MemoryData) =
+      let targetText =
+        item.target |> Option.defaultValue "" |> fun t -> t.Trim()
+
+      let labelText = item.label |> Option.defaultValue "" |> fun t -> t.Trim()
+
+      match findTarget targets targetText, labelOf labelText with
+      | Some target, Some label ->
+        let deltas =
+          item.deltas |> Option.defaultValue [] |> List.choose deltaOf
+
+        let summary =
+          item.summary
+          |> Option.defaultValue ""
+          |> fun text ->
+              if text.Length > 200 then text.Substring(0, 200) else text
+
+        Ok {
+          Summary = summary
+          Deltas = deltas
+          Origin =
+            Mark {
+              Target = target
+              Label = label
+              Date = date
+            }
+          Status = Proposed
+          Scope = scopeOf item.scope
+        }
+      | None, _ -> Error(UnknownTarget targetText)
+      | _, None -> Error(UnknownLabel labelText)
+
+    let results = items |> List.map read
+
+    {
+      // the surface cap: the first ten mapped memories survive
+      Memories =
+        results
+        |> List.choose(function
+          | Ok memory -> Some memory
+          | Error _ -> None)
+        |> List.truncate 10
+      Rejections =
+        results
+        |> List.choose(function
+          | Error rejection -> Some rejection
+          | Ok _ -> None)
+    }
+
+/// The agent reads the trainer's free-text note and answers with the
+/// memories it maps to the closed surface.
+let interpretNote(client: IChatClient, targets: Target list, note: string) =
+  task {
+    let! response =
+      ask client (interpretationSystem targets) (interpretationNote note)
+
+    return
+      interpretationOf(targets, DateOnly.FromDateTime(DateTime.Today), response)
+  }

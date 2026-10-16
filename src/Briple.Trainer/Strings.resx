@@ -36,14 +36,8 @@
   <data name="athlete.gender" xml:space="preserve">
     <value>Género</value>
   </data>
-  <data name="athlete.variants" xml:space="preserve">
-    <value>Variantes (ej. 3dias, 5dias)</value>
-  </data>
   <data name="athlete.goals" xml:space="preserve">
     <value>Objetivos</value>
-  </data>
-  <data name="athlete.focus" xml:space="preserve">
-    <value>Énfasis (separado por comas)</value>
   </data>
   <data name="athlete.save" xml:space="preserve">
     <value>Guardar</value>
@@ -89,6 +83,12 @@
   </data>
   <data name="memories.consolidateAgent" xml:space="preserve">
     <value>Consolidar con el agente</value>
+  </data>
+  <data name="memory.scope.plan" xml:space="preserve">
+    <value>Este plan</value>
+  </data>
+  <data name="memory.scope.athlete" xml:space="preserve">
+    <value>Siempre</value>
   </data>
   <data name="mark.target" xml:space="preserve">
     <value>Ejercicio o día</value>
@@ -144,14 +144,98 @@
   <data name="wizard.goal" xml:space="preserve">
     <value>Objetivo</value>
   </data>
-  <data name="wizard.focus" xml:space="preserve">
-    <value>Énfasis (separado por comas)</value>
+  <data name="wizard.frequency" xml:space="preserve">
+    <value>Días por semana</value>
   </data>
-  <data name="wizard.rir" xml:space="preserve">
-    <value>RIR por semana (ej. 1:3, 2:2.5)</value>
+  <data name="wizard.emphasis" xml:space="preserve">
+    <value>Énfasis</value>
   </data>
-  <data name="wizard.counts" xml:space="preserve">
-    <value>Conteos por variante (#ej)</value>
+  <data name="freq.2" xml:space="preserve">
+    <value>2 días por semana</value>
+  </data>
+  <data name="freq.3" xml:space="preserve">
+    <value>3 días por semana</value>
+  </data>
+  <data name="freq.4" xml:space="preserve">
+    <value>4 días por semana</value>
+  </data>
+  <data name="freq.5" xml:space="preserve">
+    <value>5 días por semana</value>
+  </data>
+  <data name="freq.6" xml:space="preserve">
+    <value>6 días por semana</value>
+  </data>
+  <data name="emphasis.arms" xml:space="preserve">
+    <value>Brazos</value>
+  </data>
+  <data name="emphasis.shoulders" xml:space="preserve">
+    <value>Hombros</value>
+  </data>
+  <data name="emphasis.chest" xml:space="preserve">
+    <value>Pecho</value>
+  </data>
+  <data name="emphasis.back" xml:space="preserve">
+    <value>Espalda</value>
+  </data>
+  <data name="emphasis.legs" xml:space="preserve">
+    <value>Piernas</value>
+  </data>
+  <data name="emphasis.glutes" xml:space="preserve">
+    <value>Glúteos</value>
+  </data>
+  <data name="emphasis.core" xml:space="preserve">
+    <value>Core</value>
+  </data>
+  <data name="emphasis.fullBody" xml:space="preserve">
+    <value>Cuerpo completo</value>
+  </data>
+  <data name="emphasis.squat" xml:space="preserve">
+    <value>Sentadilla</value>
+  </data>
+  <data name="emphasis.deadlift" xml:space="preserve">
+    <value>Peso muerto</value>
+  </data>
+  <data name="emphasis.benchPress" xml:space="preserve">
+    <value>Press de banca</value>
+  </data>
+  <data name="emphasis.overheadPress" xml:space="preserve">
+    <value>Press militar</value>
+  </data>
+  <data name="emphasis.olympicLifts" xml:space="preserve">
+    <value>Olímpicos</value>
+  </data>
+  <data name="emphasis.push" xml:space="preserve">
+    <value>Empuje</value>
+  </data>
+  <data name="emphasis.pull" xml:space="preserve">
+    <value>Tracción</value>
+  </data>
+  <data name="emphasis.fullBodyCircuit" xml:space="preserve">
+    <value>Circuito de cuerpo completo</value>
+  </data>
+  <data name="emphasis.hiit" xml:space="preserve">
+    <value>HIIT</value>
+  </data>
+  <data name="emphasis.strengthCardio" xml:space="preserve">
+    <value>Fuerza + cardio</value>
+  </data>
+  <data name="emphasis.continuousZone2" xml:space="preserve">
+    <value>Continuo (zona 2)</value>
+  </data>
+  <data name="emphasis.intervalHiit" xml:space="preserve">
+    <value>Intervalado (HIIT)</value>
+  </data>
+  <data name="emphasis.mixed" xml:space="preserve">
+    <value>Mixto</value>
+  </data>
+  <data name="emphasis.mobility" xml:space="preserve">
+    <value>Movilidad</value>
+  </data>
+  <data name="emphasis.stability" xml:space="preserve">
+    <value>Estabilidad</value>
+  </data>
+  <data name="emphasis.movementPatterns" xml:space="preserve">
+    <value>Patrones de movimiento</value>
   </data>
   <data name="wizard.generating" xml:space="preserve">
     <value>Generando… puede tardar uno o dos minutos.</value>
@@ -177,11 +261,38 @@
   <data name="review.saved" xml:space="preserve">
     <value>Cambios guardados</value>
   </data>
+  <data name="review.saveFailed" xml:space="preserve">
+    <value>No se pudo guardar: {0}</value>
+  </data>
+  <data name="review.exportFailed" xml:space="preserve">
+    <value>No se pudo exportar: {0}</value>
+  </data>
   <data name="review.exported" xml:space="preserve">
     <value>Exportado a {0}</value>
   </data>
   <data name="review.invalid" xml:space="preserve">
     <value>El plan no parsea: {0}</value>
+  </data>
+  <data name="review.noteTitle" xml:space="preserve">
+    <value>Memorizar</value>
+  </data>
+  <data name="review.notePlaceholder" xml:space="preserve">
+    <value>Escribe lo que observaste, p. ej. «la sentadilla quedó liviana, puede cargar más»</value>
+  </data>
+  <data name="review.noteInterpret" xml:space="preserve">
+    <value>Interpretar</value>
+  </data>
+  <data name="review.noteSurface" xml:space="preserve">
+    <value>leve, pesado, dolor o sin equipo sobre los ejercicios y días de este plan</value>
+  </data>
+  <data name="review.noteRejected" xml:space="preserve">
+    <value>No pudimos memorizar tu nota: solo sabemos cubrir {0}. Avísale al desarrollador para ampliar la cobertura.</value>
+  </data>
+  <data name="review.noteFailed" xml:space="preserve">
+    <value>No pudimos leer la nota: {0}</value>
+  </data>
+  <data name="review.noteFull" xml:space="preserve">
+    <value>Este plan ya tiene 10 memorias; descarta alguna antes de agregar más.</value>
   </data>
   <data name="plan.guide" xml:space="preserve">
     <value>Guía</value>
@@ -203,6 +314,15 @@
   </data>
   <data name="plan.notes" xml:space="preserve">
     <value>Notas</value>
+  </data>
+  <data name="plan.edit" xml:space="preserve">
+    <value>Editar</value>
+  </data>
+  <data name="plan.done" xml:space="preserve">
+    <value>Listo</value>
+  </data>
+  <data name="plan.revert" xml:space="preserve">
+    <value>Deshacer</value>
   </data>
   <data name="settings.missing" xml:space="preserve">
     <value>Falta el archivo settings.json con la clave del proveedor (BYOK).</value>
@@ -227,6 +347,9 @@
   </data>
   <data name="login.failed" xml:space="preserve">
     <value>No se pudo guardar: {0}</value>
+  </data>
+  <data name="login.continue" xml:space="preserve">
+    <value>Continuar</value>
   </data>
   <data name="error.title" xml:space="preserve">
     <value>Error</value>

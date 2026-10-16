@@ -1,16 +1,21 @@
 module Briple.Trainer.Program
 
-// The boot: the App type (SimpleTheme base), the shell window with the
+// The boot: Serilog first (console + daily file under the user's local
+// app data), the App type (FluentTheme base), the shell window with the
 // app bar at the bottom and the routes filling the rest, over the env
-// built on the default database.
+// built on the default database. The logger flushes on the way out.
+
+open System
+open System.IO
 
 open Avalonia
 open Avalonia.Controls
 open Avalonia.Layout
-open Avalonia.Themes.Simple
+open Avalonia.Themes.Fluent
 open NXUI.Extensions
 
 open Navs
+open Serilog
 
 open Briple.Trainer.Components.AppBar
 open Briple.Trainer.Components.Fields
@@ -20,12 +25,39 @@ open Briple.Trainer.Strings
 open Briple.Trainer.Theme
 open Briple.Trainer.Views
 
-/// The application root: SimpleTheme is the base, the Metro language
+/// The application root: FluentTheme as shipped, the app's own look
 /// lives in Theme and in the control factories.
 type App() =
   inherit Application()
 
-  override this.Initialize() = this.Styles.Add(SimpleTheme())
+  override this.Initialize() = this.Styles.Add(FluentTheme())
+
+/// Console plus one rolling file a day under %LocalAppData%.
+let configureLogging() : unit =
+  let folder =
+    Path.Combine(
+      Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+      "Briple.Trainer",
+      "logs"
+    )
+
+  Directory.CreateDirectory(folder) |> ignore
+
+  Log.Logger <-
+    LoggerConfiguration()
+#if DEBUG
+      .MinimumLevel
+      .Debug()
+#else
+      .MinimumLevel
+      .Information()
+#endif
+      .WriteTo.Console()
+      .WriteTo.File(
+        Path.Combine(folder, "briple-.log"),
+        rollingInterval = RollingInterval.Day
+      )
+      .CreateLogger()
 
 let errorWindow(message: string) =
   Window(Title = "Briple Trainer", Width = 640.0, Height = 400.0)
@@ -69,7 +101,7 @@ let buildShell(env: AppEnv) =
 
   window
 
-let inline start(argv, [<InlineIfLambda>] buildRoot: unit -> Window) =
+let start(argv, buildRoot: unit -> Window) : int =
   AppBuilder
     .Configure<App>()
     .UsePlatformDetect()
@@ -77,9 +109,13 @@ let inline start(argv, [<InlineIfLambda>] buildRoot: unit -> Window) =
 
 [<EntryPoint>]
 let main argv =
+  configureLogging()
 
-  match Env.create(defaultDbPath()) with
-  | Error e ->
-    eprintfn $"boot failed: %O{e}"
-    start(argv, fun () -> errorWindow e.Message)
-  | Ok env -> start(argv, fun () -> buildShell env)
+  try
+    match Env.create(defaultDbPath()) with
+    | Error e ->
+      Log.Fatal(e, "boot failed")
+      start(argv, fun () -> errorWindow e.Message)
+    | Ok env -> start(argv, fun () -> buildShell env)
+  finally
+    Log.CloseAndFlush()

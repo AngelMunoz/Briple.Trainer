@@ -22,4 +22,5 @@ let main args =
       Validator.Tests.tests
       Prompts.Tests.tests
       Agent.Tests.tests
+      Agent.Tests.interpretationTests
     ])

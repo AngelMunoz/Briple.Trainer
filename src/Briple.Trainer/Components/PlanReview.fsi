@@ -1,10 +1,11 @@
 module Briple.Trainer.Components.PlanReview
 
 // The plan review as an MVUish component: props in (the culture and the
-// parsed plan), events out (PlanChanged after every field edit). The view
-// mirrors the Briple app: variant sections, week badges with the
-// mesocycle RIR, circuit groups and one editable row per exercise. Only
-// the verbatim fields are editable (reps, RIR, rest, notes); edits flow
+// parsed plan), events out (PlanChanged after every field edit). The
+// view reads first: the weeks render as a pivot, every exercise is a
+// text line, and one row at a time enters an explicit edit mode (commit
+// keeps the edits, revert restores the last snapshot). Only the
+// verbatim fields are editable (reps, RIR, rest, notes); edits flow
 // back as the full Plan tree.
 
 open Avalonia.Controls
@@ -40,9 +41,22 @@ type Props = {
   Parsed: ParsedPlan
 }
 
-type Model = { Plan: Plan }
+type Model = {
+  Plan: Plan
+  /// The last committed tree: what revert restores.
+  Snapshot: Plan
+  /// The week the pivot shows.
+  Week: int
+  /// The row in explicit edit mode.
+  Editing: RowPath voption
+}
 
-type Msg = SetField of path: RowPath * field: ExerciseField * text: string
+type Msg =
+  | SetField of path: RowPath * field: ExerciseField * text: string
+  | SetWeek of week: int
+  | BeginEdit of path: RowPath
+  | EndEdit
+  | RevertEdit
 
 /// The review of one parsed plan.
 type PlanReview =

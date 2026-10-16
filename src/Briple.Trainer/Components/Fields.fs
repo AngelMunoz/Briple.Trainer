@@ -154,6 +154,40 @@ let inline entry
       |> Observable.subscribe onChanged
       |> ignore)
 
+/// A radio button per option in one group; the control owns the visual
+/// state, so the active option is always visible.
+let inline radioRow
+  (
+    options: string list,
+    group: string,
+    initial: string,
+    [<InlineIfLambda>] onPick: string -> unit
+  ) : Control =
+  let row(option: string) : Control =
+    RadioButton(Content = option, GroupName = group, FontFamily = font)
+      .IsChecked(Nullable((option = initial)))
+      .OnClickHandler(fun _ _ -> onPick option)
+
+  StackPanel().Orientation(Orientation.Horizontal).Spacing(12.0).Children [|
+    for option in options -> row option
+  |]
+
+/// One checkbox whose checked state follows an observable.
+let inline checkRow
+  (
+    text: string,
+    isOn: IObservable<bool>,
+    [<InlineIfLambda>] onToggle: unit -> unit
+  ) : Control =
+  let check = CheckBox(Content = text, FontFamily = font)
+
+  let tap =
+    isOn |> Observable.subscribe(fun on -> check.IsChecked <- Nullable on)
+
+  check.DetachedFromVisualTree.Add(fun _ -> tap.Dispose())
+
+  check.OnClickHandler(fun _ _ -> onToggle()) :> Control
+
 let inline page(titleText: string, content: Control) : Control =
   ScrollViewer()
     .Content(

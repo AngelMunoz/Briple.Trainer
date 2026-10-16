@@ -57,13 +57,7 @@ module Keys =
   val athleteGender: string = "athlete.gender"
 
   [<Literal>]
-  val athleteVariants: string = "athlete.variants"
-
-  [<Literal>]
   val athleteGoals: string = "athlete.goals"
-
-  [<Literal>]
-  val athleteFocus: string = "athlete.focus"
 
   [<Literal>]
   val athleteSave: string = "athlete.save"
@@ -109,6 +103,12 @@ module Keys =
 
   [<Literal>]
   val memoriesConsolidateAgent: string = "memories.consolidateAgent"
+
+  [<Literal>]
+  val memoryScopePlan: string = "memory.scope.plan"
+
+  [<Literal>]
+  val memoryScopeAthlete: string = "memory.scope.athlete"
 
   [<Literal>]
   val markTarget: string = "mark.target"
@@ -162,13 +162,97 @@ module Keys =
   val wizardGoal: string = "wizard.goal"
 
   [<Literal>]
-  val wizardFocus: string = "wizard.focus"
+  val wizardFrequency: string = "wizard.frequency"
 
   [<Literal>]
-  val wizardRir: string = "wizard.rir"
+  val wizardEmphasis: string = "wizard.emphasis"
 
   [<Literal>]
-  val wizardCounts: string = "wizard.counts"
+  val freq2: string = "freq.2"
+
+  [<Literal>]
+  val freq3: string = "freq.3"
+
+  [<Literal>]
+  val freq4: string = "freq.4"
+
+  [<Literal>]
+  val freq5: string = "freq.5"
+
+  [<Literal>]
+  val freq6: string = "freq.6"
+
+  [<Literal>]
+  val emphasisArms: string = "emphasis.arms"
+
+  [<Literal>]
+  val emphasisShoulders: string = "emphasis.shoulders"
+
+  [<Literal>]
+  val emphasisChest: string = "emphasis.chest"
+
+  [<Literal>]
+  val emphasisBack: string = "emphasis.back"
+
+  [<Literal>]
+  val emphasisLegs: string = "emphasis.legs"
+
+  [<Literal>]
+  val emphasisGlutes: string = "emphasis.glutes"
+
+  [<Literal>]
+  val emphasisCore: string = "emphasis.core"
+
+  [<Literal>]
+  val emphasisFullBody: string = "emphasis.fullBody"
+
+  [<Literal>]
+  val emphasisSquat: string = "emphasis.squat"
+
+  [<Literal>]
+  val emphasisDeadlift: string = "emphasis.deadlift"
+
+  [<Literal>]
+  val emphasisBenchPress: string = "emphasis.benchPress"
+
+  [<Literal>]
+  val emphasisOverheadPress: string = "emphasis.overheadPress"
+
+  [<Literal>]
+  val emphasisOlympicLifts: string = "emphasis.olympicLifts"
+
+  [<Literal>]
+  val emphasisPush: string = "emphasis.push"
+
+  [<Literal>]
+  val emphasisPull: string = "emphasis.pull"
+
+  [<Literal>]
+  val emphasisFullBodyCircuit: string = "emphasis.fullBodyCircuit"
+
+  [<Literal>]
+  val emphasisHiit: string = "emphasis.hiit"
+
+  [<Literal>]
+  val emphasisStrengthCardio: string = "emphasis.strengthCardio"
+
+  [<Literal>]
+  val emphasisContinuousZone2: string = "emphasis.continuousZone2"
+
+  [<Literal>]
+  val emphasisIntervalHiit: string = "emphasis.intervalHiit"
+
+  [<Literal>]
+  val emphasisMixed: string = "emphasis.mixed"
+
+  [<Literal>]
+  val emphasisMobility: string = "emphasis.mobility"
+
+  [<Literal>]
+  val emphasisStability: string = "emphasis.stability"
+
+  [<Literal>]
+  val emphasisMovementPatterns: string = "emphasis.movementPatterns"
 
   [<Literal>]
   val wizardGenerating: string = "wizard.generating"
@@ -198,10 +282,37 @@ module Keys =
   val reviewSaved: string = "review.saved"
 
   [<Literal>]
+  val reviewSaveFailed: string = "review.saveFailed"
+
+  [<Literal>]
+  val reviewExportFailed: string = "review.exportFailed"
+
+  [<Literal>]
   val reviewExported: string = "review.exported"
 
   [<Literal>]
   val reviewInvalid: string = "review.invalid"
+
+  [<Literal>]
+  val reviewNoteTitle: string = "review.noteTitle"
+
+  [<Literal>]
+  val reviewNotePlaceholder: string = "review.notePlaceholder"
+
+  [<Literal>]
+  val reviewNoteInterpret: string = "review.noteInterpret"
+
+  [<Literal>]
+  val reviewNoteSurface: string = "review.noteSurface"
+
+  [<Literal>]
+  val reviewNoteRejected: string = "review.noteRejected"
+
+  [<Literal>]
+  val reviewNoteFailed: string = "review.noteFailed"
+
+  [<Literal>]
+  val reviewNoteFull: string = "review.noteFull"
 
   [<Literal>]
   val planGuide: string = "plan.guide"
@@ -223,6 +334,15 @@ module Keys =
 
   [<Literal>]
   val planNotes: string = "plan.notes"
+
+  [<Literal>]
+  val planEdit: string = "plan.edit"
+
+  [<Literal>]
+  val planDone: string = "plan.done"
+
+  [<Literal>]
+  val planRevert: string = "plan.revert"
 
   [<Literal>]
   val settingsMissing: string = "settings.missing"
@@ -247,6 +367,9 @@ module Keys =
 
   [<Literal>]
   val loginFailed: string = "login.failed"
+
+  [<Literal>]
+  val loginContinue: string = "login.continue"
 
   [<Literal>]
   val errorTitle: string = "error.title"

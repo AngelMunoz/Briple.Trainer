@@ -26,10 +26,14 @@ type Props = {
   Memory: Memory
 }
 
-type Model = { Selected: Delta list }
+type Model = {
+  Selected: Delta list
+  Scope: MemoryScope
+}
 
 type Msg =
   | Toggle of Delta
+  | SetScope of MemoryScope
   | Accept
   | Discard
 
@@ -80,7 +84,11 @@ let deltaText (culture: CultureInfo) (delta: Delta) =
   | PatternVariant name -> name
 
 let init(props: Props) =
-  { Selected = props.Memory.Deltas }, Cmd.none
+  {
+    Selected = props.Memory.Deltas
+    Scope = props.Memory.Scope
+  },
+  Cmd.none
 
 /// The update closes over `onEvent`: the confirm and discard decisions are
 /// one-shot outputs, not model transitions.
@@ -95,10 +103,13 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
 
     { model with Selected = selected }, Cmd.none
 
+  | SetScope scope -> { model with Scope = scope }, Cmd.none
+
   | Accept ->
     let memory = {
       props.Memory with
           Deltas = model.Selected
+          Scope = model.Scope
     }
 
     onEvent(Event.Confirmed(props.Id, memory))
@@ -117,29 +128,42 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
   do
 
     let view (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
-      let options = props.Memory.Deltas |> List.map(deltaText culture)
+      let optionRow(delta: Delta) : Control =
+        let selected =
+          model |> Observable.map(fun m -> List.contains delta m.Selected)
 
-      let selected =
-        model
-        |> Observable.map(fun m -> m.Selected |> List.map(deltaText culture))
+        checkRow(
+          deltaText culture delta,
+          selected,
+          fun () -> dispatch(Toggle delta)
+        )
+
+      // how far the confirmed memory travels: this plan or the athlete
+      let scopeRow =
+        let nameOf scope =
+          match scope with
+          | Plan -> get(culture, Keys.memoryScopePlan)
+          | Athlete -> get(culture, Keys.memoryScopeAthlete)
+
+        radioRow(
+          [ nameOf Plan; nameOf Athlete ],
+          $"memory-scope-{props.Id}",
+          nameOf props.Memory.Scope,
+          fun picked ->
+            dispatch(
+              SetScope(if picked = nameOf Athlete then Athlete else Plan)
+            )
+        )
 
       StackPanel()
         .Spacing(6.0)
         .Margin(0.0, 0.0, 0.0, 12.0)
         .Children(
           TextBlock().Text(originText culture props.Memory).FontFamily(font),
-          reactiveMultiChips(
-            options,
-            selected,
-            fun picked ->
-              props.Memory.Deltas
-              |> List.tryPick(fun delta ->
-                if deltaText culture delta = picked then
-                  Some delta
-                else
-                  None)
-              |> Option.iter(Toggle >> dispatch)
-          ),
+          StackPanel().Spacing(4.0).Children [|
+            for delta in props.Memory.Deltas -> optionRow delta
+          |],
+          scopeRow,
           StackPanel()
             .Orientation(Orientation.Horizontal)
             .Spacing(8.0)

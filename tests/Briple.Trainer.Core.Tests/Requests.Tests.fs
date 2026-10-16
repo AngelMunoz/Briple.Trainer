@@ -1,7 +1,8 @@
 module Briple.Trainer.Core.Tests.Requests.Tests
 
-// "Month 2" is expressed as an adjustment over month 1; the target
-// counts 68/104/136 travel in the request as traced parameters.
+// The request contract: the brief carries goal, frequency and emphasis;
+// the RIR progression derives from the period; the adjustment inherits
+// the counts of the previous plan on the variant it keeps.
 
 open System
 open Expecto
@@ -27,133 +28,179 @@ let private confirmedMemory =
   |> consolidate
   |> confirm [ Load 5 ]
 
+let private man = {
+  Name = "hombre"
+  Gender = Male
+  Goals = []
+}
+
 let private manBrief = {
   Goal = Hypertrophy
+  Frequency = TresDias
+  Emphasis = []
   Adjustments = []
-  Focus = []
-  RirPerWeek = [ (1, "3"); (2, "2-3"); (3, "2"); (4, "1") ]
-  Variants = [ "3dias"; "5dias" ]
 }
 
 let tests =
   testList "Requests" [
-    testCase
-      "month 2 is expressed as an adjustment over month 1 with counts 68/104/136"
-      (fun () ->
-        let month1 = parseFixture "training_plan_4w.txt"
-        let month2 = parseFixture "month2_4w.txt"
+    testCase "the RIR progression derives from the period" (fun () ->
+      Expect.equal
+        (derivedRirPerWeek 4)
+        [ (1, "3"); (2, "2"); (3, "1"); (4, "0") ]
+        "four weeks: 3-2-1-0"
 
-        let man =
-          athletesOfPlan month1.Plan |> List.find(fun a -> a.Gender = Male)
+      Expect.equal
+        (derivedRirPerWeek 5)
+        [ (1, "3"); (2, "2"); (3, "1"); (4, "0"); (5, "0") ]
+        "it floors at 0"
 
-        let woman =
-          athletesOfPlan month1.Plan |> List.find(fun a -> a.Gender = Female)
+      Expect.equal (derivedRirPerWeek 1) [ (1, "3") ] "one week: 3")
 
-        let manCounts = planCounts man month2.Plan
-        let womanCounts = planCounts woman month2.Plan
+    testCase "the brief's tokens are its one frequency" (fun () ->
+      Expect.equal (variantTokens manBrief) [ "3dias" ] "tres dias"
 
-        Expect.equal
-          manCounts
-          [ ("3dias", 68); ("5dias", 104) ]
-          "target counts of the man"
+      Expect.equal
+        (variantTokens { manBrief with Frequency = CincoDias })
+        [ "5dias" ]
+        "cinco dias")
 
-        Expect.equal
-          womanCounts
-          [ ("5dias", 136) ]
-          "target counts of the woman"
+    testCase "the emphasis catalog depends on the goal" (fun () ->
+      Expect.hasLength (Emphasis.optionsFor Hypertrophy) 8 "hypertrophy"
 
-        let request =
-          adjustmentRequest
-            man
-            [ confirmedMemory ]
-            4
-            manBrief
-            month1.Plan
-            manCounts
+      Expect.hasLength (Emphasis.optionsFor CardioVascularHealth) 3 "cardio"
 
-        let parameters = parametersForAdjustment request
+      Expect.equal
+        (Emphasis.optionsFor Hypertrophy |> List.head)
+        Arms
+        "the hypertrophy catalog starts with arms"
 
-        Expect.contains
-          parameters
-          (PlanWeeks(4, TrainerBrief))
-          "the period travels"
+      Expect.equal
+        (Emphasis.toToken ContinuousZone2)
+        "zone-2 continuous"
+        "token")
 
-        Expect.contains
-          parameters
-          (AthleteVariants([ "3dias"; "5dias" ], TrainerBrief))
-          "the brief's variants"
-
-        Expect.contains
-          parameters
-          (VariantCount("3dias", 68, TrainerBrief))
-          "68 brief: it changes against month 1 (72)"
-
-        Expect.contains
-          parameters
-          (VariantCount("5dias", 104, TrainerBrief))
-          "104 brief: it changes against month 1 (72)"
-
-        Expect.contains
-          parameters
-          (Adjustment(
-            Exercise "Press de banca",
-            [ Load 5 ],
-            ConfirmedMemory confirmedMemory
-          ))
-          "the confirmed memory travels into the request")
-
-    testCase
-      "a count equal to the previous plan's traces to PreviousPlan"
-      (fun () ->
-        let month1 = parseFixture "training_plan_4w.txt"
-
-        let man =
-          athletesOfPlan month1.Plan |> List.find(fun a -> a.Gender = Male)
-
-        let sameCounts = planCounts man month1.Plan
-
-        let request =
-          adjustmentRequest man [] 4 manBrief month1.Plan sameCounts
-
-        Expect.contains
-          (parametersForAdjustment request)
-          (VariantCount("3dias", 72, PreviousPlan))
-          "unchanged comes from the previous plan")
-
-    testCase "the new plan joins profile, memories, brief and counts" (fun () ->
+    testCase "the adjustment inherits the previous counts it keeps" (fun () ->
       let month1 = parseFixture "training_plan_4w.txt"
 
-      let man =
-        athletesOfPlan month1.Plan |> List.find(fun a -> a.Gender = Male)
+      let request =
+        adjustmentRequest man [ confirmedMemory ] 4 manBrief month1.Plan
 
-      let brief = { manBrief with Variants = [ "3dias" ] }
-
-      let parameters =
-        newRequest man [ confirmedMemory ] 2 brief [ ("3dias", 36) ]
-        |> parametersForNew
+      let parameters = parametersForAdjustment request
 
       Expect.contains
         parameters
-        (AthleteVariants([ "3dias"; "5dias" ], AthleteProfile))
-        "the profile fixes all of its variants"
+        (PlanWeeks(4, TrainerBrief))
+        "the period travels"
 
       Expect.contains
         parameters
         (AthleteVariants([ "3dias" ], TrainerBrief))
-        "the brief picks which ones to generate"
+        "the brief's frequency is the only variant"
 
       Expect.contains
         parameters
-        (PlanWeeks(2, TrainerBrief))
-        "the brief's period"
+        (VariantCount("3dias", 72, PreviousPlan))
+        "3dias keeps its previous 72"
+
+      Expect.isFalse
+        (parameters |> List.contains(VariantCount("5dias", 120, PreviousPlan)))
+        "the frequency it drops does not travel"
 
       Expect.contains
         parameters
-        (WeekRir(1, "3", TrainerBrief))
-        "the brief's RIR per week"
+        (WeekRir(1, "3", Derived))
+        "the derived RIR travels with its origin"
 
       Expect.contains
         parameters
-        (VariantCount("3dias", 36, TrainerBrief))
-        "the brief's target counts")
+        (Adjustment(
+          Exercise "Press de banca",
+          [ Load 5 ],
+          ConfirmedMemory confirmedMemory
+        ))
+        "the confirmed memory travels into the request")
+
+    testCase "the relevant memories follow the scope" (fun () ->
+      let planA = Guid.NewGuid()
+      let planB = Guid.NewGuid()
+
+      let athleteScoped = {
+        consolidate {
+          Target = Day "Miércoles"
+          Label = Pain
+          Date = DateOnly(2026, 10, 1)
+        } with
+            Status = Confirmed
+            Scope = Athlete
+      }
+
+      let onPlanA = {
+        consolidate {
+          Target = Exercise "Sentadilla"
+          Label = Light
+          Date = DateOnly(2026, 10, 2)
+        } with
+            Status = Confirmed
+            Scope = Plan
+      }
+
+      let onPlanB = {
+        onPlanA with
+            Origin =
+              Mark {
+                Target = Exercise "Peso muerto"
+                Label = Heavy
+                Date = DateOnly(2026, 10, 3)
+              }
+      }
+
+      let stillProposed = { onPlanA with Status = Proposed }
+
+      let confirmed = [
+        athleteScoped, ValueNone
+        onPlanA, ValueSome planA
+        onPlanB, ValueSome planB
+        stillProposed, ValueSome planA
+      ]
+
+      // adjusting plan A: the athlete trait plus plan A's own fact
+      Expect.equal
+        (relevantMemories(confirmed, ValueSome planA))
+        [ athleteScoped; onPlanA ]
+        "the athlete ones plus the active plan's"
+
+      // adjusting plan B: plan A's fact stays behind
+      Expect.equal
+        (relevantMemories(confirmed, ValueSome planB))
+        [ athleteScoped; onPlanB ]
+        "only the active plan's facts ride"
+
+      // no active plan: nothing plan-scoped travels
+      Expect.equal
+        (relevantMemories(confirmed, ValueNone))
+        [ athleteScoped ]
+        "only the athlete ones")
+
+    testCase "the new plan joins memories and brief without counts" (fun () ->
+      let parameters =
+        newRequest man [ confirmedMemory ] 2 manBrief |> parametersForNew
+
+      Expect.contains
+        parameters
+        (AthleteVariants([ "3dias" ], TrainerBrief))
+        "the brief picks the variant"
+
+      Expect.contains parameters (PlanWeeks(2, TrainerBrief)) "the period"
+
+      Expect.contains
+        parameters
+        (WeekRir(1, "3", Derived))
+        "the derived RIR travels"
+
+      Expect.isFalse
+        (parameters
+         |> List.exists(function
+           | VariantCount _ -> true
+           | _ -> false))
+        "a new plan fixes no counts")
   ]

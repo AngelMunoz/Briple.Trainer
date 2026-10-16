@@ -26,10 +26,14 @@ type Props = {
   Memory: Memory
 }
 
-type Model = { Selected: Delta list }
+type Model = {
+  Selected: Delta list
+  Scope: MemoryScope
+}
 
 type Msg =
   | Toggle of Delta
+  | SetScope of MemoryScope
   | Accept
   | Discard
 

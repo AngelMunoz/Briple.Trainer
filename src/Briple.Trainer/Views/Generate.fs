@@ -28,18 +28,25 @@ open Briple.Trainer.Core.Wizard
 open Briple.Trainer.Env
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
+open Briple.Trainer.Stores
 open Briple.Trainer.Theme
+
+open Serilog
 
 [<Struct>]
 type WizardPageProps = {
   Culture: CultureInfo
+  /// The raw storage: the audit line only.
   Store: IStore
+  Memories: MemoryStore
+  Plans: PlanStore
   Agent: IProvideAgent
   Athlete: AthleteEntity
+  /// The confirmed memories relevant to this generation: athlete-scoped
+  /// ones plus the plan-scoped ones of the plan being adjusted.
+  Confirmed: Memory list
   Proposals: MemoryEntity list
   Previous: PlanEntity voption
-  OnFinished: Guid -> unit
-  OnCancelled: unit -> unit
 }
 
 // --- pure request assembly ---
@@ -62,23 +69,16 @@ type RequestParts = {
   Memories: Memory list
   Weeks: int
   Brief: Brief
-  Counts: (string * int) list
   Previous: PlanEntity voption
 }
 
 let requestOf(parts: RequestParts) : Generation =
   match parts.Previous with
   | AdjustmentBase plan ->
-    adjustmentRequest
-      parts.Athlete
-      parts.Memories
-      parts.Weeks
-      parts.Brief
-      plan
-      parts.Counts
+    adjustmentRequest parts.Athlete parts.Memories parts.Weeks parts.Brief plan
     |> Generation.PlanAdjustment
   | _ ->
-    newRequest parts.Athlete parts.Memories parts.Weeks parts.Brief parts.Counts
+    newRequest parts.Athlete parts.Memories parts.Weeks parts.Brief
     |> Generation.NewPlan
 
 let inline kindOf kind =
@@ -90,6 +90,17 @@ let inline callOf(agent: IProvideAgent) =
   function
   | Generation.NewPlan request -> agent.GenerateNew request
   | Generation.PlanAdjustment request -> agent.GenerateAdjustment request
+
+/// Persists the edited proposal and re-emits the athlete's slice.
+let updateMemory (store: MemoryStore) (entity: MemoryEntity) =
+  store.Update entity
+
+/// Writes the audit line of one generation.
+let addRequest
+  (store: IStore)
+  (athleteId: Guid, kind: string, payload: string)
+  =
+  store.AddRequest(athleteId, kind, payload)
 
 // --- the wizard state machine ---
 
@@ -106,14 +117,13 @@ type Model = {
   /// One entry per card that decided, confirm or discard.
   Decided: Guid list
   Confirmed: (Guid * Memory) list
-  Counts: (string * int) list
 }
 
 type Msg =
   | MemoryDecided of MemoryReview.Event
   | NextRequested
   | BackToMemories
-  | BriefSubmitted of weeks: int * brief: Brief * counts: (string * int) list
+  | BriefSubmitted of weeks: int * brief: Brief
   | GenerationDone of run: Run * kind: string
   | GenerationFailed of reason: string
   | PlanSaved of Result<PlanEntity, exn>
@@ -132,7 +142,6 @@ let init(props: WizardPageProps) =
     Step = Memories
     Decided = []
     Confirmed = []
-    Counts = []
   },
   Cmd.none
 
@@ -161,12 +170,11 @@ let update
       |> List.tryFind(fun entity -> entity.Id = id)
       |> Option.map(fun entity ->
         Cmd.OfTask.perform
-          (fun () ->
-            props.Store.UpdateMemory {
-              entity with
-                  Memory = confirm memory.Deltas entity.Memory
-            })
-          ()
+          (updateMemory props.Memories)
+          {
+            entity with
+                Memory = confirm memory.Deltas entity.Memory
+          }
           (fun _ -> Recorded))
       |> Option.defaultValue Cmd.none
 
@@ -188,12 +196,11 @@ let update
       |> List.tryFind(fun entity -> entity.Id = id)
       |> Option.map(fun entity ->
         Cmd.OfTask.perform
-          (fun () ->
-            props.Store.UpdateMemory {
-              entity with
-                  Memory = discard entity.Memory
-            })
-          ()
+          (updateMemory props.Memories)
+          {
+            entity with
+                Memory = discard entity.Memory
+          }
           (fun _ -> Recorded))
       |> Option.defaultValue Cmd.none
 
@@ -203,14 +210,13 @@ let update
 
   | BackToMemories -> { model with Step = Memories }, Cmd.none
 
-  | BriefSubmitted(weeks, brief, counts) ->
+  | BriefSubmitted(weeks, brief) ->
     let request =
       requestOf {
         Athlete = props.Athlete.Profile
-        Memories = model.Confirmed |> List.map snd
+        Memories = props.Confirmed @ (model.Confirmed |> List.map snd)
         Weeks = weeks
         Brief = brief
-        Counts = counts
         Previous = props.Previous
       }
 
@@ -218,22 +224,18 @@ let update
 
     let record =
       Cmd.OfTask.perform
-        (fun () ->
-          props.Store.AddRequest(props.Athlete.Id, kind, $"weeks={weeks}"))
-        ()
+        (addRequest props.Store)
+        (props.Athlete.Id,
+         kind,
+         $"weeks={weeks};freq={VariantFrequency.toFileToken brief.Frequency}")
         (fun _ -> Recorded)
 
     let run =
-      Cmd.OfTask.perform (fun () -> callOf props.Agent request) () (function
+      Cmd.OfTask.perform (callOf props.Agent) request (function
         | Ok run -> GenerationDone(run, kind)
         | Error e -> GenerationFailed e.Message)
 
-    {
-      model with
-          Step = Generating
-          Counts = counts
-    },
-    Cmd.batch [ record; run ]
+    { model with Step = Generating }, Cmd.batch [ record; run ]
 
   | GenerationDone(run, kind) ->
     match run.Verdict with
@@ -260,17 +262,14 @@ let update
   | ConfirmPlan ->
     match model.Step with
     | Done(plan, _, kind) ->
+      // the recorded counts are what the plan carries, not an input
       let insert = {
         AthleteId = props.Athlete.Id
         Kind = kind
-        Counts = model.Counts
+        Counts = planCounts props.Athlete.Profile plan
       }
 
-      model,
-      Cmd.OfTask.perform
-        (fun () -> props.Store.AddPlan(insert, plan))
-        ()
-        PlanSaved
+      model, Cmd.OfTask.perform props.Plans.Add (insert, plan) PlanSaved
     | _ -> model, Cmd.none
 
   | PlanSaved(Ok entity) ->
@@ -278,7 +277,7 @@ let update
     model, Cmd.none
 
   | PlanSaved(Error e) ->
-    eprintfn $"plan save failed: %O{e}"
+    Log.Error(e, "plan save failed")
     model, Cmd.none
 
   | Cancelled ->
@@ -337,8 +336,8 @@ let briefStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
 
   let submitted(event: WizardBrief.Event) =
     match event with
-    | WizardBrief.Event.Submitted(weeks, brief, counts) ->
-      dispatch(BriefSubmitted(weeks, brief, counts))
+    | WizardBrief.Event.Submitted(weeks, brief) ->
+      dispatch(BriefSubmitted(weeks, brief))
     | WizardBrief.Event.Cancelled -> dispatch Cancelled
 
   StackPanel()
@@ -349,18 +348,22 @@ let briefStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
         {
           Culture = props.Culture
           Athlete = props.Athlete.Profile
-          PreviousCounts =
-            props.Previous
-            |> ValueOption.map _.Counts
-            |> ValueOption.defaultValue []
         },
         submitted
       ),
       button(t Keys.wizardBack, (fun () -> dispatch BackToMemories))
     )
 
+/// The generation runs for one or two minutes: an indeterminate bar and
+/// the status line; nothing else to press while it works.
 let inline generatingStep(props: WizardPageProps) : Control =
-  statusLine(get(props.Culture, Keys.wizardGenerating), false)
+  StackPanel()
+    .Spacing(12.0)
+    .Margin(0.0, 16.0, 0.0, 16.0)
+    .Children(
+      ProgressBar(IsIndeterminate = true, Maximum = 100.0, MinWidth = 240.0),
+      statusLine(get(props.Culture, Keys.wizardGenerating), false)
+    )
 
 let failedStep
   (props: WizardPageProps, dispatch: Dispatch<Msg>, reasons: string array)
@@ -455,15 +458,12 @@ let view
 
     shell(ContentControl().Content steps)
 
-type WizardPage(props: WizardPageProps) as this =
+type WizardPage
+  (props: WizardPageProps, [<InlineIfLambda>] onOutcome: Outcome -> unit) as this
+  =
   inherit UserControl()
 
   do
-    let onOutcome =
-      function
-      | PlanFinished id -> props.OnFinished id
-      | WizardCancelled -> props.OnCancelled()
-
     let program = Program.mkProgram init (update props onOutcome) (view props)
 
     this.Content <- Program.runWith props program

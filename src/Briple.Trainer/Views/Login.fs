@@ -4,7 +4,7 @@ module Briple.Trainer.Views.Login
 // provider name, endpoint and model come from Env.defaultSettings. The
 // token goes through the env credentials capability; when the OS vault
 // fails, the token falls back to settings.json and the page answers with
-// the huge insecure warning and the reason.
+// the huge insecure warning, the reason, and an explicit continue.
 
 open System
 open System.Globalization
@@ -32,7 +32,7 @@ type LoginPageProps = {
 // --- the page state ---
 
 /// What the last save produced; the vault-failed case is the fallback the
-/// page must shout about.
+/// page must shout about before the user continues.
 type SaveState =
   | Idle
   | VaultSaved
@@ -51,9 +51,12 @@ type Model = { Token: string; State: SaveState }
 type Msg =
   | SetToken of string
   | SaveRequested
+  | ContinueInsecure
 
 let init(props: LoginPageProps) = { Token = ""; State = Idle }, Cmd.none
 
+/// The update closes over the done callback: a secured save continues
+/// immediately; the insecure one waits for the explicit continue.
 let update (props: LoginPageProps) (msg: Msg) (model: Model) =
   match msg with
   | SetToken value -> { model with Token = value }, Cmd.none
@@ -61,17 +64,25 @@ let update (props: LoginPageProps) (msg: Msg) (model: Model) =
   | SaveRequested ->
     let state =
       match props.Save model.Token with
-      | Ok CredentialSave.Secured -> VaultSaved
+      | Ok CredentialSave.Secured ->
+        props.OnDone()
+        VaultSaved
       | Ok(CredentialSave.Insecure reason) -> VaultFailed reason
       | Error reason -> SaveFailed reason
 
     { model with State = state }, Cmd.none
 
+  | ContinueInsecure ->
+    props.OnDone()
+    model, Cmd.none
+
 // --- the view ---
 
-/// The huge insecure warning: red block, the failure cause, and what it
-/// means that the token sits in plain text.
-let insecureWarning(culture: CultureInfo, reason: string) : Control =
+/// The huge insecure warning: red block, the failure cause, what it
+/// means that the token sits in plain text, and the way out.
+let insecureWarning
+  (culture: CultureInfo, reason: string, dispatch: Dispatch<Msg>)
+  : Control =
   StackPanel()
     .Spacing(8.0)
     .Margin(0.0, 12.0)
@@ -91,10 +102,16 @@ let insecureWarning(culture: CultureInfo, reason: string) : Control =
         .FontSize(14.0)
         .TextWrapping(TextWrapping.Wrap)
         .Foreground(errorBrush)
-      :> Control
+      :> Control,
+      primaryButton(
+        get(culture, Keys.loginContinue),
+        fun () -> dispatch ContinueInsecure
+      )
     )
 
-let outcomeView(culture: CultureInfo, state: SaveState) : Control =
+let outcomeView
+  (culture: CultureInfo, state: SaveState, dispatch: Dispatch<Msg>)
+  : Control =
   match state with
   | Idle -> TextBlock() :> Control
   | VaultSaved ->
@@ -103,7 +120,7 @@ let outcomeView(culture: CultureInfo, state: SaveState) : Control =
       .FontFamily(font)
       .Foreground(muted)
     :> Control
-  | VaultFailed reason -> insecureWarning(culture, reason)
+  | VaultFailed reason -> insecureWarning(culture, reason, dispatch)
   | SaveFailed reason ->
     TextBlock()
       .Text(getf(culture, Keys.loginFailed, [ reason :> obj ]))
@@ -146,7 +163,8 @@ let view
 
   // the outcome area follows the save state stream
   let outcome =
-    model |> Observable.map(fun m -> box(outcomeView(culture, m.State)))
+    model
+    |> Observable.map(fun m -> box(outcomeView(culture, m.State, dispatch)))
 
   let outcomeHost = ContentControl()
 

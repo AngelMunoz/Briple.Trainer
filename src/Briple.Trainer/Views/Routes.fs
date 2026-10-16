@@ -2,25 +2,28 @@ module Briple.Trainer.Views.Routes
 
 open System
 open Avalonia.Controls
-open Avalonia.Threading
 open Navs
 open Navs.Avalonia
 
 open IcedTasks
 
+open Serilog
+
 open Briple.Trainer.Components
 open Briple.Trainer.Components.AthleteList
 open Briple.Trainer.Components.NewAthleteForm
 open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Requests
 open Briple.Trainer.Env
 open Briple.Trainer.Persistence
+open Briple.Trainer.Stores
 open Briple.Trainer.Views
 
 let inline go(nav: INavigable<Control>, url: string) : unit =
   asyncEx {
     match! nav.Navigate url with
     | Ok() -> ()
-    | Error e -> eprintfn $"navigation to {url} failed: %O{e}"
+    | Error e -> Log.Error("navigation to {Url} failed: {Error}", url, string e)
   }
   |> Async.StartImmediate
 
@@ -32,7 +35,7 @@ let inline orEmpty(what: string) : Result<'a list, exn> -> 'a list =
   function
   | Ok xs -> xs
   | Error e ->
-    eprintfn $"{what} failed: %O{e}"
+    Log.Error(e, "{Que} failed", what)
     []
 
 /// A guid route parameter as an active pattern: `match ctx with GuidParam
@@ -41,24 +44,24 @@ let inline orEmpty(what: string) : Result<'a list, exn> -> 'a list =
 let inline (|GuidParam|_|) (name: string) (ctx: RouteContext) =
   ctx.getParam<Guid> name
 
+/// The athletes page: the component over the live list; no data loads
+/// here, the store fills it.
 let athletesPage
-  (env: #IProvideStore & #IProvideCulture, nav: INavigable<Control>)
-  : Async<Control> = asyncEx {
-  let! athletes = env.Store.ListAthletes()
-
-  let loaded = athletes |> orEmpty "athlete list"
-
-  return
-    AthleteList.view {
+  (env: #IProvideStores & #IProvideCulture, nav: INavigable<Control>)
+  : Control =
+  AthleteList(
+    {
       Culture = env.Culture
-      Athletes = loaded
-      OnNew = fun () -> go(nav, "/athletes/new")
-      OnOpen = fun id -> go(nav, $"/athletes/{id}")
-    }
-}
+      Athletes = env.Stores.Athletes.Observe()
+    },
+    fun event ->
+      match event with
+      | AthleteList.NewRequested -> go(nav, "/athletes/new")
+      | AthleteList.OpenRequested id -> go(nav, $"/athletes/{id}")
+  )
 
 let newAthletePage
-  (env: #IProvideStore & #IProvideCulture, nav: INavigable<Control>)
+  (env: #IProvideStores & #IProvideCulture, nav: INavigable<Control>)
   : Control =
   NewAthleteForm(
     { Culture = env.Culture },
@@ -66,9 +69,9 @@ let newAthletePage
       match event with
       | NewAthleteForm.Saved athlete ->
         asyncEx {
-          match! env.Store.AddAthlete athlete with
+          match! env.Stores.Athletes.Add athlete with
           | Ok _ -> go(nav, "/")
-          | Error e -> eprintfn $"athlete save failed: %O{e}"
+          | Error e -> Log.Error(e, "athlete save failed")
         }
         |> Async.StartImmediate
       | NewAthleteForm.Cancelled -> go(nav, "/")
@@ -76,7 +79,7 @@ let newAthletePage
 
 let detailPage
   (
-    env: #IProvideStore & #IProvideCulture,
+    env: #IProvideStore & #IProvideStores & #IProvideCulture,
     athleteId: Guid,
     nav: INavigable<Control>
   ) : Async<Control> = asyncEx {
@@ -84,75 +87,92 @@ let detailPage
 
   match athlete with
   | Error e ->
-    eprintfn $"athlete load failed: %O{e}"
+    Log.Error(e, "athlete load failed")
     return TextBlock(Text = string e.Message)
   | Ok ValueNone -> return notFound()
   | Ok(ValueSome athlete) ->
-    let! memories = env.Store.ListMemories athleteId
-    let! plans = env.Store.ListPlans athleteId
-
-    let memories = memories |> orEmpty "memory list"
-    let plans = plans |> orEmpty "plan list"
-
+    // the page subscribes to the plan store; the emissions fill it
     return
-      Athletes.AthleteDetailPage {
-        Culture = env.Culture
-        Store = env.Store
-        Athlete = athlete
-        Memories = memories
-        Plans = plans
-        OnGenerate = fun () -> go(nav, $"/athletes/{athleteId}/generate")
-        OnReview =
-          fun planId -> go(nav, $"/athletes/{athleteId}/review/{planId}")
-      }
+      Athletes.AthleteDetailPage(
+        {
+          Culture = env.Culture
+          Plans = env.Stores.Plans
+          Athlete = athlete
+        },
+        fun event ->
+          match event with
+          | Athletes.Event.GenerateRequested ->
+            go(nav, $"/athletes/{athleteId}/generate")
+          | Athletes.Event.ReviewRequested planId ->
+            go(nav, $"/athletes/{athleteId}/review/{planId}")
+      )
 }
 
 let wizardPage
   (
-    env: #IProvideStore & #IProvideCulture & #IProvideAgent,
+    env: #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideAgent,
     athleteId: Guid,
     nav: INavigable<Control>
   ) : Async<Control> = asyncEx {
+  // point-in-time snapshots: the wizard works over what exists now
   let! athlete = env.Store.FindAthlete athleteId
   let! memories = env.Store.ListMemories athleteId
   let! plans = env.Store.ListPlans athleteId
 
-  let proposals =
-    memories
-    |> orEmpty "memory list"
-    |> List.filter(fun entity -> entity.Memory.Status = Proposed)
+  let entities = memories |> orEmpty "memory list"
+
+  let proposals = entities |> List.filter(fun e -> e.Memory.Status = Proposed)
 
   let previous =
     plans |> orEmpty "plan list" |> List.tryLast |> ValueOption.ofOption
 
+  // what this generation carries: the athlete-scoped confirmations plus
+  // the plan-scoped ones of the plan being adjusted
+  let confirmed =
+    relevantMemories(
+      entities |> List.map(fun entity -> entity.Memory, entity.PlanId),
+      previous |> ValueOption.map _.Id
+    )
+
   match athlete with
   | Ok(ValueSome athlete) ->
     return
-      Generate.WizardPage {
-        Culture = env.Culture
-        Store = env.Store
-        Agent = env
-        Athlete = athlete
-        Proposals = proposals
-        Previous = previous
-        OnFinished =
-          fun planId -> go(nav, $"/athletes/{athleteId}/review/{planId}")
-        OnCancelled = fun () -> go(nav, $"/athletes/{athleteId}")
-      }
+      Generate.WizardPage(
+        {
+          Culture = env.Culture
+          Store = env.Store
+          Memories = env.Stores.Memories
+          Plans = env.Stores.Plans
+          Agent = env
+          Athlete = athlete
+          Confirmed = confirmed
+          Proposals = proposals
+          Previous = previous
+        },
+        fun outcome ->
+          match outcome with
+          | Generate.PlanFinished planId ->
+            go(nav, $"/athletes/{athleteId}/review/{planId}")
+          | Generate.WizardCancelled -> go(nav, $"/athletes/{athleteId}")
+      )
   | _ -> return notFound()
 }
 
 let reviewPage
-  (env: #IProvideStore & #IProvideCulture & #IProvideHost, planId: Guid)
-  : Async<Control> = asyncEx {
-  let! plan = env.Store.FindPlan planId
+  (
+    env: #IProvideStores & #IProvideCulture & #IProvideHost & #IProvideAgent,
+    planId: Guid
+  ) : Async<Control> = asyncEx {
+  let! plan = env.Stores.Plans.Find planId
 
   match plan with
   | Ok(ValueSome entity) ->
     return
       Review.ReviewPage {
         Culture = env.Culture
-        Store = env.Store
+        Plans = env.Stores.Plans
+        Memories = env.Stores.Memories
+        Agent = env
         Host = env.Host
         Entity = entity
       }
@@ -170,7 +190,7 @@ let loginPage
 
 let build
   (env:
-    #IProvideStore & #IProvideCulture & #IProvideLanguage & #IProvideHost & #IProvideAgent & #IProvideCredentials)
+    #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideLanguage & #IProvideHost & #IProvideAgent & #IProvideCredentials)
   : Routes =
   // the shell opens on the login when there is no working token yet
   let initial =

@@ -47,20 +47,6 @@ let tests =
       for field in allFields do
         Expect.isNonEmpty (originsFor field) $"field %A{field} without origins")
 
-    testCase "the athlete's adjustments come from the profile" (fun () ->
-      let athlete = {
-        Name = "Pepe"
-        Gender = Male
-        Variants = [ "3dias"; "5dias" ]
-        Goals = []
-        Focus = []
-      }
-
-      Expect.equal
-        (ofProfile athlete)
-        [ AthleteVariants([ "3dias"; "5dias" ], AthleteProfile) ]
-        "the profile fixes the variants")
-
     testCase "a confirmed memory reflects into the next request" (fun () ->
       let memory = memoryOf Light (Exercise "Press de banca") [ Load 10 ]
 
@@ -89,7 +75,9 @@ let tests =
 
       Expect.equal (classOf TrainerBrief) FromBrief "brief"
 
-      Expect.equal (classOf Agent) FromAgent "agent")
+      Expect.equal (classOf Agent) FromAgent "agent"
+
+      Expect.equal (classOf Derived) FromDerived "derived")
 
     testCase "proposed and discarded contribute no parameters" (fun () ->
       let proposal = mark Light (Exercise "Press de banca") |> consolidate

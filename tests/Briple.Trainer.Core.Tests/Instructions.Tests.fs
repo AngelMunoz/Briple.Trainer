@@ -2,7 +2,8 @@ module Briple.Trainer.Core.Tests.Instructions.Tests
 
 // The parameters → instructions mapping: the fixed part comes from the
 // request, the asked part is the inventory's agent-origin fields, and
-// the forbidden part depends on the flow.
+// the forbidden part depends on the flow: the new plan owns its volume,
+// the adjustment keeps the previous counts.
 
 open System
 open Expecto
@@ -16,17 +17,60 @@ open Briple.Trainer.Core.Instructions
 let private maleAthlete = {
   Name = "hombre"
   Gender = Male
-  Variants = [ "3dias"; "5dias" ]
   Goals = []
-  Focus = []
 }
 
 let private brief = {
   Goal = Hypertrophy
+  Frequency = TresDias
+  Emphasis = []
   Adjustments = []
-  Focus = []
-  RirPerWeek = []
-  Variants = [ "3dias"; "5dias" ]
+}
+
+/// One male block, variant 3dias, one week, `perDay` exercises per day.
+let private planWith perDay : Plan = {
+  Version = 1
+  Title = "anterior"
+  Weeks = 1
+  Generated = ""
+  Origin = ""
+  Blocks = [
+    {
+      Gender = Male
+      Variants = [
+        {
+          Id = "3dias"
+          Title = None
+          Weeks = [
+            {
+              Number = 1
+              Days = [
+                {
+                  Id = "Lunes"
+                  Title = None
+                  Notes = []
+                  Exercises = [
+                    for order in 1..perDay ->
+                      {
+                        Circuit = "A"
+                        Laps = "3"
+                        Order = order
+                        Name = $"Ejercicio {order}"
+                        Reps = "6-8"
+                        Rir = "1-2"
+                        Rest = "3 min"
+                        Notes = "-"
+                      }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+  Extras = []
 }
 
 let private agentFields = [
@@ -50,27 +94,16 @@ let private agentFields = [
 let tests =
   testList "Instructions" [
     testCase
-      "the adjustment fixes the parameters, asks the agent fields and forbids three things"
+      "the adjustment fixes the previous counts and forbids changing them"
       (fun () ->
-        let candidate: Plan = {
-          Version = 1
-          Title = "anterior"
-          Weeks = 4
-          Generated = ""
-          Origin = ""
-          Blocks = []
-          Extras = []
-        }
-
-        let request =
-          adjustmentRequest maleAthlete [] 4 brief candidate [ ("3dias", 68) ]
+        let request = adjustmentRequest maleAthlete [] 4 brief (planWith 2)
 
         let instructions = forAdjustment request
 
         Expect.contains
           instructions.Fix
-          (VariantCount("3dias", 68, TrainerBrief))
-          "the counts get fixed"
+          (VariantCount("3dias", 2, PreviousPlan))
+          "the kept counts get fixed"
 
         Expect.equal
           instructions.Ask
@@ -82,27 +115,28 @@ let tests =
           [ ChangeCounts; OutsideVariants; LeaveFormat ]
           "the adjustment touches neither counts, options nor format")
 
-    testCase "the new plan fixes and forbids its counts" (fun () ->
-      let instructions =
-        forNew(newRequest maleAthlete [] 4 brief [ ("3dias", 68) ])
+    testCase "the new plan owns its volume" (fun () ->
+      let instructions = forNew(newRequest maleAthlete [] 4 brief)
 
-      Expect.contains
-        instructions.Fix
-        (VariantCount("3dias", 68, TrainerBrief))
-        "the brief's counts get fixed"
+      Expect.isFalse
+        (instructions.Fix
+         |> List.exists(function
+           | VariantCount _ -> true
+           | _ -> false))
+        "no counts get fixed"
 
       Expect.equal
         instructions.Forbid
-        [ ChangeCounts; OutsideVariants; LeaveFormat ]
-        "the new plan touches neither counts, options nor format")
+        [ OutsideVariants; LeaveFormat ]
+        "the new plan touches neither options nor format")
 
-    testCase "the weeks and the variants get fixed in both flows" (fun () ->
-      let newPlan = forNew(newRequest maleAthlete [] 4 brief [])
+    testCase "the weeks and the frequency get fixed in both flows" (fun () ->
+      let newPlan = forNew(newRequest maleAthlete [] 4 brief)
 
       Expect.contains newPlan.Fix (PlanWeeks(4, TrainerBrief)) "weeks fixed"
 
       Expect.contains
         newPlan.Fix
-        (AthleteVariants([ "3dias"; "5dias" ], TrainerBrief))
-        "variants fixed")
+        (AthleteVariants([ "3dias" ], TrainerBrief))
+        "the frequency variant is fixed")
   ]
