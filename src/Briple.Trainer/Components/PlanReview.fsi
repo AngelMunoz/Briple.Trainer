@@ -45,15 +45,12 @@ type Model = {
   Plan: Plan
   /// The last committed tree: what revert restores.
   Snapshot: Plan
-  /// The week the pivot shows.
-  Week: int
   /// The row in explicit edit mode.
   Editing: RowPath voption
 }
 
 type Msg =
   | SetField of path: RowPath * field: ExerciseField * text: string
-  | SetWeek of week: int
   | BeginEdit of path: RowPath
   | EndEdit
   | RevertEdit

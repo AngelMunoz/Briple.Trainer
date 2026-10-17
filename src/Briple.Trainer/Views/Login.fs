@@ -17,6 +17,7 @@ open NXUI.Extensions
 
 open MVUish.Avalonia
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Env
 open Briple.Trainer.Strings
@@ -61,7 +62,9 @@ let update (props: LoginPageProps) (msg: Msg) (model: Model) =
   match msg with
   | SetToken value -> { model with Token = value }, Cmd.none
 
-  | SaveRequested ->
+  // one save attempt per terminal state: a double click or a revisit of
+  // the cached page must not write the credential twice
+  | SaveRequested when model.State = Idle ->
     let state =
       match props.Save model.Token with
       | Ok CredentialSave.Secured ->
@@ -71,6 +74,8 @@ let update (props: LoginPageProps) (msg: Msg) (model: Model) =
       | Error reason -> SaveFailed reason
 
     { model with State = state }, Cmd.none
+
+  | SaveRequested -> model, Cmd.none
 
   | ContinueInsecure ->
     props.OnDone()
@@ -103,8 +108,9 @@ let insecureWarning
         .TextWrapping(TextWrapping.Wrap)
         .Foreground(errorBrush)
       :> Control,
-      primaryButton(
+      iconPrimaryButton(
         get(culture, Keys.loginContinue),
+        Icons.alertCircle,
         fun () -> dispatch ContinueInsecure
       )
     )
@@ -153,10 +159,13 @@ let view
         |> ignore)
 
   let complete =
-    model |> Observable.map(fun m -> not(String.IsNullOrWhiteSpace m.Token))
+    model
+    |> Observable.map(fun m ->
+      m.State = Idle && not(String.IsNullOrWhiteSpace m.Token))
 
   let saveCommand =
-    let save = command(t Keys.loginSave, fun () -> dispatch SaveRequested)
+    let save =
+      iconCommand(t Keys.loginSave, Icons.key, fun () -> dispatch SaveRequested)
 
     save.IsEnabled(complete)
 
@@ -173,6 +182,7 @@ let view
   fluentPage {
     Title = t Keys.loginTitle
     Commands = [ saveCommand ]
+    Footer = noFooter
     Body =
       StackPanel()
         .Spacing(12.0)

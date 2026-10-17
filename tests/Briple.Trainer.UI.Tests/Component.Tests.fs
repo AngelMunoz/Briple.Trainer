@@ -92,18 +92,8 @@ let private textBoxes(root: Control) : TextBox list =
     | _ -> None)
   |> List.ofSeq
 
-let private buttons(root: Control) : Button list =
-  root.GetVisualDescendants()
-  |> Seq.choose(fun visual ->
-    match visual with
-    | :? Button as button -> Some button
-    | _ -> None)
-  |> List.ofSeq
-
 let private clickText(root: Control, text: string) : unit =
-  buttons root
-  |> List.tryFind(fun button -> string button.Content = text)
-  |> Option.iter click
+  buttonWithText(root, text) |> Option.iter click
 
 let tests =
   testList "components" [
@@ -311,6 +301,7 @@ let tests =
             {
               Culture = es
               Athlete = sampleAthlete
+              HasPrevious = false
             },
             events.Add
           ))
@@ -334,7 +325,7 @@ let tests =
       Expect.isTrue reported "the submit event reached the parent"
 
       match List.ofSeq events with
-      | Briple.Trainer.Components.WizardBrief.Event.Submitted(weeks, brief) :: _ ->
+      | Briple.Trainer.Components.WizardBrief.Event.Submitted(weeks, brief, _) :: _ ->
         Expect.equal weeks 4 "the default period"
 
         Expect.equal brief.Goal Hypertrophy "the athlete's first goal"

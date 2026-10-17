@@ -8,6 +8,7 @@ open NXUI.Extensions
 
 open MVUish.Avalonia
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
@@ -25,6 +26,8 @@ type Model = {
   Name: string
   Gender: Gender voption
   Goals: PlanGoal list
+  /// One save per form: true after the profile left as an event.
+  Saved: bool
 }
 
 type Msg =
@@ -58,6 +61,7 @@ let init(_: Props) =
     Name = ""
     Gender = ValueNone
     Goals = [ Hypertrophy ]
+    Saved = false
   },
   Cmd.none
 
@@ -78,9 +82,11 @@ let update (onEvent: Event -> unit) (msg: Msg) (model: Model) =
 
     { model with Goals = goals }, Cmd.none
 
-  | Save when isValid model ->
+  // the event leaves once: a second click (double click, or a revisit of
+  // a still-alive form) must not insert the athlete again
+  | Save when isValid model && not model.Saved ->
     onEvent(Saved(profileOf model))
-    model, Cmd.none
+    { model with Saved = true }, Cmd.none
 
   | Save -> model, Cmd.none
 
@@ -108,7 +114,8 @@ type NewAthleteForm(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as 
   do
 
     let view (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
-      let saveEnabled = model |> Observable.map isValid
+      let saveEnabled =
+        model |> Observable.map(fun m -> isValid m && not m.Saved)
 
       let nameEntry = entry(t Keys.athleteName, "", (SetName >> dispatch))
 
@@ -136,13 +143,19 @@ type NewAthleteForm(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as 
         StackPanel().Spacing(6.0).Children rows :> Control
 
       let saveCommand =
-        let save = command(t Keys.athleteSave, (fun () -> dispatch Save))
+        let save =
+          iconCommand(
+            t Keys.athleteSave,
+            Icons.contentSave,
+            (fun () -> dispatch Save)
+          )
 
         save.IsEnabled(saveEnabled)
 
       fluentPage {
         Title = t Keys.athletesNew
         Commands = [ saveCommand ]
+        Footer = noFooter
         Body =
           StackPanel()
             .Spacing(4.0)

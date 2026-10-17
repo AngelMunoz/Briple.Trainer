@@ -18,6 +18,7 @@ open MVUish.Avalonia.Collections
 
 open Serilog
 
+open Briple.Trainer
 open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Agent
@@ -235,8 +236,9 @@ let view
 
   let interpret =
     let primary =
-      primaryButton(
+      iconPrimaryButton(
         t Keys.reviewNoteInterpret,
+        Icons.commentText,
         (fun () -> dispatch InterpretRequested)
       )
 

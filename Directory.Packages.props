@@ -15,8 +15,8 @@
     <PackageVersion Include="Avalonia.Headless" Version="12.0.5" />
     <PackageVersion Include="NXUI" Version="12.0.0" />
     <PackageVersion Include="NXUI.Desktop" Version="12.0.0" />
-    <PackageVersion Include="Navs.Avalonia" Version="1.0.0" />
-    <PackageVersion Include="MVUish.Avalonia" Version="1.0.0" />
+    <PackageVersion Include="Navs.Avalonia" Version="1.0.1" />
+    <PackageVersion Include="MVUish.Avalonia" Version="1.0.1" />
 
     <!-- Data -->
     <PackageVersion Include="Donald" Version="10.1.0" />

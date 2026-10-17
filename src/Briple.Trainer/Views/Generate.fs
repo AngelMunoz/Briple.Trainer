@@ -21,6 +21,7 @@ open IcedTasks
 
 open MVUish.Avalonia
 
+open Briple.Trainer
 open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Agent
@@ -222,7 +223,9 @@ type Step =
   | Memories
   | Brief
   | Generating
-  | Failed of reasons: string array * last: (int * Brief) voption
+  | Failed of
+    reasons: string array *
+    last: (int * Brief * WizardBrief.Mode) voption
   | Done of plan: Plan * advisories: Violation list * kind: string
 
 type Model = {
@@ -230,8 +233,9 @@ type Model = {
   /// One entry per card that decided, confirm or discard.
   Decided: Guid list
   Confirmed: (Guid * Memory) list
-  /// The last submitted brief, what a retry re-sends.
-  LastBrief: (int * Brief) voption
+  /// The last submitted brief, what a retry re-sends: period, brief and
+  /// the starting point the user picked.
+  LastBrief: (int * Brief * WizardBrief.Mode) voption
   /// The generation in flight; cancelled when the wizard exits.
   Run: CancellationTokenSource voption
 }
@@ -240,7 +244,7 @@ type Msg =
   | MemoryDecided of MemoryReview.Event
   | NextRequested
   | BackToMemories
-  | BriefSubmitted of weeks: int * brief: Brief
+  | BriefSubmitted of weeks: int * brief: Brief * mode: WizardBrief.Mode
   | GenerationDone of run: Run * kind: string
   | GenerationFailed of reason: string
   | PlanSaved of Result<PlanEntity, exn>
@@ -329,14 +333,18 @@ let update
 
   | BackToMemories -> { model with Step = Memories }, Cmd.none
 
-  | BriefSubmitted(weeks, brief) ->
+  | BriefSubmitted(weeks, brief, mode) ->
     let request =
       requestOf {
         Athlete = props.Athlete.Profile
         Memories = props.Confirmed @ (model.Confirmed |> List.map snd)
         Weeks = weeks
         Brief = brief
-        Previous = props.Previous
+        // a fresh plan starts clean: no previous counts to honor
+        Previous =
+          (match props.Previous, mode with
+           | ValueSome entity, WizardBrief.Mode.Adjust -> ValueSome entity
+           | _ -> ValueNone)
       }
 
     let kind = kindOf request
@@ -365,7 +373,7 @@ let update
     {
       model with
           Step = Generating
-          LastBrief = ValueSome(weeks, brief)
+          LastBrief = ValueSome(weeks, brief, mode)
           Run = ValueSome cts
     },
     Cmd.batch [ record; run ]
@@ -461,7 +469,12 @@ let memoriesStep
     List.length m.Decided = List.length props.Proposals
 
   let next =
-    let step = command(t Keys.wizardNext, (fun () -> dispatch NextRequested))
+    let step =
+      iconButton(
+        t Keys.wizardNext,
+        Icons.chevronRight,
+        (fun () -> dispatch NextRequested)
+      )
 
     step.IsEnabled(model |> Observable.map resolved)
 
@@ -478,14 +491,30 @@ let memoriesStep
         )
     |]
 
-    if Array.isEmpty cards then
+    if Array.isEmpty cards && List.isEmpty props.Confirmed then
       label(t Keys.memoriesEmpty)
     else
-      linesPanel cards
+      linesPanel [|
+        // the confirmed adjustments riding this generation: visible, so
+        // the step never claims there is nothing to carry
+        if not(List.isEmpty props.Confirmed) then
+          yield sectionTitle(t Keys.wizardApplies)
+
+          for memory in props.Confirmed do
+            if not(String.IsNullOrWhiteSpace memory.Summary) then
+              yield
+                TextBlock()
+                  .Text(memory.Summary)
+                  .FontFamily(font)
+                  .Foreground(muted)
+
+        yield! cards
+      |]
 
   fluentPage {
     Title = t Keys.wizardStepMemories
-    Commands = [ next ]
+    Commands = []
+    Footer = { Secondary = []; Primary = [ next ] }
     Body = decided
     Measure = 760.0
   }
@@ -495,20 +524,27 @@ let briefStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
 
   let submitted(event: WizardBrief.Event) =
     match event with
-    | WizardBrief.Event.Submitted(weeks, brief) ->
-      dispatch(BriefSubmitted(weeks, brief))
+    | WizardBrief.Event.Submitted(weeks, brief, mode) ->
+      dispatch(BriefSubmitted(weeks, brief, mode))
     | WizardBrief.Event.Cancelled -> dispatch Cancelled
 
-  let back = command(t Keys.wizardBack, (fun () -> dispatch BackToMemories))
+  let back =
+    iconButton(
+      t Keys.wizardBack,
+      Icons.chevronLeft,
+      (fun () -> dispatch BackToMemories)
+    )
 
   fluentPage {
     Title = t Keys.wizardStepBrief
-    Commands = [ back ]
+    Commands = []
+    Footer = { Secondary = [ back ]; Primary = [] }
     Body =
       WizardBrief.WizardBrief(
         {
           Culture = props.Culture
           Athlete = props.Athlete.Profile
+          HasPrevious = props.Previous.IsSome
         },
         submitted
       )
@@ -519,14 +555,16 @@ let briefStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
 /// status line, and the way out in the command bar.
 let generatingStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
   let cancel =
-    command(
+    iconButton(
       get(props.Culture, Keys.wizardCancelGeneration),
+      Icons.stop,
       (fun () -> dispatch Cancelled)
     )
 
   fluentPage {
     Title = get(props.Culture, Keys.wizardTitle)
-    Commands = [ cancel ]
+    Commands = []
+    Footer = { Secondary = [ cancel ]; Primary = [] }
     Body =
       StackPanel()
         .Spacing(12.0)
@@ -543,7 +581,7 @@ let generatingStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
 type FailureContext = {
   Props: WizardPageProps
   Reasons: string array
-  Last: (int * Brief) voption
+  Last: (int * Brief * WizardBrief.Mode) voption
 }
 
 let failedStep(ctx: FailureContext, dispatch: Dispatch<Msg>) : Control =
@@ -551,22 +589,28 @@ let failedStep(ctx: FailureContext, dispatch: Dispatch<Msg>) : Control =
 
   // the retry re-sends the last brief instead of walking the steps again
   let retry =
-    command(
+    iconPrimaryButton(
       t Keys.wizardRetry,
+      Icons.refresh,
       fun () ->
         ctx.Last
-        |> ValueOption.iter(fun (weeks, brief) ->
-          dispatch(BriefSubmitted(weeks, brief)))
+        |> ValueOption.iter(fun (weeks, brief, mode) ->
+          dispatch(BriefSubmitted(weeks, brief, mode)))
     )
 
-  let exit = command(t Keys.wizardExit, (fun () -> dispatch Cancelled))
+  let exit =
+    iconButton(t Keys.wizardExit, Icons.logout, (fun () -> dispatch Cancelled))
 
   let reasonsPanel =
     linesPanel [| for reason in ctx.Reasons -> statusLine(reason, true) |]
 
   fluentPage {
     Title = t Keys.errorTitle
-    Commands = [ retry; exit ]
+    Commands = []
+    Footer = {
+      Secondary = [ exit ]
+      Primary = [ retry ]
+    }
     Body = reasonsPanel
     Measure = 760.0
   }
@@ -606,10 +650,17 @@ let doneStep(ctx: DoneContext, dispatch: Dispatch<Msg>) : Control =
 
   fluentPage {
     Title = t Keys.wizardTitle
-    Commands = [
-      command(t Keys.wizardConfirm, (fun () -> dispatch ConfirmPlan))
-      command(t Keys.wizardDiscard, discard)
-    ]
+    Commands = []
+    Footer = {
+      Secondary = [ iconButton(t Keys.wizardDiscard, Icons.delete, discard) ]
+      Primary = [
+        iconPrimaryButton(
+          t Keys.wizardConfirm,
+          Icons.check,
+          (fun () -> dispatch ConfirmPlan)
+        )
+      ]
+    }
     Body =
       StackPanel()
         .Spacing(8.0)
@@ -669,6 +720,7 @@ let view
     fluentPage {
       Title = get(props.Culture, Keys.wizardTitle)
       Commands = []
+      Footer = noFooter
       Body = label(get(props.Culture, Keys.settingsMissing))
       Measure = 560.0
     }
@@ -692,7 +744,7 @@ let view
 
     TransitioningContentControl()
       .PageTransition(CrossFade(TimeSpan.FromMilliseconds 150.0))
-      .Content(steps)
+      .Content(steps.ToBinding())
 
 type WizardPage
   (props: WizardPageProps, [<InlineIfLambda>] onOutcome: Outcome -> unit) as this

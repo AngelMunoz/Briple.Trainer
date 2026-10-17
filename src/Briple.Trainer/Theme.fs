@@ -14,6 +14,9 @@ let errorBrush = SolidColorBrush(Color.Parse "#C0392B") :> IBrush
 
 let chip = SolidColorBrush(Color.Parse "#D8D8D8") :> IBrush
 
+/// The accent at a wash: tonal fills for badges and selection states.
+let accentTonal = SolidColorBrush(Color.Parse "#DCE9F7") :> IBrush
+
 /// The OS UI font, like CSS `system-ui`: the platform FontManager
 /// resolves it (Segoe UI on Windows, the system default on macOS/Linux).
 let font = FontFamily.Default

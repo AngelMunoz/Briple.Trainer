@@ -166,6 +166,62 @@ let tests =
           (Some entity.Id)
           "the open event carries the id"
       }
+
+      test "a store emission after detach still reaches the list" {
+        let entity name = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = name
+            Gender = Female
+            Goals = [ Strength ]
+          }
+        }
+
+        let source = new BehaviorSubject<AthleteEntity list>([ entity "Ana" ])
+
+        let control =
+          probeUi(fun () ->
+            AthleteList({ Culture = es; Athletes = source }, ignore))
+
+        // the test owns the window so the detach is exact
+        let host =
+          probeUi(fun () ->
+            let window = Window(Content = control)
+            window.Show() |> ignore
+            window)
+
+        let ana =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun c -> buttonWithText(c, "Ana") |> Option.isSome)
+          )
+
+        Expect.isTrue ana "the first row rendered"
+
+        // leaving the page detaches the control: a cached route does
+        // exactly this on every navigation away
+        onUi(fun () -> host.Content <- null)
+
+        settle()
+
+        // the store emits while nobody is watching
+        onUi(fun () -> source.OnNext([ entity "Ana"; entity "Beto" ]))
+
+        settle()
+
+        // coming back re-attaches the same control instance
+        mount control
+
+        let beto =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun c -> buttonWithText(c, "Beto") |> Option.isSome)
+          )
+
+        Expect.isTrue beto "the late emission reached the reattached list"
+      }
     ]
 
     testList "new athlete form" [
@@ -241,6 +297,74 @@ let tests =
 
           Expect.equal athlete.Goals [ Hypertrophy ] "the default goal rides"
         | None -> failtest "no saved profile"
+      }
+
+      test "a double click on save reports one athlete" {
+        let events = ResizeArray<Event>()
+
+        let form =
+          probeUi(fun () -> NewAthleteForm({ Culture = es }, events.Add))
+
+        mount form
+
+        onUi(fun () ->
+          match textBoxes form with
+          | nameEntry :: _ -> nameEntry.Text <- "Pepe"
+          | [] -> failtest "the name entry did not render")
+
+        settle()
+
+        let genderRendered =
+          waitFor(
+            2000,
+            (fun () -> form),
+            (fun f -> buttonWithText(f, "Hombre") |> Option.isSome)
+          )
+
+        Expect.isTrue genderRendered "the gender radios did not render"
+
+        settle()
+
+        let genderRadio =
+          match probeUi(fun () -> buttonWithText(form, "Hombre")) with
+          | Some button -> button
+          | None -> failtest "the gender radio vanished"
+
+        onUi(fun () -> click genderRadio)
+
+        settle()
+
+        let saveButton =
+          match probeUi(fun () -> buttonWithText(form, "Guardar")) with
+          | Some button -> button
+          | None -> failtest "the save button did not render"
+
+        // a double click: two clicks land before the form has any reason
+        // to consider itself done
+        onUi(fun () -> click saveButton)
+        onUi(fun () -> click saveButton)
+
+        let reported =
+          waitFor(
+            2000,
+            (fun () -> List.ofSeq events),
+            fun current ->
+              current
+              |> List.exists(function
+                | Saved _ -> true
+                | Cancelled -> false)
+          )
+
+        Expect.isTrue reported "the save event reached the parent"
+
+        let saves =
+          events
+          |> Seq.filter(function
+            | Saved _ -> true
+            | Cancelled -> false)
+          |> Seq.length
+
+        Expect.equal saves 1 "one save per form, no matter the clicks"
       }
     ]
 

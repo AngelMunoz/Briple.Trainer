@@ -33,12 +33,17 @@ type RouteDeps<'T
   and 'T :> IProvideLogging> = 'T
 
 let inline go(nav: INavigable<Control>, url: string) : unit =
-  asyncEx {
-    match! nav.Navigate url with
-    | Ok() -> ()
-    | Error e -> Log.Error("navigation to {Url} failed: {Error}", url, string e)
-  }
-  |> Async.StartImmediate
+  // one navigation at a time: a request that lands while another runs
+  // feeds the transition window where cached views re-parent and the
+  // renderer dies ("Visual already has a parent")
+  if nav.StateSnapshot <> NavigationState.Navigating then
+    asyncEx {
+      match! nav.Navigate url with
+      | Ok() -> ()
+      | Error e ->
+        Log.Error("navigation to {Url} failed: {Error}", url, string e)
+    }
+    |> Async.StartImmediate
 
 let inline notFound() : Control = TextBlock(Text = "not found")
 
@@ -230,8 +235,9 @@ let settingsPage
 
 /// The agent gate, shared by every data route: the app's data sits
 /// behind the provider token, and without one the navigation sends the
-/// user to connect it. Only the login and the settings stay open. The
-/// routes carry no cache, so the guard runs on every activation.
+/// user to connect it. Only the login and the settings stay open. Routes
+/// are cached, and Navs 1.0.1 runs guards on cached URLs too, so the
+/// gate holds on every activation.
 let requiresAgent(env: #IProvideAgent) : GuardResponse =
   if env.AgentAvailable then
     GuardResponse.Continue
@@ -267,6 +273,9 @@ let build(env: RouteDeps<'T>) : IRouter<Control> =
       "/athletes/new",
       fun _ nav -> newAthletePage(env, nav)
     )
+    // a fresh form every visit: a cached one keeps its model alive and
+    // resubmits the athlete on the next save click
+    |> Navs.Route.cache CacheStrategy.NoCache
     |> gate
 
     Navs.Route.define<Control>(

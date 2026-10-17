@@ -12,6 +12,7 @@ open FSharp.Control.Reactive
 
 open MVUish.Avalonia
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Plan.Projection
 open Briple.Trainer.Core.Plan.Parser
@@ -47,15 +48,12 @@ type Model = {
   Plan: Plan
   /// The last committed tree: what revert restores.
   Snapshot: Plan
-  /// The week the pivot shows.
-  Week: int
   /// The row in explicit edit mode.
   Editing: RowPath voption
 }
 
 type Msg =
   | SetField of path: RowPath * field: ExerciseField * text: string
-  | SetWeek of week: int
   | BeginEdit of path: RowPath
   | EndEdit
   | RevertEdit
@@ -64,7 +62,6 @@ let init(props: Props) =
   {
     Plan = props.Parsed.Plan
     Snapshot = props.Parsed.Plan
-    Week = 1
     Editing = ValueNone
   },
   Cmd.none
@@ -125,8 +122,6 @@ let update (msg: Msg) (model: Model) =
     let edited = model.Plan |> editExercise path (applyField field text)
     { model with Plan = edited }, Cmd.none
 
-  | SetWeek week -> { model with Week = week }, Cmd.none
-
   | BeginEdit path -> { model with Editing = ValueSome path }, Cmd.none
 
   | EndEdit ->
@@ -177,18 +172,21 @@ let exerciseRow(ctx: SectionContext, path: RowPath, exercise: Exercise) =
   let rowPath = { path with Order = exercise.Order }
 
   let readBody(current: Exercise) : Control =
-    StackPanel()
-      .Orientation(Orientation.Horizontal)
-      .Spacing(8.0)
+    // the button claims the right edge and centers; the line fills the
+    // rest, so it wraps instead of pushing the button off the measure
+    DockPanel()
       .Children(
+        iconButton(
+          get(ctx.Props.Culture, Keys.planEdit),
+          Icons.pencil,
+          fun () -> ctx.Dispatch(BeginEdit rowPath)
+        )
+          .VerticalAlignment(VerticalAlignment.Center)
+          .DockRight(),
         TextBlock()
           .Text(exerciseLine current)
           .FontFamily(font)
-          .TextWrapping(TextWrapping.Wrap),
-        button(
-          get(ctx.Props.Culture, Keys.planEdit),
-          fun () -> ctx.Dispatch(BeginEdit rowPath)
-        )
+          .TextWrapping(TextWrapping.Wrap)
       )
 
   let editBody: Control =
@@ -220,12 +218,14 @@ let exerciseRow(ctx: SectionContext, path: RowPath, exercise: Exercise) =
           .Orientation(Orientation.Horizontal)
           .Spacing(8.0)
           .Children(
-            button(
+            iconButton(
               get(ctx.Props.Culture, Keys.planDone),
+              Icons.check,
               fun () -> ctx.Dispatch EndEdit
             ),
-            button(
+            iconButton(
               get(ctx.Props.Culture, Keys.planRevert),
+              Icons.undo,
               fun () -> ctx.Dispatch RevertEdit
             )
           )
@@ -313,8 +313,8 @@ let variantSection(ctx: SectionContext, path: RowPath, variant: Variant) =
         | None -> weekLabel
       )
       .FontWeight(FontWeight.Bold)
-      .Foreground(Brushes.White)
-      .Background(accent)
+      .Foreground(accent)
+      .Background(accentTonal)
       .Padding(8.0, 2.0)
       .FontFamily(font)
       .HorizontalAlignment(HorizontalAlignment.Left)
@@ -392,33 +392,45 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
 
         StackPanel().Spacing(12.0).Children sections
 
-      // the week pivot: one tab per week, the header carries the number
+      // the week pivot: headers land eagerly, the content builds on
+      // first selection — no four copies of the plan up front, and the
+      // TabControl owns the selection
       let weeks = weekNumbers |> List.distinct |> Array.ofList
-
-      let tabOf(weekNumber: int) : TabItem =
-        TabItem(
-          Header =
-            TextBlock()
-              .Text(getf(props.Culture, Keys.planWeek, [ weekNumber :> obj ]))
-              .FontSize(16.0)
-              .FontWeight(FontWeight.SemiBold)
-              .FontFamily(font),
-          Content = render weekNumber
-        )
 
       let weekTabs = TabControl()
 
-      weeks
-      |> Array.iter(fun weekNumber ->
-        weekTabs.Items.Add(tabOf weekNumber) |> ignore)
+      let built: Control option array = Array.create weeks.Length None
+
+      let tabs =
+        weeks
+        |> Array.map(fun weekNumber ->
+          TabItem(
+            Header =
+              TextBlock()
+                .Text(
+                  getf(props.Culture, Keys.planWeek, [ weekNumber :> obj ])
+                )
+                .FontSize(16.0)
+                .FontWeight(FontWeight.SemiBold)
+                .FontFamily(font)
+          ))
+
+      let show(index: int) : unit =
+        if index >= 0 && index < weeks.Length then
+          match built[index] with
+          | None ->
+            let content = render weeks[index]
+            built[index] <- Some content
+            tabs[index].Content <- content
+          | Some _ -> ()
+
+      tabs |> Array.iter(weekTabs.Items.Add >> ignore)
+
+      weekTabs.SelectionChanged.Add(fun _ -> show weekTabs.SelectedIndex)
 
       weekTabs.SelectedIndex <- 0
 
-      weekTabs.SelectionChanged.Add(fun _ ->
-        let index = weekTabs.SelectedIndex
-
-        if index >= 0 && index < weeks.Length then
-          dispatch(SetWeek weeks[index]))
+      show 0
 
       StackPanel().Spacing(8.0).Children(weekTabs)
 

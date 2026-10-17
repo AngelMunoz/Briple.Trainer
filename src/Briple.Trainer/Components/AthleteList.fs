@@ -12,6 +12,7 @@ open NXUI.Extensions
 open MVUish.Avalonia
 open MVUish.Avalonia.Collections
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
@@ -105,16 +106,26 @@ let view
     list
 
   let emptyState =
-    label(t Keys.athletesEmpty)
+    StackPanel()
+      .Spacing(8.0)
+      .Children(
+        glyph(Icons.accountSearchOutline, 32.0, muted),
+        label(t Keys.athletesEmpty)
+      )
       .IsVisible(model |> Observable.map(fun m -> List.isEmpty m.Athletes))
 
   let newCommand =
-    command(t Keys.athletesNew, (fun () -> onEvent Event.NewRequested))
+    iconCommand(
+      t Keys.athletesNew,
+      Icons.plus,
+      (fun () -> onEvent Event.NewRequested)
+    )
 
   fluentPage(
     {
       Title = t Keys.athletesTitle
       Commands = [ newCommand ]
+      Footer = noFooter
       Body = StackPanel().Spacing(8.0).Children(emptyState, rows)
       Measure = 760.0
     }

@@ -14,9 +14,15 @@ open Avalonia.Controls
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Requests
 
+/// What the brief builds on when a previous plan exists: chain on it or
+/// start clean. The choice rides the Submitted event.
+type Mode =
+  | Adjust
+  | Fresh
+
 /// What the form reports to its parent.
 type Event =
-  | Submitted of weeks: int * brief: Brief
+  | Submitted of weeks: int * brief: Brief * mode: Mode
   | Cancelled
 
 /// The form inputs.
@@ -24,6 +30,8 @@ type Event =
 type Props = {
   Culture: CultureInfo
   Athlete: Athlete
+  /// True when there is a previous plan this generation could adjust.
+  HasPrevious: bool
 }
 
 type Model = {
@@ -31,6 +39,7 @@ type Model = {
   Goal: PlanGoal
   Frequency: VariantFrequency
   Emphasis: Emphasis list
+  Mode: Mode
 }
 
 type Msg =
@@ -38,6 +47,7 @@ type Msg =
   | SetGoal of PlanGoal
   | SetFrequency of VariantFrequency
   | ToggleEmphasis of Emphasis
+  | SetMode of Mode
   | Submit
   | Cancel
 

@@ -509,6 +509,21 @@ module Keys =
   [<Literal>]
   let advisoryTimedWithRir = "advisory.timedWithRir"
 
+  [<Literal>]
+  let reviewUnsaved = "review.unsaved"
+
+  [<Literal>]
+  let wizardApplies = "wizard.applies"
+
+  [<Literal>]
+  let wizardMode = "wizard.mode"
+
+  [<Literal>]
+  let wizardModeAdjust = "wizard.mode.adjust"
+
+  [<Literal>]
+  let wizardModeNew = "wizard.mode.new"
+
 /// One user-facing failure line: the action that failed and the cause,
 /// clipped to a readable length. The full detail belongs to the log.
 let friendly(culture: CultureInfo, action: string, reason: string) : string =

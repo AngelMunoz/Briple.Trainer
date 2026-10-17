@@ -502,6 +502,21 @@ module Keys =
   [<Literal>]
   val advisoryTimedWithRir: string = "advisory.timedWithRir"
 
+  [<Literal>]
+  val reviewUnsaved: string = "review.unsaved"
+
+  [<Literal>]
+  val wizardApplies: string = "wizard.applies"
+
+  [<Literal>]
+  val wizardMode: string = "wizard.mode"
+
+  [<Literal>]
+  val wizardModeAdjust: string = "wizard.mode.adjust"
+
+  [<Literal>]
+  val wizardModeNew: string = "wizard.mode.new"
+
 /// One user-facing failure line: the action that failed and the cause,
 /// clipped to a readable length.
 val friendly: culture: CultureInfo * action: string * reason: string -> string

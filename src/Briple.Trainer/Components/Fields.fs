@@ -8,12 +8,24 @@ open NXUI.Extensions
 
 open Briple.Trainer.Theme
 
-/// The page contract: title, page commands and body, read inside a
-/// measure so prose and forms keep a readable width.
+/// Flow actions of a page footer: secondaries keep to the left,
+/// primaries claim the right.
+[<Struct>]
+type FooterBar = {
+  Secondary: Control list
+  Primary: Control list
+}
+
+/// The empty footer, for pages without flow actions.
+let noFooter: FooterBar = { Secondary = []; Primary = [] }
+
+/// The page contract: title, page commands, flow actions and body, read
+/// inside a measure so prose and forms keep a readable width.
 [<Struct>]
 type PageChrome = {
   Title: string
   Commands: Control list
+  Footer: FooterBar
   Body: Control
   Measure: float
 }
@@ -80,6 +92,56 @@ let inline command
   : CommandBarButton =
   CommandBarButton(Label = text).OnClickHandler(fun _ _ -> onClick())
 
+/// A 20px glyph that takes the text color of its container.
+let inline icon(geometry: StreamGeometry) : Control =
+  PathIcon(Data = geometry) :> Control
+
+/// A glyph at an explicit size and tone, for standalone composition.
+let inline glyph
+  (geometry: StreamGeometry, size: float, tone: IBrush)
+  : Control =
+  PathIcon(Data = geometry, Width = size, Height = size, Foreground = tone)
+  :> Control
+
+/// A glyph before its label: the content of an action control.
+let inline glyphLabel(geometry: StreamGeometry, text: string) : Control =
+  StackPanel()
+    .Orientation(Orientation.Horizontal)
+    .Spacing(8.0)
+    .Children(icon geometry, TextBlock().Text(text).FontFamily(font))
+
+/// A plain button with a glyph before its label.
+let inline iconButton
+  (
+    text: string,
+    geometry: StreamGeometry,
+    [<InlineIfLambda>] onClick: unit -> unit
+  ) : Button =
+  button(text, onClick).Content(glyphLabel(geometry, text))
+
+/// The primary action button with a glyph before its label.
+let inline iconPrimaryButton
+  (
+    text: string,
+    geometry: StreamGeometry,
+    [<InlineIfLambda>] onClick: unit -> unit
+  ) : Button =
+  let flat = iconButton(text, geometry, onClick)
+
+  flat.Classes.Add("accent")
+
+  flat
+
+/// One CommandBar command with its glyph left of the label.
+let inline iconCommand
+  (
+    text: string,
+    geometry: StreamGeometry,
+    [<InlineIfLambda>] onClick: unit -> unit
+  ) : CommandBarButton =
+  CommandBarButton(Label = text, Icon = PathIcon(Data = geometry))
+    .OnClickHandler(fun _ _ -> onClick())
+
 let inline chipButton
   (text: string, [<InlineIfLambda>] onClick: unit -> unit, isOn: bool)
   : Button =
@@ -96,9 +158,10 @@ let inline choiceChips
     selected: string,
     [<InlineIfLambda>] onPick: string -> unit
   ) : Control =
-  StackPanel().Orientation(Orientation.Horizontal).Spacing(6.0).Children [|
+  WrapPanel().Children [|
     for option in options ->
       chipButton(option, (fun () -> onPick option), (option = selected))
+        .Margin(0.0, 0.0, 6.0, 6.0)
       :> Control
   |]
 
@@ -108,13 +171,14 @@ let inline multiChips
     selected: string list,
     [<InlineIfLambda>] onToggle: string -> unit
   ) : Control =
-  StackPanel().Orientation(Orientation.Horizontal).Spacing(6.0).Children [|
+  WrapPanel().Children [|
     for option in options ->
       chipButton(
         option,
         (fun () -> onToggle option),
         (List.contains option selected)
       )
+        .Margin(0.0, 0.0, 6.0, 6.0)
       :> Control
   |]
 
@@ -144,7 +208,7 @@ let inline reactiveChoiceChips
         )
   |]
 
-  StackPanel().Orientation(Orientation.Horizontal).Spacing(6.0).Children(rows)
+  WrapPanel().Children [| for row in rows -> row.Margin(0.0, 0.0, 6.0, 6.0) |]
 
 let inline reactiveMultiChips
   (
@@ -170,9 +234,10 @@ let inline reactiveMultiChips
             else
               Brushes.Black :> IBrush)
         )
+        .Margin(0.0, 0.0, 6.0, 6.0)
   |]
 
-  StackPanel().Orientation(Orientation.Horizontal).Spacing(6.0).Children(rows)
+  WrapPanel().Children(rows)
 
 let inline entry
   (
@@ -204,11 +269,10 @@ let inline radioRow
   let row(option: string) : Control =
     RadioButton(Content = option, GroupName = group, FontFamily = font)
       .IsChecked(Nullable((option = initial)))
+      .Margin(0.0, 0.0, 12.0, 4.0)
       .OnClickHandler(fun _ _ -> onPick option)
 
-  StackPanel().Orientation(Orientation.Horizontal).Spacing(12.0).Children [|
-    for option in options -> row option
-  |]
+  WrapPanel().Children [| for option in options -> row option |]
 
 /// One checkbox whose checked state follows an observable.
 let inline checkRow
@@ -226,13 +290,15 @@ let inline checkRow
 
   check.OnClickHandler(fun _ _ -> onToggle())
 
-/// The CommandBar of a page: the commands land as primaries, dynamic
-/// overflow takes the rest when the window runs narrow.
+/// The CommandBar of a page: labels ride beside the glyphs (nothing
+/// truncates), the commands land as primaries and dynamic overflow takes
+/// the rest when the window runs narrow.
 let inline commandBar(commands: Control list) : Control =
   let bar =
     CommandBar()
       .IsDynamicOverflowEnabled(true)
-      .HorizontalAlignment(HorizontalAlignment.Left)
+      .DefaultLabelPosition(CommandBarDefaultLabelPosition.Right)
+      .HorizontalAlignment(HorizontalAlignment.Stretch)
 
   commands
   |> List.iter(fun command ->
@@ -243,32 +309,65 @@ let inline commandBar(commands: Control list) : Control =
 
   bar
 
-/// The full page: the CommandBar under the title, the body below, all
-/// inside the measure.
+/// The full page: the title and CommandBar pinned along the top edge,
+/// the flow actions (when any) pinned to the bottom, and the body
+/// scrolling in between, centered inside the measure.
 let inline fluentPage(chrome: PageChrome) : Control =
-  let header =
+  let header: Control =
     match chrome.Commands with
-    | [] -> pageTitle chrome.Title
+    | [] ->
+      StackPanel()
+        .Margin(24.0, 16.0, 24.0, 0.0)
+        .Children(pageTitle chrome.Title)
     | commands ->
       StackPanel()
         .Spacing(12.0)
+        .Margin(24.0, 16.0, 24.0, 0.0)
         .Children(pageTitle chrome.Title, commandBar commands)
 
-  ScrollViewer()
-    .Content(
-      StackPanel()
-        .Margin(24.0)
-        .Spacing(12.0)
-        .MaxWidth(chrome.Measure)
-        .HorizontalAlignment(HorizontalAlignment.Left)
-        .Children(header, chrome.Body)
-    )
+  let body =
+    ScrollViewer()
+      .Content(
+        StackPanel()
+          .Margin(24.0)
+          .Spacing(12.0)
+          .MaxWidth(chrome.Measure)
+          .Children(chrome.Body)
+      )
+
+  match chrome.Footer.Secondary, chrome.Footer.Primary with
+  | [], [] ->
+    DockPanel().LastChildFill(true).Children(header.DockTop(), body) :> Control
+  | secondary, primary ->
+    // flow actions: secondaries keep left, primaries claim the right
+    let footer =
+      DockPanel()
+        .LastChildFill(false)
+        .Margin(24.0, 12.0, 24.0, 16.0)
+        .Children(
+          StackPanel()
+            .Orientation(Orientation.Horizontal)
+            .Spacing(8.0)
+            .Children(List.toArray secondary)
+            .DockLeft(),
+          StackPanel()
+            .Orientation(Orientation.Horizontal)
+            .Spacing(8.0)
+            .Children(List.toArray primary)
+            .DockRight()
+        )
+
+    DockPanel()
+      .LastChildFill(true)
+      .Children(header.DockTop(), footer.DockBottom(), body)
+    :> Control
 
 /// A body-only page: the page contract without commands.
 let inline page(titleText: string, content: Control) : Control =
   fluentPage {
     Title = titleText
     Commands = []
+    Footer = noFooter
     Body = content
     Measure = 760.0
   }

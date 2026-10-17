@@ -59,6 +59,8 @@
     <Compile Include="Toasts.fs" />
     <Compile Include="Dialogs.fsi" />
     <Compile Include="Dialogs.fs" />
+    <Compile Include="Icons.fsi" />
+    <Compile Include="Icons.fs" />
     <Compile Include="Components\Fields.fsi" />
     <Compile Include="Components\Fields.fs" />
     <Compile Include="Components\AthleteList.fsi" />

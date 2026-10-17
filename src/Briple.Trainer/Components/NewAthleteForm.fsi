@@ -28,6 +28,8 @@ type Model = {
   Name: string
   Gender: Gender voption
   Goals: PlanGoal list
+  /// True once the profile left as an event; a spent form saves nothing.
+  Saved: bool
 }
 
 type Msg =

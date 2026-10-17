@@ -9,6 +9,7 @@ open NXUI.Extensions
 
 open MVUish.Avalonia
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Strings
@@ -168,12 +169,14 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
             .Orientation(Orientation.Horizontal)
             .Spacing(8.0)
             .Children(
-              button(
+              iconButton(
                 get(culture, Keys.memoriesConfirm),
+                Icons.check,
                 fun () -> dispatch Accept
               ),
-              button(
+              iconButton(
                 get(culture, Keys.memoriesDiscard),
+                Icons.delete,
                 fun () -> dispatch Discard
               )
             )

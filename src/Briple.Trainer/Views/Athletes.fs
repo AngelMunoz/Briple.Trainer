@@ -18,6 +18,7 @@ open NXUI.Extensions
 open MVUish.Avalonia
 open MVUish.Avalonia.Collections
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
@@ -144,8 +145,9 @@ let view
         .Children(
           pageTitle props.Athlete.Profile.Name,
           profileLine(props.Culture, props.Athlete.Profile),
-          primaryButton(
+          iconPrimaryButton(
             t Keys.plansGenerate,
+            Icons.flash,
             (fun () -> onEvent Event.GenerateRequested)
           )
             .HorizontalAlignment(HorizontalAlignment.Left),

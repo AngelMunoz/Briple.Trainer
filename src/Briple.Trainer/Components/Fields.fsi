@@ -8,13 +8,26 @@ module Briple.Trainer.Components.Fields
 
 open System
 open Avalonia.Controls
+open Avalonia.Media
 
-/// The page contract: title, page commands and body, read inside a
-/// measure so prose and forms keep a readable width.
+/// Flow actions of a page footer: secondaries keep to the left,
+/// primaries claim the right.
+[<Struct>]
+type FooterBar = {
+  Secondary: Control list
+  Primary: Control list
+}
+
+/// The empty footer, for pages without flow actions.
+val noFooter: FooterBar
+
+/// The page contract: title, page commands, flow actions and body, read
+/// inside a measure so prose and forms keep a readable width.
 [<Struct>]
 type PageChrome = {
   Title: string
   Commands: Control list
+  Footer: FooterBar
   Body: Control
   Measure: float
 }
@@ -47,6 +60,38 @@ val inline hyperlinkButton:
 /// One command for the page's CommandBar.
 val inline command:
   text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> CommandBarButton
+
+/// A 20px glyph that takes the text color of its container: PathIcon as
+/// the Fluent theme sizes and colors it.
+val inline icon: geometry: StreamGeometry -> Control
+
+/// A glyph at an explicit size and tone, for standalone composition.
+val inline glyph:
+  geometry: StreamGeometry * size: float * tone: IBrush -> Control
+
+/// A glyph before its label: the content of an action control.
+val inline glyphLabel: geometry: StreamGeometry * text: string -> Control
+
+/// A plain button with a glyph before its label.
+val inline iconButton:
+  text: string *
+  geometry: StreamGeometry *
+  [<InlineIfLambda>] onClick: (unit -> unit) ->
+    Button
+
+/// The primary action button with a glyph before its label.
+val inline iconPrimaryButton:
+  text: string *
+  geometry: StreamGeometry *
+  [<InlineIfLambda>] onClick: (unit -> unit) ->
+    Button
+
+/// One CommandBar command with its glyph left of the label.
+val inline iconCommand:
+  text: string *
+  geometry: StreamGeometry *
+  [<InlineIfLambda>] onClick: (unit -> unit) ->
+    CommandBarButton
 
 /// A single-choice chip row; the selected option renders in accent.
 val inline choiceChips:

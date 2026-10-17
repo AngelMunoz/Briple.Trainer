@@ -474,4 +474,19 @@
   <data name="advisory.timedWithRir" xml:space="preserve">
     <value>'{0}' timed with an RIR target instead of rpe or zone</value>
   </data>
+  <data name="review.unsaved" xml:space="preserve">
+    <value>You have unsaved changes</value>
+  </data>
+  <data name="wizard.applies" xml:space="preserve">
+    <value>Confirmed adjustments that will apply</value>
+  </data>
+  <data name="wizard.mode" xml:space="preserve">
+    <value>Starting point</value>
+  </data>
+  <data name="wizard.mode.adjust" xml:space="preserve">
+    <value>Adjust the previous plan</value>
+  </data>
+  <data name="wizard.mode.new" xml:space="preserve">
+    <value>Fresh plan from scratch</value>
+  </data>
 </root>

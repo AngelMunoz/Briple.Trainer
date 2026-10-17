@@ -11,6 +11,7 @@ open System.IO
 open System.Reactive.Subjects
 
 open Avalonia
+open Avalonia.Animation
 open Avalonia.Controls
 open Avalonia.Controls.Templates
 open Avalonia.Input
@@ -76,9 +77,14 @@ let errorWindow(message: string) =
     .Content(page(message, TextBlock().Text("").FontFamily(font)))
     .FontFamily(font)
 
-/// One pane entry: the label follows the language, the target is a URL.
+/// One pane entry: the label follows the language, the glyph marks the
+/// section, the target is a URL.
 [<Struct>]
-type NavItem = { Label: string; Target: string }
+type NavItem = {
+  Label: string
+  Target: string
+  Icon: StreamGeometry
+}
 
 let buildShell(env: AppEnv) =
   let router = Routes.build env
@@ -98,6 +104,10 @@ let buildShell(env: AppEnv) =
 
   currentUrl |> Observable.subscribe history.Sync |> ignore
 
+  // the pane state as one stream: the rows hide their labels, the pane
+  // title hides itself and the SplitView follows, all from one source
+  let paneOpen = new BehaviorSubject<bool>(true)
+
   // the pane rows: a button per section, the active one follows the URL
   let paneList =
     let items =
@@ -109,13 +119,17 @@ let buildShell(env: AppEnv) =
           {
             Label = get(culture, Keys.navAthletes)
             Target = "/"
+            Icon = Icons.accountGroup
           }
           {
             Label = get(culture, Keys.navSettings)
             Target = "/settings"
+            Icon = Icons.settings
           }
         ])
 
+    // the glyph rides a 48px rail that matches the compact pane: open,
+    // the label shows beside it; collapsed, the glyph centers on the rail
     let navRow(item: NavItem) : Control =
       let active =
         currentUrl
@@ -123,7 +137,24 @@ let buildShell(env: AppEnv) =
           History.sectionOf url = ValueSome item.Target)
 
       Button()
-        .Content(item.Label)
+        .Content(
+          DockPanel()
+            .Children(
+              // the selection bar: the Fluent accent strip on the rail
+              Border().Width(3.0).Background(accent).IsVisible(active),
+              Border()
+                .Width(48.0)
+                .Child(
+                  PathIcon(Data = item.Icon)
+                    .HorizontalAlignment(HorizontalAlignment.Center)
+                ),
+              TextBlock()
+                .Text(item.Label)
+                .FontFamily(font)
+                .VerticalAlignment(VerticalAlignment.Center)
+                .IsVisible(paneOpen)
+            )
+        )
         .HorizontalContentAlignment(HorizontalAlignment.Left)
         .Foreground(
           active |> Observable.map(fun on -> if on then accent else text)
@@ -154,7 +185,12 @@ let buildShell(env: AppEnv) =
       Button.ContentProperty :> AvaloniaProperty,
       env.LanguageChanged
       |> Observable.map(fun language ->
-        box(get(Language.toCulture language, Keys.commonBack)))
+        box(
+          glyphLabel(
+            Icons.arrowLeft,
+            get(Language.toCulture language, Keys.commonBack)
+          )
+        ))
     )
     |> ignore
 
@@ -172,15 +208,42 @@ let buildShell(env: AppEnv) =
 
   Env.applyTheme((env :> IProvideTheme).Theme)
 
+  // the Fluent window: the content reaches behind the system caption and
+  // the surface is Mica where the platform offers it, falling back to
+  // acrylic blur and plain transparency. The root margin keeps the pane
+  // below the caption.
+  window.ExtendClientAreaToDecorationsHint <- true
+
+  window.ExtendClientAreaTitleBarHeightHint <- 32.0
+
+  window.TransparencyLevelHint <-
+    ResizeArray [
+      WindowTransparencyLevel.Mica
+      WindowTransparencyLevel.AcrylicBlur
+      WindowTransparencyLevel.Transparent
+    ]
+
+  window.Background <- Brushes.Transparent
+
+  // the window title names the section, under the current language
+  let titleOf(url: string) =
+    let app = get(env.Culture, Keys.appTitle)
+
+    match History.sectionOf url with
+    | ValueSome "/" -> $"{app} — {get(env.Culture, Keys.navAthletes)}"
+    | ValueSome "/settings" -> $"{app} — {get(env.Culture, Keys.navSettings)}"
+    | _ -> app
+
+  currentUrl
+  |> Observable.subscribe(fun url -> window.Title <- titleOf url)
+  |> ignore
+
   // a language switch refreshes the chrome and re-navigates the current
-  // URL: the routes carry no cache, so every page rebuilds under the new
-  // culture
+  // URL; the pages stay cached (the culture snapshot inside them is the
+  // known gap the reactive-culture plan addresses)
   env.LanguageChanged
   |> Observable.skip 1
-  |> Observable.subscribe(fun _ ->
-    window.Title <- get(env.Culture, Keys.appTitle)
-
-    Routes.go(router, currentUrl.Value))
+  |> Observable.subscribe(fun _ -> Routes.go(router, currentUrl.Value))
   |> ignore
 
   window.KeyBindings.Add(
@@ -193,6 +256,18 @@ let buildShell(env: AppEnv) =
   let pane =
     StackPanel()
       .Children(
+        // the pane toggle: the only way in and out of the compact rail
+        Button()
+          .Content(
+            Border()
+              .Width(48.0)
+              .Child(
+                PathIcon(Data = Icons.menu)
+                  .HorizontalAlignment(HorizontalAlignment.Center)
+              )
+          )
+          .HorizontalContentAlignment(HorizontalAlignment.Left)
+          .OnClickHandler(fun _ _ -> paneOpen.OnNext(not paneOpen.Value)),
         TextBlock()
           .Text(
             env.LanguageChanged
@@ -201,7 +276,8 @@ let buildShell(env: AppEnv) =
           )
           .FontSize(18.0)
           .FontWeight(FontWeight.SemiBold)
-          .Margin(16.0, 20.0, 16.0, 12.0),
+          .Margin(16.0, 8.0, 16.0, 12.0)
+          .IsVisible(paneOpen),
         paneList
       )
 
@@ -211,10 +287,16 @@ let buildShell(env: AppEnv) =
       .Margin(12.0, 8.0)
       .Children(backButton.DockLeft())
 
-  // the router outlet renders the current route with the library's
-  // default page transition
+  // the router outlet swaps cached views with no page transition: the
+  // library default crossfade/slide keeps two presenters alive, and
+  // re-parenting a cached singleton through that window is what killed
+  // the renderer ("Visual already has a parent"). An empty composite
+  // completes instantly; null here falls back to the library default.
   let outlet = RouterOutlet()
   outlet.Router <- router
+
+  outlet.PageTransition <-
+    CompositePageTransition(PageTransitions = ResizeArray [])
 
   let content =
     DockPanel().LastChildFill(true).Children(chrome.DockTop(), outlet)
@@ -228,12 +310,29 @@ let buildShell(env: AppEnv) =
       .Pane(pane)
       .Content(content)
 
-  // the dialog overlay rides on top of everything
-  window.Content(Grid().Children(split, Dialogs.host)) |> ignore
+  // the pane stream drives the SplitView: the hamburger, the rows and
+  // the open state read one source
+  paneOpen
+  |> Observable.subscribe(fun isOpen -> split.IsPaneOpen <- isOpen)
+  |> ignore
 
-  // narrow windows collapse the pane to the compact rail
+  // the dialog overlay rides on top of everything; the top margin keeps
+  // the content below the extended caption
+  window.Content(
+    Grid().Margin(0.0, 32.0, 0.0, 0.0).Children(split, Dialogs.host)
+  )
+  |> ignore
+
+  // narrow windows snap the pane to the rail and wide ones open it, but
+  // only when the window crosses the line: a manual toggle survives
+  let mutable wideWindow = true
+
   window.SizeChanged.Add(fun size ->
-    split.IsPaneOpen <- size.NewSize.Width >= 700.0)
+    let wide = size.NewSize.Width >= 700.0
+
+    if wide <> wideWindow then
+      wideWindow <- wide
+      paneOpen.OnNext wide)
 
   window
 

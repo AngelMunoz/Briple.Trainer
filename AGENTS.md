@@ -42,9 +42,9 @@ providers (DeepSeek, Meta Muse), all OpenAI-compatible.
   `Parser.fs` (XParsec; line classifier + recursive block assembler),
   `Projection.fs` (pure date to session). Core never references the consumer
   app or any UI package.
-- `src/Briple.Trainer/` - the Avalonia desktop consumer. No SukiUI: strict
-  Metro theme on top of SimpleTheme (CornerRadius 0, one accent, Segoe UI),
-  NXUI for UI authored in code.
+- `src/Briple.Trainer/` - the Avalonia desktop consumer. Fluent theme as
+  shipped: one accent, Mica window, labels-right CommandBars, Dock-based
+  page skeleton, MDI Light glyph paths. NXUI for UI authored in code.
 - `tests/Briple.Trainer.Core.Tests/` - the Expecto suite over Core.
 - `Directory.Packages.props` - central package management; every package
   version lives there, never in a project file.

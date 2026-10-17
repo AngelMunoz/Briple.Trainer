@@ -5,6 +5,7 @@ open System.Globalization
 open Avalonia.Controls
 open NXUI.Extensions
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Env
 open Briple.Trainer.Strings
@@ -72,7 +73,7 @@ type SettingsPage(props: SettingsPageProps) as this =
         .Spacing(8.0)
         .Children(
           label(t Keys.settingsMissingToken),
-          primaryButton(t Keys.settingsConnect, props.OpenLogin)
+          iconPrimaryButton(t Keys.settingsConnect, Icons.key, props.OpenLogin)
         )
 
   do
@@ -81,6 +82,7 @@ type SettingsPage(props: SettingsPageProps) as this =
       fluentPage {
         Title = t Keys.navSettings
         Commands = []
+        Footer = noFooter
         Body =
           StackPanel()
             .Spacing(4.0)

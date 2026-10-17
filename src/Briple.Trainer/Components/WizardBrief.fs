@@ -11,19 +11,28 @@ open NXUI.Extensions
 open MVUish.Avalonia
 open MVUish.Avalonia.Collections
 
+open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Strings
 
+/// What the brief builds on when a previous plan exists: chain on it or
+/// start clean. The choice rides the Submitted event.
+type Mode =
+  | Adjust
+  | Fresh
+
 type Event =
-  | Submitted of weeks: int * brief: Brief
+  | Submitted of weeks: int * brief: Brief * mode: Mode
   | Cancelled
 
 [<Struct>]
 type Props = {
   Culture: CultureInfo
   Athlete: Athlete
+  /// True when there is a previous plan this generation could adjust.
+  HasPrevious: bool
 }
 
 type Model = {
@@ -31,6 +40,7 @@ type Model = {
   Goal: PlanGoal
   Frequency: VariantFrequency
   Emphasis: Emphasis list
+  Mode: Mode
 }
 
 type Msg =
@@ -38,6 +48,7 @@ type Msg =
   | SetGoal of PlanGoal
   | SetFrequency of VariantFrequency
   | ToggleEmphasis of Emphasis
+  | SetMode of Mode
   | Submit
   | Cancel
 
@@ -91,6 +102,7 @@ let init(props: Props) =
       props.Athlete.Goals |> List.tryHead |> Option.defaultValue Hypertrophy
     Frequency = TresDias
     Emphasis = []
+    Mode = Adjust
   },
   Cmd.none
 
@@ -120,6 +132,8 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
 
     { model with Emphasis = picked }, Cmd.none
 
+  | SetMode mode -> { model with Mode = mode }, Cmd.none
+
   | Submit ->
     onEvent(
       Event.Submitted(
@@ -129,7 +143,8 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
           Frequency = model.Frequency
           Emphasis = model.Emphasis
           Adjustments = []
-        }
+        },
+        model.Mode
       )
     )
 
@@ -191,6 +206,31 @@ type WizardBrief(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as thi
       let initialGoal =
         athleteGoals |> List.tryHead |> Option.defaultValue Hypertrophy
 
+      // the starting point, only when there is a previous plan: silent
+      // adjustment was a surprise the user did not pick
+      let modeRow: Control =
+        if props.HasPrevious then
+          let modeName mode =
+            match mode with
+            | Adjust -> t Keys.wizardModeAdjust
+            | Fresh -> t Keys.wizardModeNew
+
+          field(
+            t Keys.wizardMode,
+            fun () ->
+              radioRow(
+                [ modeName Adjust; modeName Fresh ],
+                "brief-mode",
+                modeName Adjust,
+                fun picked ->
+                  dispatch(
+                    SetMode(if picked = modeName Fresh then Fresh else Adjust)
+                  )
+              )
+          )
+        else
+          StackPanel() :> Control
+
       let weeksChips =
         radioRow(
           [ for week in 1..4 -> $"{week}" ],
@@ -246,14 +286,23 @@ type WizardBrief(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as thi
         list
 
       let generateButton =
-        primaryButton(t Keys.wizardGenerate, (fun () -> dispatch Submit))
+        iconPrimaryButton(
+          t Keys.wizardGenerate,
+          Icons.play,
+          (fun () -> dispatch Submit)
+        )
 
       let cancelButton =
-        button(t Keys.athleteCancel, (fun () -> dispatch Cancel))
+        iconButton(
+          t Keys.athleteCancel,
+          Icons.arrowLeft,
+          (fun () -> dispatch Cancel)
+        )
 
       StackPanel()
         .Spacing(4.0)
         .Children(
+          modeRow,
           field(t Keys.wizardWeeks, (fun () -> weeksChips)),
           field(t Keys.wizardGoal, (fun () -> goalChips)),
           field(t Keys.wizardFrequency, (fun () -> frequencyChips)),

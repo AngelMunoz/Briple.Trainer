@@ -19,6 +19,7 @@ open IcedTasks
 
 open Serilog
 
+open Briple.Trainer
 open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Core.Plan.Parser
@@ -45,17 +46,23 @@ let inline invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
   fluentPage {
     Title = get(props.Culture, Keys.reviewTitle)
     Commands = []
+    Footer = noFooter
     Body =
-      TextBlock()
-        .Text(
-          getf(
-            props.Culture,
-            Keys.reviewInvalid,
-            [ Parse.describe failure :> obj ]
-          )
+      StackPanel()
+        .Spacing(8.0)
+        .Children(
+          glyph(Icons.alertCircle, 24.0, errorBrush),
+          TextBlock()
+            .Text(
+              getf(
+                props.Culture,
+                Keys.reviewInvalid,
+                [ Parse.describe failure :> obj ]
+              )
+            )
+            .Foreground(errorBrush)
+            .FontFamily(font)
         )
-        .Foreground(errorBrush)
-        .FontFamily(font)
     Measure = 760.0
   }
 
@@ -72,8 +79,9 @@ let inline saveCommand
     latest: BehaviorSubject<Plan option>,
     status: BehaviorSubject<string>
   ) : CommandBarButton =
-  command(
+  iconCommand(
     get(props.Culture, Keys.reviewSave),
+    Icons.contentSave,
     fun () ->
       latest.Value
       |> Option.iter(fun _ ->
@@ -147,7 +155,7 @@ let inline exportCommand
       }
       |> Async.Start
 
-    command(t Keys.reviewExport, pick))
+    iconCommand(t Keys.reviewExport, Icons.download, pick))
 
 // --- the page ---
 
@@ -204,11 +212,19 @@ type ReviewPage(props: ReviewPageProps) as this =
         fluentPage {
           Title = get(props.Culture, Keys.reviewTitle)
           Commands = commands
+          Footer = noFooter
           Body =
             StackPanel()
               .Spacing(8.0)
               .Children(
                 TextBlock().Text(status).Foreground(muted).FontFamily(font),
+                // the edits live in `latest`: this keeps the pending work
+                // visible until Guardar persists it
+                TextBlock()
+                  .Text(get(props.Culture, Keys.reviewUnsaved))
+                  .Foreground(muted)
+                  .FontFamily(font)
+                  .IsVisible(latest |> Observable.map Option.isSome),
                 review,
                 notes
               )
