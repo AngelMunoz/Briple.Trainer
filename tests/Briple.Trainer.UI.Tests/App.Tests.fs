@@ -8,10 +8,14 @@ open System.Globalization
 open System.IO
 open System.Reactive.Subjects
 
+open Avalonia
 open Avalonia.Controls
+open Avalonia.Controls.Presenters
 open Avalonia.VisualTree
 
 open Expecto
+open FSharp.Control.Reactive
+open FSharp.Data.Adaptive
 open Navs.Avalonia
 
 open Briple.Trainer.Components.AthleteList
@@ -47,11 +51,11 @@ let private buttons(root: Control) : Button list =
   |> List.ofSeq
 
 /// Mounts the dialog overlay, asks one confirmation and answers through
-/// the buttons; the pair is the reply cell and the overlay.
+/// the buttons; the tuple is the reply cell, the overlay and its window.
 let private askDialog() =
   let overlay = probeUi(fun () -> Briple.Trainer.Dialogs.host)
 
-  mount overlay
+  let window = mountWindow overlay
 
   let replied = ref None
 
@@ -70,7 +74,7 @@ let private askDialog() =
       ignore
     ))
 
-  replied, overlay
+  replied, overlay, window
 
 let tests =
   testList "app" [
@@ -94,11 +98,14 @@ let tests =
 
     testList "athlete list" [
       test "the empty page renders the empty-state text" {
+        let _, culture = liveCulture es
+
         let control =
           probeUi(fun () ->
             AthleteList(
               {
-                Culture = es
+                Culture = culture
+                Lead = ValueNone
                 Athletes = new BehaviorSubject<AthleteEntity list>([])
               },
               ignore
@@ -128,11 +135,14 @@ let tests =
           }
         }
 
+        let _, culture = liveCulture es
+
         let control =
           probeUi(fun () ->
             AthleteList(
               {
-                Culture = es
+                Culture = culture
+                Lead = ValueNone
                 Athletes = new BehaviorSubject<AthleteEntity list>([ entity ])
               },
               fun event ->
@@ -167,6 +177,184 @@ let tests =
           "the open event carries the id"
       }
 
+      test "rows of different lengths share one chevron edge" {
+        let entity name goals = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = name
+            Gender = Female
+            Goals = goals
+          }
+        }
+
+        let ana = entity "Ana" [ Strength ]
+
+        let beto =
+          entity "Beto" [
+            Hypertrophy
+            WeightLoss
+            CardioVascularHealth
+            BasicBodyActivation
+            Strength
+          ]
+
+        let _, culture = liveCulture es
+
+        let control =
+          probeUi(fun () ->
+            AthleteList(
+              {
+                Culture = culture
+                Lead = ValueNone
+                Athletes =
+                  new BehaviorSubject<AthleteEntity list>([ ana; beto ])
+              },
+              ignore
+            ))
+
+        let window =
+          probeUi(fun () ->
+            let window =
+              Window(Content = control, Width = 1000.0, Height = 700.0)
+
+            window.Show() |> ignore
+            window)
+
+        let rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            fun root ->
+              buttonWithText(root, "Ana") |> Option.isSome
+              && buttonWithText(root, "Beto") |> Option.isSome
+          )
+
+        Expect.isTrue rendered "the rows did not render"
+
+        settle()
+
+        let measure name =
+          probeUi(fun () ->
+            let row =
+              buttonWithText(control, name)
+              |> Option.defaultWith(fun () ->
+                failtest $"the {name} row vanished")
+
+            let icon =
+              row.GetVisualDescendants()
+              |> Seq.choose(fun visual ->
+                match visual with
+                | :? PathIcon as icon -> Some icon
+                | _ -> None)
+              |> Seq.tryHead
+              |> Option.defaultWith(fun () -> failtest "the chevron vanished")
+
+            let left = row.TranslatePoint(Point(0.0, 0.0), window)
+            let iconLeft = icon.TranslatePoint(Point(0.0, 0.0), window)
+
+            left.Value.X,
+            left.Value.X + row.Bounds.Width,
+            iconLeft.Value.X,
+            left.Value.Y,
+            row.Bounds.Height,
+            iconLeft.Value.Y,
+            icon.Bounds.Height)
+
+        let (anaLeft,
+             anaRight,
+             anaChevron,
+             anaTop,
+             anaHeight,
+             anaIconTop,
+             anaIconHeight) =
+          measure "Ana"
+
+        let (betoLeft,
+             betoRight,
+             betoChevron,
+             betoTop,
+             betoHeight,
+             betoIconTop,
+             betoIconHeight) =
+          measure "Beto"
+
+        Expect.equal anaLeft betoLeft "both rows share the left edge"
+
+        Expect.isLessThan anaLeft 100.0 "the rows start at the page margin"
+
+        Expect.equal anaRight betoRight "both rows share the right edge"
+
+        Expect.equal
+          anaChevron
+          betoChevron
+          "a longer summary must not push the chevron"
+
+        Expect.isGreaterThan
+          anaChevron
+          (anaRight - 40.0)
+          "the chevron sits at the row's trailing edge"
+
+        let anaIconCenter = anaIconTop + anaIconHeight / 2.0
+        let anaRowCenter = anaTop + anaHeight / 2.0
+
+        Expect.isLessThan
+          (abs(anaIconCenter - anaRowCenter))
+          1.5
+          "the chevron centers on the row's full height"
+
+        let betoIconCenter = betoIconTop + betoIconHeight / 2.0
+        let betoRowCenter = betoTop + betoHeight / 2.0
+
+        Expect.isLessThan
+          (abs(betoIconCenter - betoRowCenter))
+          1.5
+          "the longer row centers its chevron too"
+      }
+
+      test "the page lead sits before the title" {
+        let _, culture = liveCulture es
+
+        let control =
+          probeUi(fun () ->
+            AthleteList(
+              {
+                Culture = culture
+                Lead = ValueSome(TextBlock(Text = "back") :> Control)
+                Athletes = new BehaviorSubject<AthleteEntity list>([])
+              },
+              ignore
+            ))
+
+        mount control
+        settle()
+
+        let lead =
+          probeUi(fun () ->
+            control.GetVisualDescendants()
+            |> Seq.choose(fun visual ->
+              match visual with
+              | :? TextBlock as text when text.Text = "back" -> Some text
+              | _ -> None)
+            |> Seq.tryHead)
+
+        let title =
+          probeUi(fun () ->
+            control.GetVisualDescendants()
+            |> Seq.choose(fun visual ->
+              match visual with
+              | :? TextBlock as text when text.Text = "Atletas" -> Some text
+              | _ -> None)
+            |> Seq.tryHead)
+
+        match lead, title with
+        | Some lead, Some title ->
+          Expect.isLessThan
+            lead.Bounds.X
+            title.Bounds.X
+            "the lead must be the first element of the header row"
+        | _ -> failtest "the lead or the title did not render"
+      }
+
       test "a store emission after detach still reaches the list" {
         let entity name = {
           Id = Guid.NewGuid()
@@ -179,9 +367,18 @@ let tests =
 
         let source = new BehaviorSubject<AthleteEntity list>([ entity "Ana" ])
 
+        let _, culture = liveCulture es
+
         let control =
           probeUi(fun () ->
-            AthleteList({ Culture = es; Athletes = source }, ignore))
+            AthleteList(
+              {
+                Culture = culture
+                Lead = ValueNone
+                Athletes = source
+              },
+              ignore
+            ))
 
         // the test owns the window so the detach is exact
         let host =
@@ -225,41 +422,33 @@ let tests =
     ]
 
     testList "new athlete form" [
-      test "a valid save reports the profile through the event" {
+      test "a name is enough to save and the default gender rides" {
         let events = ResizeArray<Event>()
+        let _, culture = liveCulture es
 
         let form =
-          probeUi(fun () -> NewAthleteForm({ Culture = es }, events.Add))
+          probeUi(fun () ->
+            NewAthleteForm(
+              {
+                Culture = culture
+                Lead = ValueNone
+                Gate =
+                  Briple.Trainer.Navigation.PageGate(
+                    "/athletes/new",
+                    fun _ _ -> async { return true }
+                  )
+              },
+              events.Add
+            ))
 
         mount form
 
-        // the name entry is the only TextBox; setting the property
-        // raises TextChanged, which the form subscribed through NXUI
+        // the name entry is the only TextBox; the gender already reads
+        // Hombre from the model
         onUi(fun () ->
           match textBoxes form with
           | nameEntry :: _ -> nameEntry.Text <- "Pepe"
           | [] -> failtest "the name entry did not render")
-
-        settle()
-
-        // the gender is a radio row; the goals ship with one checked
-        let genderRendered =
-          waitFor(
-            2000,
-            (fun () -> form),
-            (fun f -> buttonWithText(f, "Hombre") |> Option.isSome)
-          )
-
-        Expect.isTrue genderRendered "the gender radios did not render"
-
-        settle()
-
-        let genderRadio =
-          match probeUi(fun () -> buttonWithText(form, "Hombre")) with
-          | Some button -> button
-          | None -> failtest "the gender radio vanished"
-
-        onUi(fun () -> click genderRadio)
 
         settle()
 
@@ -301,9 +490,22 @@ let tests =
 
       test "a double click on save reports one athlete" {
         let events = ResizeArray<Event>()
+        let _, culture = liveCulture es
 
         let form =
-          probeUi(fun () -> NewAthleteForm({ Culture = es }, events.Add))
+          probeUi(fun () ->
+            NewAthleteForm(
+              {
+                Culture = culture
+                Lead = ValueNone
+                Gate =
+                  Briple.Trainer.Navigation.PageGate(
+                    "/athletes/new",
+                    fun _ _ -> async { return true }
+                  )
+              },
+              events.Add
+            ))
 
         mount form
 
@@ -311,26 +513,6 @@ let tests =
           match textBoxes form with
           | nameEntry :: _ -> nameEntry.Text <- "Pepe"
           | [] -> failtest "the name entry did not render")
-
-        settle()
-
-        let genderRendered =
-          waitFor(
-            2000,
-            (fun () -> form),
-            (fun f -> buttonWithText(f, "Hombre") |> Option.isSome)
-          )
-
-        Expect.isTrue genderRendered "the gender radios did not render"
-
-        settle()
-
-        let genderRadio =
-          match probeUi(fun () -> buttonWithText(form, "Hombre")) with
-          | Some button -> button
-          | None -> failtest "the gender radio vanished"
-
-        onUi(fun () -> click genderRadio)
 
         settle()
 
@@ -366,26 +548,164 @@ let tests =
 
         Expect.equal saves 1 "one save per form, no matter the clicks"
       }
+
+      test "the phase is derived: typing marks unsaved, the save clears it" {
+        let gate =
+          Briple.Trainer.Navigation.PageGate(
+            "/athletes/new",
+            fun _ _ -> async { return true }
+          )
+
+        let events = ResizeArray<Event>()
+        let _, culture = liveCulture es
+
+        let form =
+          probeUi(fun () ->
+            NewAthleteForm(
+              {
+                Culture = culture
+                Lead = ValueNone
+                Gate = gate
+              },
+              events.Add
+            ))
+
+        mount form
+
+        Expect.equal
+          gate.PhaseValue
+          Briple.Trainer.Navigation.PagePhase.Ready
+          "a fresh form is ready"
+
+        onUi(fun () ->
+          match textBoxes form with
+          | nameEntry :: _ -> nameEntry.Text <- "Pepe"
+          | [] -> failtest "the name entry did not render")
+
+        let dirty =
+          waitFor(
+            2000,
+            (fun () -> gate.PhaseValue),
+            fun value ->
+              value = Briple.Trainer.Navigation.PagePhase.UnsavedChanges
+          )
+
+        Expect.isTrue dirty "typing marks the form unsaved"
+
+        let saveButton =
+          match probeUi(fun () -> buttonWithText(form, "Guardar")) with
+          | Some button -> button
+          | None -> failtest "the save button did not render"
+
+        onUi(fun () -> click saveButton)
+
+        let ready =
+          waitFor(
+            2000,
+            (fun () -> gate.PhaseValue),
+            fun value -> value = Briple.Trainer.Navigation.PagePhase.Ready
+          )
+
+        Expect.isTrue ready "an in-flight save is not lost work"
+      }
+
+      test "a culture switch keeps the typed name" {
+        let source, culture = liveCulture es
+        let en = Language.toCulture En
+
+        let gate =
+          Briple.Trainer.Navigation.PageGate(
+            "/athletes/new",
+            fun _ _ -> async { return true }
+          )
+
+        let form =
+          probeUi(fun () ->
+            NewAthleteForm(
+              {
+                Culture = culture
+                Lead = ValueNone
+                Gate = gate
+              },
+              ignore
+            ))
+
+        mount form
+
+        onUi(fun () ->
+          match textBoxes form with
+          | nameEntry :: _ -> nameEntry.Text <- "Emilio"
+          | [] -> failtest "the name entry did not render")
+
+        settle()
+
+        onUi(fun () -> source.OnNext en)
+
+        let retitled =
+          waitFor(
+            2000,
+            (fun () -> form),
+            (fun current -> hasText(current, get(en, Keys.athletesNew)))
+          )
+
+        Expect.isTrue retitled "the page rebuilt in the new language"
+
+        let nameStillThere =
+          probeUi(fun () ->
+            match textBoxes form with
+            | nameEntry :: _ -> nameEntry.Text
+            | [] -> "")
+
+        Expect.equal
+          nameStillThere
+          "Emilio"
+          "the typed name survived the rebuild"
+      }
     ]
 
     testList "navigation history" [
-      test "push ignores a repeat of the current top" {
+      test "settle ignores a repeat of the current top" {
         let stack =
-          [] |> History.push "/a" |> History.push "/b" |> History.push "/b"
+          []
+          |> History.settle "/a"
+          |> History.settle "/b"
+          |> History.settle "/b"
 
         Expect.equal stack [ "/b"; "/a" ] "dedup"
       }
 
-      test "back answers the previous entry and pop drops the current" {
-        let stack = [] |> History.push "/" |> History.push "/athletes/new"
+      test "back only reads the previous entry" {
+        let stack = [] |> History.settle "/" |> History.settle "/athletes/new"
 
         Expect.equal (History.back stack) (Some "/") "back target"
 
-        Expect.equal (History.pop stack) [ "/" ] "pop"
+        Expect.equal
+          stack
+          [ "/athletes/new"; "/" ]
+          "back does not change the stack"
+      }
+
+      test "a completed back collapses the top" {
+        let stack = [] |> History.settle "/" |> History.settle "/athletes/new"
+
+        Expect.equal
+          (History.settle "/" stack)
+          [ "/" ]
+          "the earlier entry replaces the top"
+      }
+
+      test "a cancelled back keeps every entry" {
+        let stack = [] |> History.settle "/" |> History.settle "/athletes/new"
+
+        let target = History.back stack
+
+        Expect.equal target (Some "/") "the target is the previous entry"
+
+        Expect.isTrue (History.canBack stack) "the stack still has the entry"
       }
 
       test "a single entry cannot go back" {
-        let stack = [] |> History.push "/"
+        let stack = [] |> History.settle "/"
 
         Expect.isFalse (History.canBack stack) "one entry"
 
@@ -396,7 +716,7 @@ let tests =
         let stack =
           [ 1..300 ]
           |> List.map string
-          |> List.fold (fun acc url -> History.push url acc) []
+          |> List.fold (fun acc url -> History.settle url acc) []
 
         Expect.equal (List.length stack) 100 "capped"
       }
@@ -420,7 +740,7 @@ let tests =
           "login has no section"
       }
 
-      test "the live stack records and answers back" {
+      test "the live stack follows successful navigations" {
         let stack = BackStack()
 
         stack.Sync "/"
@@ -430,11 +750,90 @@ let tests =
 
         Expect.equal (stack.Back()) (Some "/") "back target"
 
-        Expect.equal stack.Current (Some "/") "popped"
+        Expect.equal
+          stack.Current
+          (Some "/athletes/new")
+          "reading the target does not consume it"
+
+        // the cancelled navigation leaves the stack alone
+        Expect.equal (stack.Back()) (Some "/") "the same target again"
+
+        // the completed navigation collapses the entry
+        stack.Sync "/"
+
+        Expect.equal stack.Current (Some "/") "the back completed"
 
         Expect.equal (stack.Back()) None "nothing below"
       }
     ]
+
+    test "a back navigation through the router updates the live stack" {
+      let db =
+        Path.Combine(Path.GetTempPath(), $"briple-back-{Guid.NewGuid():N}.db")
+
+      match Briple.Trainer.Persistence.migrate(testLogger, db) with
+      | Error e -> failtest $"migrate failed: {e}"
+      | Ok() -> ()
+
+      let env =
+        probeUi(fun () ->
+          Briple.Trainer.Env.AppEnv(
+            Briple.Trainer.Stores.createStores(sqliteStore db, ignore),
+            Briple.Trainer.Secrets.create(),
+            ValueSome {
+              Briple.Trainer.Env.defaultSettings with
+                  Key = "token"
+            }
+          ))
+
+      let shell =
+        probeUi(fun () ->
+          Briple.Trainer.Views.Routes.build(
+            env,
+            (fun () -> TextBlock() :> Control)
+          ))
+
+      let router = shell.Router
+      let history = BackStack()
+
+      router.Route
+      |> AVal.toObservable
+      |> Observable.choose(fun route ->
+        route |> ValueOption.toOption |> Option.map _.path)
+      |> Observable.subscribe history.Sync
+      |> ignore
+
+      let path() =
+        router.RouteSnapshot |> ValueOption.map _.path |> ValueOption.toOption
+
+      let booted = waitFor(5000, path, fun current -> current = Some "/")
+      Expect.isTrue booted "the boot landed on the athletes list"
+
+      onUi(fun () -> Briple.Trainer.Views.Routes.go(router, "/athletes/new"))
+
+      let atForm =
+        waitFor(5000, path, fun current -> current = Some "/athletes/new")
+
+      Expect.isTrue atForm "the form opened"
+
+      Expect.equal (history.Back()) (Some "/") "the previous entry is the list"
+
+      // no input: the form is Ready and the back proceeds
+      onUi(fun () ->
+        history.Back()
+        |> Option.iter(fun url -> Briple.Trainer.Views.Routes.go(router, url)))
+
+      let returned = waitFor(5000, path, fun current -> current = Some "/")
+
+      Expect.isTrue returned "the back navigation landed on the list"
+
+      Expect.equal
+        history.Current
+        (Some "/")
+        "the completed back collapsed the form entry"
+
+      Expect.equal (history.Back()) None "nothing below the list"
+    }
 
     test "the export writes the raw text verbatim" {
       let path =
@@ -455,7 +854,7 @@ let tests =
       // one mounted overlay: the host is a single control, so both
       // answers run over the same instance
       test "the dialog answers accept and cancel through its buttons" {
-        let replied, overlay = askDialog()
+        let replied, overlay, window = askDialog()
 
         let shown =
           waitFor(
@@ -520,6 +919,13 @@ let tests =
         settle()
 
         Expect.equal replied.Value (Some false) "cancelled"
+
+        // release the singleton host so the shell can mount it next
+        onUi(fun () ->
+          window.Content <- null
+          window.Close())
+
+        settle()
       }
     ]
 
@@ -552,7 +958,14 @@ let tests =
           ((env :> Briple.Trainer.Env.IProvideAgent).AgentAvailable)
           "the env carries no token"
 
-        let router = probeUi(fun () -> Briple.Trainer.Views.Routes.build env)
+        let shell =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Routes.build(
+              env,
+              (fun () -> TextBlock() :> Control)
+            ))
+
+        let router = shell.Router
 
         let current() =
           router.RouteSnapshot |> ValueOption.map _.path |> ValueOption.toOption
@@ -594,7 +1007,13 @@ let tests =
 
         let windowOf(env: Briple.Trainer.Env.AppEnv) =
           probeUi(fun () ->
-            let router = Briple.Trainer.Views.Routes.build env
+            let router =
+              (Briple.Trainer.Views.Routes.build(
+                env,
+                (fun () -> TextBlock() :> Control)
+              ))
+                .Router
+
             let outlet = RouterOutlet()
             outlet.Router <- router
 

@@ -517,6 +517,36 @@ module Keys =
   [<Literal>]
   val wizardModeNew: string = "wizard.mode.new"
 
+  [<Literal>]
+  val wizardStepOf: string = "wizard.stepOf"
+
+  [<Literal>]
+  val guardAthleteTitle: string = "guard.athlete.title"
+
+  [<Literal>]
+  val guardAthleteBody: string = "guard.athlete.body"
+
+  [<Literal>]
+  val guardGenerationTitle: string = "guard.generation.title"
+
+  [<Literal>]
+  val guardGenerationBody: string = "guard.generation.body"
+
+  [<Literal>]
+  val guardPlanTitle: string = "guard.plan.title"
+
+  [<Literal>]
+  val guardPlanBody: string = "guard.plan.body"
+
+  [<Literal>]
+  val guardUnsavedTitle: string = "guard.unsaved.title"
+
+  [<Literal>]
+  val guardUnsavedBody: string = "guard.unsaved.body"
+
+  [<Literal>]
+  val guardLeave: string = "guard.leave"
+
 /// One user-facing failure line: the action that failed and the cause,
 /// clipped to a readable length.
 val friendly: culture: CultureInfo * action: string * reason: string -> string

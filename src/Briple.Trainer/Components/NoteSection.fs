@@ -2,11 +2,13 @@ module Briple.Trainer.Components.NoteSection
 
 open System
 open System.Globalization
+open System.Reactive.Subjects
 open System.Threading
 open System.Threading.Tasks
 
 open Avalonia.Controls
 open Avalonia.Controls.Templates
+open Avalonia.Media
 open IcedTasks
 open IcedTasks.Polyfill.Task.Tasks
 open NXUI.Extensions
@@ -25,6 +27,7 @@ open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Env
+open Briple.Trainer.Navigation
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
 open Briple.Trainer.Stores
@@ -32,20 +35,6 @@ open Briple.Trainer.Theme
 
 [<Struct>]
 type Event = MemoryConfirmed of MemoryEntity
-
-[<Struct>]
-type Props = {
-  Culture: CultureInfo
-  Agent: IProvideAgent
-  Memories: MemoryStore
-  AthleteId: Guid
-  /// The plan the note is observed on: its vocabulary closes the
-  /// surface and its id stamps plan-scoped memories.
-  Plan: Plan
-  PlanId: Guid
-  /// The page's token: leaving the review page cancels the reading.
-  Cancel: CancellationToken
-}
 
 /// What the last reading produced, rendered next to the field.
 type Status =
@@ -60,6 +49,24 @@ type Model = {
   Busy: bool
   Proposals: (Guid * Memory) list
   Status: Status
+}
+
+[<Struct>]
+type Props = {
+  Culture: CultureInfo
+  Agent: IProvideAgent
+  Memories: MemoryStore
+  AthleteId: Guid
+  /// The plan the note is observed on: its vocabulary closes the
+  /// surface and its id stamps plan-scoped memories.
+  Plan: Plan
+  PlanId: Guid
+  /// The page's token: leaving the review page cancels the reading.
+  Cancel: CancellationToken
+  /// The state the page kept from a previous render.
+  Initial: Model
+  /// Every transition travels to the page.
+  OnState: Model -> unit
 }
 
 /// One pass over the agent: the cap verdict or the reading.
@@ -78,14 +85,9 @@ type Msg =
 /// Ten live memories is the surface cap of one plan context.
 let memoryCap = 10
 
-let init(_: Props) =
-  {
-    Note = ""
-    Busy = false
-    Proposals = []
-    Status = Idle
-  },
-  Cmd.none
+/// Replays the page's kept state: a culture rebuild never loses a note,
+/// a reading or a pending proposal.
+let init(props: Props) = props.Initial, Cmd.none
 
 /// The live count decides before the agent is called.
 let read(props: Props, note: string) : Task<Reading> = task {
@@ -122,28 +124,36 @@ let saveMemory
 /// The update closes over `onEvent`: the confirmed memory is a one-shot
 /// output, not a model transition.
 let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
+  let inline settled(next: Model, cmd: Cmd<Msg>) =
+    props.OnState next
+    next, cmd
+
   match msg with
-  | SetNote note -> { model with Note = note }, Cmd.none
+  | SetNote note -> settled({ model with Note = note }, Cmd.none)
 
   | InterpretRequested when
     not model.Busy && not(String.IsNullOrWhiteSpace model.Note)
     ->
-    {
-      model with
-          Busy = true
-          Status = Reading
-    },
-    Cmd.OfTask.perform read (props, model.Note.Trim()) Interpreted
+    settled(
+      {
+        model with
+            Busy = true
+            Status = Reading
+      },
+      Cmd.OfTask.perform read (props, model.Note.Trim()) Interpreted
+    )
 
   | InterpretRequested -> model, Cmd.none
 
   | Interpreted SurfaceFull ->
-    {
-      model with
-          Busy = false
-          Status = Full
-    },
-    Cmd.none
+    settled(
+      {
+        model with
+            Busy = false
+            Status = Full
+      },
+      Cmd.none
+    )
 
   | Interpreted(Read interpretation) ->
     // the rejections are the feedback loop: logged structured so the
@@ -158,29 +168,36 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
 
       Log.Information("nota rechazada: {Motivo} {Texto}", motive, text)
 
-    {
-      model with
-          Busy = false
-          Status =
-            if List.isEmpty interpretation.Memories then
-              Rejected
-            else
-              Idle
-          Proposals =
-            interpretation.Memories
-            |> List.map(fun memory -> Guid.NewGuid(), memory)
-    },
-    Cmd.none
+    settled(
+      {
+        model with
+            Busy = false
+            Status =
+              if List.isEmpty interpretation.Memories then
+                Rejected
+              else
+                Idle
+            // the note left as proposals: the field starts clean for
+            // the next observation
+            Note = ""
+            Proposals =
+              interpretation.Memories
+              |> List.map(fun memory -> Guid.NewGuid(), memory)
+      },
+      Cmd.none
+    )
 
   | Interpreted(Unreadable e) ->
     Log.Error(e, "note interpretation failed")
 
-    {
-      model with
-          Busy = false
-          Status = Failed e.Message
-    },
-    Cmd.none
+    settled(
+      {
+        model with
+            Busy = false
+            Status = Failed e.Message
+      },
+      Cmd.none
+    )
 
   | Decided(MemoryReview.Confirmed(localId, memory)) ->
     let decided = confirm memory.Deltas memory
@@ -188,42 +205,57 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
     model, Cmd.OfTask.perform (saveMemory props) (localId, decided) Saved
 
   | Decided(MemoryReview.Discarded localId) ->
-    {
-      model with
-          Proposals =
-            model.Proposals |> List.filter(fun (key, _) -> key <> localId)
-    },
-    Cmd.none
+    settled(
+      {
+        model with
+            Proposals =
+              model.Proposals |> List.filter(fun (key, _) -> key <> localId)
+      },
+      Cmd.none
+    )
 
   | Saved(localId, Ok entity) ->
     onEvent(Event.MemoryConfirmed entity)
 
-    {
-      model with
-          Proposals =
-            model.Proposals |> List.filter(fun (key, _) -> key <> localId)
-    },
-    Cmd.none
+    settled(
+      {
+        model with
+            Proposals =
+              model.Proposals |> List.filter(fun (key, _) -> key <> localId)
+      },
+      Cmd.none
+    )
 
   | Saved(_, Error e) ->
     Log.Error(e, "memory save failed")
-    { model with Status = Failed e.Message }, Cmd.none
+    settled({ model with Status = Failed e.Message }, Cmd.none)
+
+/// One status line: the text and whether it carries the error tone.
+[<Struct>]
+type StatusLine = { Text: string; IsError: bool }
 
 /// The status text and tone: resx only, rendered next to the field.
-let statusText(culture: CultureInfo, status: Status) : string * bool =
+let statusText(culture: CultureInfo, status: Status) : StatusLine =
   match status with
   | Idle
-  | Reading -> "", false
-  | Rejected ->
-    getf(
-      culture,
-      Keys.reviewNoteRejected,
-      [ get(culture, Keys.reviewNoteSurface) :> obj ]
-    ),
-    true
-  | Full -> get(culture, Keys.reviewNoteFull), true
-  | Failed reason ->
-    getf(culture, Keys.reviewNoteFailed, [ reason :> obj ]), true
+  | Reading -> { Text = ""; IsError = false }
+  | Rejected -> {
+      Text =
+        getf(
+          culture,
+          Keys.reviewNoteRejected,
+          [ get(culture, Keys.reviewNoteSurface) :> obj ]
+        )
+      IsError = true
+    }
+  | Full -> {
+      Text = get(culture, Keys.reviewNoteFull)
+      IsError = true
+    }
+  | Failed reason -> {
+      Text = getf(culture, Keys.reviewNoteFailed, [ reason :> obj ])
+      IsError = true
+    }
 
 let view
   (props: Props)
@@ -232,7 +264,22 @@ let view
   : Control =
   let t key = get(props.Culture, key)
 
-  let noteEntry = entry(t Keys.reviewNotePlaceholder, "", (SetNote >> dispatch))
+  // the note is prose: a multiline box, not a single line. The text
+  // binds both ways: typing dispatches, the model's distinct values
+  // redraw — so a cleared model clears the box.
+  let noteEntry =
+    TextBox()
+      .AcceptsReturn(true)
+      .TextWrapping(TextWrapping.Wrap)
+      .Height(60.0)
+      .PlaceholderText(t Keys.reviewNotePlaceholder)
+      .Text(model |> Observable.map _.Note |> Observable.distinctUntilChanged)
+      .OnTextChangedHandler(fun args observed ->
+        args.Text
+        |> Option.ofObj
+        |> Option.defaultValue ""
+        |> SetNote
+        |> dispatch)
 
   let interpret =
     let primary =
@@ -255,12 +302,11 @@ let view
 
   let status =
     TextBlock()
-      .FontFamily(font)
-      .Text(statusStream |> Observable.map fst)
+      .Text(statusStream |> Observable.map _.Text)
       .Foreground(
         statusStream
-        |> Observable.map(fun (_, isError) ->
-          if isError then errorBrush else muted)
+        |> Observable.map(fun line ->
+          if line.IsError then errorBrush else muted)
       )
 
   // the proposal cards: keyed by their local id, so a decision on one
@@ -281,12 +327,9 @@ let view
     let template =
       FuncDataTemplate<(Guid * Memory)>((fun item _ -> proposalRow item), false)
 
-    let list = ItemsControl().ItemTemplate(template)
-
-    list.BindItemsSource(model |> Observable.map(fun m -> m.Proposals), fst)
-    |> ignore
-
-    list
+    ItemsControl()
+      .ItemTemplate(template)
+      .BindItemsSource(model |> Observable.map(fun m -> m.Proposals), fst)
 
   field(
     t Keys.reviewNoteTitle,

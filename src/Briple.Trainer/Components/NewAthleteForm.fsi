@@ -1,18 +1,20 @@
 module Briple.Trainer.Components.NewAthleteForm
 
-// The registration form as an MVUish component: props in (the culture),
-// events out (Saved carries the profile; Cancelled closes). The form
-// asks for the name, the gender and at least one goal; the training
-// frequency is a decision of each plan, not of the profile. Standard
-// controls only: radios for the gender, checkboxes for the goals.
+// The registration form as an MVUish page: props in (the live culture,
+// the shell's back lead, the exit gate), events out (Saved carries the
+// profile; Cancelled closes). The form asks for the name, the gender
+// and at least one goal. The gender starts at Hombre and the model owns
+// it, so the visible selection and the saved value never disagree. The
+// phase is derived from the model, never published by a branch.
 
 open System
-open System.Globalization
 
 open Avalonia.Controls
 
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Navigation
 
 /// What the form reports to its parent.
 [<Struct>]
@@ -20,16 +22,26 @@ type Event =
   | Saved of Athlete
   | Cancelled
 
+/// The form lifecycle: one save per filling, by construction.
+type FormPhase =
+  | Filling
+  | Spent
+
 /// The form inputs.
 [<Struct>]
-type Props = { Culture: CultureInfo }
+type Props = {
+  Culture: PageCulture
+  /// The shell's back control, placed in the page header.
+  Lead: Control voption
+  /// The exit gate: the form tracks its derived phase.
+  Gate: PageGate
+}
 
 type Model = {
   Name: string
-  Gender: Gender voption
+  Gender: Gender
   Goals: PlanGoal list
-  /// True once the profile left as an event; a spent form saves nothing.
-  Saved: bool
+  Phase: FormPhase
 }
 
 type Msg =
@@ -37,6 +49,7 @@ type Msg =
   | PickGender of Gender
   | ToggleGoal of PlanGoal
   | Save
+  | Submitting
   | Cancel
 
 type NewAthleteForm =

@@ -13,6 +13,8 @@ let main argv =
       App.tests
       Components.tests
       Components.noteTests
+      Components.reviewTests
+      Components.wizardTests
     ]
 
   runTestsWithCLIArgs [] argv tests

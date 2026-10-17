@@ -1,29 +1,25 @@
 module Briple.Trainer.Views.Generate
 
-// The wizard as an MVUish component: the step lives in the model, the
-// step host's content is bound to the step stream, and the generation is
-// a Cmd whose outcome lands as a message. No manual child clearing, no
-// timers, no dispatcher posts from the page.
-
 open System
 open System.Globalization
 open System.Threading
 
 open Avalonia
-open Avalonia.Animation
 open Avalonia.Controls
+open Avalonia.Layout
 open Avalonia.Media
 open NXUI.Extensions
 
 open FSharp.Control.Reactive
-
 open IcedTasks
-
 open MVUish.Avalonia
+
+open Serilog
 
 open Briple.Trainer
 open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
@@ -32,33 +28,80 @@ open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Validator
 open Briple.Trainer.Core.Wizard
 open Briple.Trainer.Env
+open Briple.Trainer.Navigation
 open Briple.Trainer.Persistence
-open Briple.Trainer.Strings
 open Briple.Trainer.Stores
+open Briple.Trainer.Strings
 open Briple.Trainer.Theme
-
-open Serilog
 
 [<Struct>]
 type WizardPageProps = {
-  Culture: CultureInfo
-  /// The raw storage: the audit line only.
+  Culture: PageCulture
+  Lead: Control voption
   Store: IStore
   Memories: MemoryStore
   Plans: PlanStore
   Agent: IProvideAgent
   Athlete: AthleteEntity
-  /// The confirmed memories relevant to this generation: athlete-scoped
-  /// ones plus the plan-scoped ones of the plan being adjusted.
   Confirmed: Memory list
   Proposals: MemoryEntity list
   Previous: PlanEntity voption
+  Gate: PageGate
 }
+
+type Outcome =
+  | PlanFinished of Guid
+  | WizardCancelled
+
+type Draft = WizardBrief.BriefDraft
+
+type Section =
+  | MemoriesSection
+  | BriefSection
+
+/// Why a run stopped, kept as data so a culture switch re-renders the
+/// reasons in the new language.
+type Failure =
+  | RejectedPlan of Violation list
+  | Unavailable of reason: string
+
+type Phase =
+  | Editing
+  | Generating
+  | Failed of failure: Failure * last: Draft voption
+  | Done of plan: Plan * advisories: Violation list * kind: string
+
+type Model = {
+  Section: Section
+  Phase: Phase
+  Decided: Guid list
+  Confirmed: (Guid * Memory) list
+  Brief: Draft
+  Last: Draft voption
+  Token: CancellationTokenSource voption
+}
+
+type Msg =
+  | MemoryDecided of MemoryReview.Event
+  | GoSection of Section
+  | BriefChanged of Draft
+  | GenerateRequested
+  | GenerationDone of Result<Run, string> * kind: string
+  | PlanSaved of Result<PlanEntity, exn>
+  | ConfirmPlan
+  | Retry
+  | DiscardRequested
+  | Discarded
+  | Ignored
+  | Exit
+  | Finished of Guid
+  | Left
+  | RunAbandoned
+  | Shown
+  | Recorded
 
 // --- pure request assembly ---
 
-/// The previous plan when it parses; adjustments chain on it, anything
-/// else falls back to a brand-new plan.
 [<return: Struct>]
 let (|AdjustmentBase|_|)(previous: PlanEntity voption) =
   previous
@@ -67,8 +110,6 @@ let (|AdjustmentBase|_|)(previous: PlanEntity voption) =
     | Ok parsed -> ValueSome parsed.Plan
     | _ -> ValueNone)
 
-/// Everything the request needs, as one value instead of threaded
-/// parameters.
 [<Struct>]
 type RequestParts = {
   Athlete: Athlete
@@ -103,8 +144,12 @@ let inline kindOf kind =
   | Generation.NewPlan _ -> "new"
   | Generation.PlanAdjustment _ -> "adjust"
 
-// --- violation rendering: typed cases to one localized line each ---
-// (the Generate.fsi hides all of these; the page class is the export)
+let inline briefOf(draft: Draft) : Brief = {
+  Goal = draft.Goal
+  Frequency = draft.Frequency
+  Emphasis = draft.Emphasis
+  Adjustments = []
+}
 
 let genderName(culture: CultureInfo, gender: Gender) =
   match gender with
@@ -142,9 +187,6 @@ let describeAdvisory
   | TimedWithRir name ->
     getf(culture, Keys.advisoryTimedWithRir, [ name :> obj ])
 
-/// One user-facing line per violation case, in the page culture. The
-/// broken-format detail stays technical (single-language, from Core):
-/// the file format is the domain, like the parse warnings themselves.
 let describeViolation(culture: CultureInfo, violation: Violation) : string =
   match violation with
   | GenderMismatch(expected, found) ->
@@ -205,68 +247,96 @@ let inline callOf(agent: IProvideAgent, ct: CancellationToken) =
   | Generation.NewPlan request -> agent.GenerateNew(request, ct)
   | Generation.PlanAdjustment request -> agent.GenerateAdjustment(request, ct)
 
-/// Persists the edited proposal and re-emits the athlete's slice.
 let updateMemory (store: MemoryStore) (entity: MemoryEntity) =
   store.Update entity
 
-/// Writes the audit line of one generation.
 let addRequest
   (store: IStore)
   (athleteId: Guid, kind: string, payload: string)
   =
   store.AddRequest(athleteId, kind, payload)
 
-// --- the wizard state machine ---
-
-/// Where the flow stands; `Done` carries everything the confirmation needs.
-type Step =
-  | Memories
-  | Brief
-  | Generating
-  | Failed of
-    reasons: string array *
-    last: (int * Brief * WizardBrief.Mode) voption
-  | Done of plan: Plan * advisories: Violation list * kind: string
-
-type Model = {
-  Step: Step
-  /// One entry per card that decided, confirm or discard.
-  Decided: Guid list
-  Confirmed: (Guid * Memory) list
-  /// The last submitted brief, what a retry re-sends: period, brief and
-  /// the starting point the user picked.
-  LastBrief: (int * Brief * WizardBrief.Mode) voption
-  /// The generation in flight; cancelled when the wizard exits.
-  Run: CancellationTokenSource voption
-}
-
-type Msg =
-  | MemoryDecided of MemoryReview.Event
-  | NextRequested
-  | BackToMemories
-  | BriefSubmitted of weeks: int * brief: Brief * mode: WizardBrief.Mode
-  | GenerationDone of run: Run * kind: string
-  | GenerationFailed of reason: string
-  | PlanSaved of Result<PlanEntity, exn>
-  | ConfirmPlan
-  | Cancelled
-  /// A store write the page does not need to react to.
-  | Recorded
-
-/// What the page reports outward.
-type Outcome =
-  | PlanFinished of Guid
-  | WizardCancelled
+// --- the page state machine ---
 
 let init(props: WizardPageProps) =
   {
-    Step = Memories
+    Section = MemoriesSection
+    Phase = Editing
     Decided = []
     Confirmed = []
-    LastBrief = ValueNone
-    Run = ValueNone
+    Brief =
+      WizardBrief.defaultDraft(props.Athlete.Profile, props.Previous.IsSome)
+    Last = ValueNone
+    Token = ValueNone
   },
   Cmd.none
+
+let inline resolved(props: WizardPageProps, model: Model) =
+  List.length model.Decided = List.length props.Proposals
+
+let inline phaseOf(model: Model) : PagePhase =
+  match model.Phase with
+  | Generating -> Working
+  | Done _ -> UnsavedChanges
+  | Editing
+  | Failed _ -> Ready
+
+let sectionIndex section =
+  match section with
+  | MemoriesSection -> 0
+  | BriefSection -> 1
+
+let sectionOfIndex index =
+  if index = 0 then MemoriesSection else BriefSection
+
+let cancel(token: CancellationTokenSource voption) =
+  token
+  |> ValueOption.iter(fun source ->
+    source.Cancel()
+    source.Dispose())
+
+let requestFor(props: WizardPageProps, model: Model, draft: Draft) =
+  requestOf {
+    Athlete = props.Athlete.Profile
+    Memories = props.Confirmed @ (model.Confirmed |> List.map snd)
+    Weeks = draft.Weeks
+    Brief = briefOf draft
+    Previous =
+      match props.Previous, draft.Mode with
+      | ValueSome entity, WizardBrief.Mode.Adjust -> ValueSome entity
+      | _ -> ValueNone
+  }
+
+/// One run, one CTS: leaving the wizard or a new run cancels it.
+let startRun
+  (props: WizardPageProps, model: Model, draft: Draft)
+  : Model * Cmd<Msg> =
+  cancel model.Token
+
+  let request = requestFor(props, model, draft)
+  let kind = kindOf request
+  let cts = new CancellationTokenSource()
+
+  let record =
+    Cmd.OfTask.perform
+      (addRequest props.Store)
+      (props.Athlete.Id,
+       kind,
+       $"weeks={draft.Weeks};freq={VariantFrequency.toFileToken draft.Frequency}")
+      (fun _ -> Recorded)
+
+  let run =
+    Cmd.OfTask.perform (callOf(props.Agent, cts.Token)) request (fun result ->
+      GenerationDone(Result.mapError (fun (e: exn) -> e.Message) result, kind))
+
+  {
+    model with
+        Phase = Generating
+        Brief = draft
+        Last = ValueSome draft
+        Token = ValueSome cts
+  },
+  Cmd.batch [ record; run ]
 
 let update
   (props: WizardPageProps)
@@ -275,7 +345,7 @@ let update
   (model: Model)
   =
   match msg with
-  | MemoryDecided(MemoryReview.Confirmed(id, memory)) ->
+  | MemoryDecided(MemoryReview.Event.Confirmed(id, memory)) ->
     let decided = {
       model with
           Decided =
@@ -303,7 +373,7 @@ let update
 
     decided, persist
 
-  | MemoryDecided(MemoryReview.Discarded id) ->
+  | MemoryDecided(MemoryReview.Event.Discarded id) ->
     let decided = {
       model with
           Decided =
@@ -329,93 +399,55 @@ let update
 
     decided, persist
 
-  | NextRequested -> { model with Step = Brief }, Cmd.none
+  | GoSection section ->
+    match model.Phase with
+    | Editing -> { model with Section = section }, Cmd.none
+    | _ -> model, Cmd.none
 
-  | BackToMemories -> { model with Step = Memories }, Cmd.none
+  | BriefChanged draft -> { model with Brief = draft }, Cmd.none
 
-  | BriefSubmitted(weeks, brief, mode) ->
-    let request =
-      requestOf {
-        Athlete = props.Athlete.Profile
-        Memories = props.Confirmed @ (model.Confirmed |> List.map snd)
-        Weeks = weeks
-        Brief = brief
-        // a fresh plan starts clean: no previous counts to honor
-        Previous =
-          (match props.Previous, mode with
-           | ValueSome entity, WizardBrief.Mode.Adjust -> ValueSome entity
-           | _ -> ValueNone)
-      }
+  | GenerateRequested when model.Phase = Editing && resolved(props, model) ->
+    startRun(props, model, model.Brief)
 
-    let kind = kindOf request
+  | GenerateRequested -> model, Cmd.none
 
-    let record =
-      Cmd.OfTask.perform
-        (addRequest props.Store)
-        (props.Athlete.Id,
-         kind,
-         $"weeks={weeks};freq={VariantFrequency.toFileToken brief.Frequency}")
-        (fun _ -> Recorded)
+  | Retry ->
+    match model.Phase, model.Last with
+    | Failed _, ValueSome draft -> startRun(props, model, draft)
+    | _ -> model, Cmd.none
 
-    // one run, one CTS: leaving the wizard or a new run cancels it
-    model.Run
-    |> ValueOption.iter(fun cts ->
-      cts.Cancel()
-      cts.Dispose())
-
-    let cts = new CancellationTokenSource()
-
-    let run =
-      Cmd.OfTask.perform (callOf(props.Agent, cts.Token)) request (function
-        | Ok run -> GenerationDone(run, kind)
-        | Error e -> GenerationFailed e.Message)
-
-    {
-      model with
-          Step = Generating
-          LastBrief = ValueSome(weeks, brief, mode)
-          Run = ValueSome cts
-    },
-    Cmd.batch [ record; run ]
-
-  | GenerationDone(run, kind) ->
-    model.Run |> ValueOption.iter(fun cts -> cts.Dispose())
+  | GenerationDone(Ok run, kind) ->
+    model.Token |> ValueOption.iter(fun source -> source.Dispose())
 
     match run.Verdict with
     | Rejected violations ->
-      let reasons = [|
-        for violation in violations ->
-          describeViolation(props.Culture, violation)
-      |]
-
       {
         model with
-            Step = Failed(reasons, model.LastBrief)
-            Run = ValueNone
+            Phase = Failed(RejectedPlan violations, ValueSome model.Brief)
+            Token = ValueNone
       },
       Cmd.none
     | Valid(plan, advisories) ->
       {
         model with
-            Step = Done(plan, advisories, kind)
-            Run = ValueNone
+            Phase = Done(plan, advisories, kind)
+            Token = ValueNone
       },
       Cmd.none
 
-  | GenerationFailed reason ->
-    model.Run |> ValueOption.iter(fun cts -> cts.Dispose())
+  | GenerationDone(Error reason, _) ->
+    model.Token |> ValueOption.iter(fun source -> source.Dispose())
 
     {
       model with
-          Step = Failed([| reason |], model.LastBrief)
-          Run = ValueNone
+          Phase = Failed(Unavailable reason, ValueSome model.Brief)
+          Token = ValueNone
     },
     Cmd.none
 
   | ConfirmPlan ->
-    match model.Step with
+    match model.Phase with
     | Done(plan, _, kind) ->
-      // the recorded counts are what the plan carries, not an input
       let insert = {
         AthleteId = props.Athlete.Id
         Kind = kind
@@ -425,326 +457,415 @@ let update
       model, Cmd.OfTask.perform props.Plans.Add (insert, plan) PlanSaved
     | _ -> model, Cmd.none
 
+  // the phase must reach Ready before the navigation asks the guard:
+  // the message runs after the state update
   | PlanSaved(Ok entity) ->
-    model.Run |> ValueOption.iter(fun cts -> cts.Dispose())
+    cancel model.Token
 
-    onOutcome(PlanFinished entity.Id)
+    {
+      model with
+          Phase = Editing
+          Token = ValueNone
+    },
+    Cmd.ofMsg(Finished entity.Id)
 
-    { model with Run = ValueNone }, Cmd.none
-
-  | PlanSaved(Error e) ->
-    Log.Error(e, "plan save failed")
+  | Finished entityId ->
+    onOutcome(PlanFinished entityId)
     model, Cmd.none
 
-  | Cancelled ->
-    // the user left mid-run: the generation stops with the wizard
-    model.Run
-    |> ValueOption.iter(fun cts ->
-      cts.Cancel()
-      cts.Dispose())
+  | PlanSaved(Error e) ->
+    let culture = props.Culture.Current()
+    Log.Error(e, "plan save failed")
 
+    let action = get(culture, Keys.reviewSave)
+
+    Briple.Trainer.Toasts.show(
+      action,
+      friendly(culture, action, e.Message),
+      true
+    )
+
+    model, Cmd.none
+
+  | DiscardRequested ->
+    match model.Phase with
+    | Done _ ->
+      let culture = props.Culture.Current()
+
+      let ask =
+        Briple.Trainer.Dialogs.confirmAsync {
+          Title = get(culture, Keys.wizardDiscardTitle)
+          Body = get(culture, Keys.wizardDiscardBody)
+          Accept = get(culture, Keys.wizardDiscard)
+          Cancel = get(culture, Keys.commonCancel)
+        }
+
+      model,
+      Cmd.OfAsync.perform (fun () -> ask) () (fun sure ->
+        if sure then Discarded else Ignored)
+    | _ -> model, Cmd.none
+
+  | Discarded ->
+    cancel model.Token
+
+    {
+      model with
+          Phase = Editing
+          Token = ValueNone
+    },
+    Cmd.ofMsg Left
+
+  | Ignored -> model, Cmd.none
+
+  | Exit ->
+    cancel model.Token
+
+    {
+      model with
+          Phase = Editing
+          Token = ValueNone
+    },
+    Cmd.ofMsg Left
+
+  | Left ->
     onOutcome WizardCancelled
+    model, Cmd.none
 
-    { model with Run = ValueNone }, Cmd.none
+  | RunAbandoned ->
+    cancel model.Token
+
+    {
+      model with
+          Phase = Editing
+          Token = ValueNone
+    },
+    Cmd.none
+
+  | Shown ->
+    // a fresh visit, even when the router served a cached page
+    cancel model.Token
+
+    {
+      Section = MemoriesSection
+      Phase = Editing
+      Decided = []
+      Confirmed = []
+      Brief =
+        WizardBrief.defaultDraft(props.Athlete.Profile, props.Previous.IsSome)
+      Last = ValueNone
+      Token = ValueNone
+    },
+    Cmd.none
 
   | Recorded -> model, Cmd.none
 
-// --- step views ---
+// --- views ---
 
 let inline statusLine(text: string, isError: bool) : Control =
-  TextBlock()
-    .Text(text)
-    .FontFamily(font)
-    .Foreground(if isError then errorBrush else muted)
+  let tone = if isError then "danger" else "secondary"
+
+  TextBlock().Text(text).Classes("body", tone).TextWrapping(TextWrapping.Wrap)
 
 let inline linesPanel(lines: Control array) : Control =
   StackPanel().Spacing(4.0).Children(lines)
 
-let memoriesStep
-  (props: WizardPageProps, model: IObservable<Model>, dispatch: Dispatch<Msg>)
-  : Control =
-  let t key = get(props.Culture, key)
+let inline stepCaption(culture: CultureInfo, number: int) : Control =
+  label(getf(culture, Keys.wizardStepOf, [ number :> obj; 2 :> obj ]))
 
-  let inline resolved(m: Model) =
-    List.length m.Decided = List.length props.Proposals
+let memoriesColumn
+  (
+    props: WizardPageProps,
+    model: IObservable<Model>,
+    culture: CultureInfo,
+    dispatch: Dispatch<Msg>
+  ) : Control =
+  let t key = get(culture, key)
+
+  let cards: Control array = [|
+    for entity in props.Proposals ->
+      MemoryReview.MemoryReview(
+        {
+          Culture = culture
+          Id = entity.Id
+          Memory = entity.Memory
+        },
+        MemoryDecided >> dispatch
+      )
+  |]
+
+  // the adjustments that were already confirmed when the wizard
+  // opened; the cards below carry the decisions of this visit
+  let confirmedRows =
+    props.Confirmed
+    |> List.filter(fun memory -> not(String.IsNullOrWhiteSpace memory.Summary))
+    |> List.map(fun memory -> label memory.Summary)
+    |> Array.ofList
+    |> linesPanel
 
   let next =
-    let step =
-      iconButton(
+    let button =
+      iconPrimaryButton(
         t Keys.wizardNext,
         Icons.chevronRight,
-        (fun () -> dispatch NextRequested)
+        (fun () -> dispatch(GoSection BriefSection))
       )
 
-    step.IsEnabled(model |> Observable.map resolved)
+    button.IsEnabled(model |> Observable.map(fun m -> resolved(props, m)))
 
-  let decided =
-    let cards: Control array = [|
-      for entity in props.Proposals ->
-        MemoryReview.MemoryReview(
-          {
-            Culture = props.Culture
-            Id = entity.Id
-            Memory = entity.Memory
-          },
-          MemoryDecided >> dispatch
-        )
-    |]
-
-    if Array.isEmpty cards && List.isEmpty props.Confirmed then
-      label(t Keys.memoriesEmpty)
-    else
-      linesPanel [|
-        // the confirmed adjustments riding this generation: visible, so
-        // the step never claims there is nothing to carry
-        if not(List.isEmpty props.Confirmed) then
-          yield sectionTitle(t Keys.wizardApplies)
-
-          for memory in props.Confirmed do
-            if not(String.IsNullOrWhiteSpace memory.Summary) then
-              yield
-                TextBlock()
-                  .Text(memory.Summary)
-                  .FontFamily(font)
-                  .Foreground(muted)
-
-        yield! cards
-      |]
-
-  fluentPage {
-    Title = t Keys.wizardStepMemories
-    Commands = []
-    Footer = { Secondary = []; Primary = [ next ] }
-    Body = decided
-    Measure = 760.0
-  }
-
-let briefStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
-  let t key = get(props.Culture, key)
-
-  let submitted(event: WizardBrief.Event) =
-    match event with
-    | WizardBrief.Event.Submitted(weeks, brief, mode) ->
-      dispatch(BriefSubmitted(weeks, brief, mode))
-    | WizardBrief.Event.Cancelled -> dispatch Cancelled
-
-  let back =
-    iconButton(
-      t Keys.wizardBack,
-      Icons.chevronLeft,
-      (fun () -> dispatch BackToMemories)
+  StackPanel()
+    .Spacing(8.0)
+    .Children(
+      stepCaption(culture, 1),
+      (if Array.isEmpty cards then
+         label(t Keys.memoriesEmpty)
+       else
+         linesPanel cards),
+      (if List.isEmpty props.Confirmed then
+         StackPanel() :> Control
+       else
+         sectionTitle(t Keys.wizardApplies)),
+      confirmedRows,
+      next.HorizontalAlignment(HorizontalAlignment.Left)
     )
 
-  fluentPage {
-    Title = t Keys.wizardStepBrief
-    Commands = []
-    Footer = { Secondary = [ back ]; Primary = [] }
-    Body =
-      WizardBrief.WizardBrief(
-        {
-          Culture = props.Culture
-          Athlete = props.Athlete.Profile
-          HasPrevious = props.Previous.IsSome
-        },
-        submitted
+let briefColumn
+  (
+    props: WizardPageProps,
+    draft: Draft,
+    model: IObservable<Model>,
+    culture: CultureInfo,
+    dispatch: Dispatch<Msg>
+  ) : Control =
+  let t key = get(culture, key)
+
+  let brief =
+    WizardBrief.WizardBrief(
+      {
+        Culture = culture
+        Athlete = props.Athlete.Profile
+        HasPrevious = props.Previous.IsSome
+        Draft = draft
+        OnChanged = BriefChanged >> dispatch
+      }
+    )
+
+  let generate =
+    let button =
+      iconPrimaryButton(
+        t Keys.wizardGenerate,
+        Icons.play,
+        (fun () -> dispatch GenerateRequested)
       )
+
+    button.IsEnabled(model |> Observable.map(fun m -> resolved(props, m)))
+
+  StackPanel()
+    .Spacing(8.0)
+    .Children(
+      stepCaption(culture, 2),
+      brief,
+      generate.HorizontalAlignment(HorizontalAlignment.Left)
+    )
+
+let actionRow(actions: Control list) : Control =
+  StackPanel()
+    .Orientation(Orientation.Horizontal)
+    .Spacing(8.0)
+    .HorizontalAlignment(HorizontalAlignment.Right)
+    .Children(List.toArray actions)
+
+let editingView
+  (
+    props: WizardPageProps,
+    current: Model,
+    model: IObservable<Model>,
+    culture: CultureInfo,
+    dispatch: Dispatch<Msg>
+  ) : Control =
+  let t key = get(culture, key)
+
+  let hub =
+    Hub.hub {
+      Title = ""
+      Slots = [
+        Hub.slot(
+          t Keys.wizardStepMemories,
+          memoriesColumn(props, model, culture, dispatch)
+        )
+        Hub.slot(
+          t Keys.wizardStepBrief,
+          briefColumn(props, current.Brief, model, culture, dispatch)
+        )
+      ]
+      Active =
+        ValueSome(model |> Observable.map(fun m -> sectionIndex m.Section))
+      OnSelect =
+        ValueSome(fun index -> dispatch(GoSection(sectionOfIndex index)))
+    }
+
+  fluentPage {
+    Lead = props.Lead
+    Title = t Keys.wizardTitle
+    Commands = []
+    Footer = noFooter
+    Body = hub
     Measure = 760.0
   }
 
-/// The generation runs for one or two minutes: an indeterminate bar, the
-/// status line, and the way out in the command bar.
-let generatingStep(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
+let generatingView
+  (props: WizardPageProps, culture: CultureInfo, dispatch: Dispatch<Msg>)
+  : Control =
+  let t key = get(culture, key)
+
   let cancel =
     iconButton(
-      get(props.Culture, Keys.wizardCancelGeneration),
+      t Keys.wizardCancelGeneration,
       Icons.stop,
-      (fun () -> dispatch Cancelled)
+      (fun () -> dispatch Exit)
     )
 
   fluentPage {
-    Title = get(props.Culture, Keys.wizardTitle)
+    Lead = props.Lead
+    Title = t Keys.wizardTitle
     Commands = []
-    Footer = { Secondary = [ cancel ]; Primary = [] }
+    Footer = noFooter
     Body =
       StackPanel()
-        .Spacing(12.0)
-        .Margin(0.0, 16.0, 0.0, 16.0)
+        .Spacing(16.0)
+        .Margin(0.0, 32.0, 0.0, 32.0)
         .Children(
-          ProgressBar(IsIndeterminate = true, Maximum = 100.0, MinWidth = 240.0),
-          statusLine(get(props.Culture, Keys.wizardGenerating), false)
+          ProgressBar(
+            IsIndeterminate = true,
+            Maximum = 100.0,
+            Width = 240.0,
+            HorizontalAlignment = HorizontalAlignment.Center
+          ),
+          statusLine(t Keys.wizardGenerating, false)
+            .HorizontalAlignment(HorizontalAlignment.Center),
+          actionRow [ cancel ]
         )
     Measure = 560.0
   }
 
-/// What the failed step renders from, as one value.
-[<Struct>]
-type FailureContext = {
-  Props: WizardPageProps
-  Reasons: string array
-  Last: (int * Brief * WizardBrief.Mode) voption
-}
+let failedView
+  (
+    props: WizardPageProps,
+    failure: Failure,
+    last: Draft voption,
+    culture: CultureInfo,
+    dispatch: Dispatch<Msg>
+  ) : Control =
+  let t key = get(culture, key)
 
-let failedStep(ctx: FailureContext, dispatch: Dispatch<Msg>) : Control =
-  let t key = get(ctx.Props.Culture, key)
+  let reasons =
+    match failure with
+    | RejectedPlan violations ->
+      violations
+      |> List.map(fun violation -> describeViolation(culture, violation))
+      |> Array.ofList
+    | Unavailable reason -> [| reason |]
 
-  // the retry re-sends the last brief instead of walking the steps again
   let retry =
-    iconPrimaryButton(
-      t Keys.wizardRetry,
-      Icons.refresh,
-      fun () ->
-        ctx.Last
-        |> ValueOption.iter(fun (weeks, brief, mode) ->
-          dispatch(BriefSubmitted(weeks, brief, mode)))
-    )
+    let button =
+      iconPrimaryButton(
+        t Keys.wizardRetry,
+        Icons.refresh,
+        (fun () -> dispatch Retry)
+      )
+
+    button.IsEnabled(ValueOption.isSome last)
 
   let exit =
-    iconButton(t Keys.wizardExit, Icons.logout, (fun () -> dispatch Cancelled))
+    iconButton(t Keys.wizardExit, Icons.logout, (fun () -> dispatch Exit))
 
   let reasonsPanel =
-    linesPanel [| for reason in ctx.Reasons -> statusLine(reason, true) |]
+    linesPanel [| for reason in reasons -> statusLine(reason, true) |]
 
   fluentPage {
+    Lead = props.Lead
     Title = t Keys.errorTitle
     Commands = []
-    Footer = {
-      Secondary = [ exit ]
-      Primary = [ retry ]
-    }
-    Body = reasonsPanel
+    Footer = noFooter
+    Body =
+      StackPanel()
+        .Spacing(12.0)
+        .Children(reasonsPanel, actionRow [ exit; retry ])
     Measure = 760.0
   }
 
-/// What the done step renders from, as one value.
-[<Struct>]
-type DoneContext = {
-  Props: WizardPageProps
-  Plan: Plan
-  Advisories: Violation list
-}
+let doneView
+  (
+    props: WizardPageProps,
+    plan: Plan,
+    advisories: Violation list,
+    culture: CultureInfo,
+    dispatch: Dispatch<Msg>
+  ) : Control =
+  let t key = get(culture, key)
 
-let doneStep(ctx: DoneContext, dispatch: Dispatch<Msg>) : Control =
-  let t key = get(ctx.Props.Culture, key)
+  let advisoryLines =
+    advisories
+    |> List.map(fun advisory ->
+      statusLine(describeViolation(culture, advisory), true))
+    |> Array.ofList
 
-  let advisoryPanel =
-    linesPanel [|
-      for advisory in ctx.Advisories ->
-        statusLine(describeViolation(ctx.Props.Culture, advisory), true)
-    |]
+  let preview =
+    PlanReview.PlanReview(
+      {
+        Culture = culture
+        Parsed = { Plan = plan; Warnings = [] }
+        Week = ValueNone
+        Editing = false
+      },
+      ignore
+    )
 
-  // discarding throws away one or two minutes of generation: it asks
-  let discard() =
-    asyncEx {
-      let! sure =
-        Briple.Trainer.Dialogs.confirmAsync {
-          Title = t Keys.wizardDiscardTitle
-          Body = t Keys.wizardDiscardBody
-          Accept = t Keys.wizardDiscard
-          Cancel = t Keys.commonCancel
-        }
+  let discard =
+    iconButton(
+      t Keys.wizardDiscard,
+      Icons.delete,
+      (fun () -> dispatch DiscardRequested)
+    )
 
-      if sure then
-        dispatch Cancelled
-    }
-    |> Async.StartImmediate
+  let confirm =
+    iconPrimaryButton(
+      t Keys.wizardConfirm,
+      Icons.check,
+      (fun () -> dispatch ConfirmPlan)
+    )
 
   fluentPage {
+    Lead = props.Lead
     Title = t Keys.wizardTitle
     Commands = []
-    Footer = {
-      Secondary = [ iconButton(t Keys.wizardDiscard, Icons.delete, discard) ]
-      Primary = [
-        iconPrimaryButton(
-          t Keys.wizardConfirm,
-          Icons.check,
-          (fun () -> dispatch ConfirmPlan)
-        )
-      ]
-    }
+    Footer = noFooter
     Body =
       StackPanel()
         .Spacing(8.0)
         .Children(
-          PlanReview.PlanReview(
-            {
-              Culture = ctx.Props.Culture
-              Parsed = { Plan = ctx.Plan; Warnings = [] }
-            },
-            ignore
-          ),
-          advisoryPanel
+          preview,
+          (if Array.isEmpty advisoryLines then
+             StackPanel() :> Control
+           else
+             linesPanel advisoryLines),
+          actionRow [ discard; confirm ]
         )
     Measure = 760.0
   }
 
-/// What a step renders from, as one value.
-[<Struct>]
-type StepContext = {
-  Props: WizardPageProps
-  Model: IObservable<Model>
-  Dispatch: Dispatch<Msg>
-}
-
-let stepView(ctx: StepContext, step: Step) : Control =
-  match step with
-  | Memories -> memoriesStep(ctx.Props, ctx.Model, ctx.Dispatch)
-  | Brief -> briefStep(ctx.Props, ctx.Dispatch)
-  | Generating -> generatingStep(ctx.Props, ctx.Dispatch)
-  | Failed(reasons, last) ->
-    failedStep(
-      {
-        Props = ctx.Props
-        Reasons = reasons
-        Last = last
-      },
-      ctx.Dispatch
-    )
-  | Done(plan, advisories, _) ->
-    doneStep(
-      {
-        Props = ctx.Props
-        Plan = plan
-        Advisories = advisories
-      },
-      ctx.Dispatch
-    )
-
-// --- the page ---
-
 let view
   (props: WizardPageProps)
+  (culture: CultureInfo)
+  (current: Model)
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
-  if not props.Agent.AgentAvailable then
-    fluentPage {
-      Title = get(props.Culture, Keys.wizardTitle)
-      Commands = []
-      Footer = noFooter
-      Body = label(get(props.Culture, Keys.settingsMissing))
-      Measure = 560.0
-    }
-  else
-    // the host's content follows the step stream; distinct steps only, so
-    // the memory cards keep their in-progress selections between
-    // decisions, and the swap crossfades
-    let steps =
-      model
-      |> Observable.map(fun m -> m.Step)
-      |> Observable.distinctUntilChanged
-      |> Observable.map(fun step ->
-        stepView(
-          {
-            Props = props
-            Model = model
-            Dispatch = dispatch
-          },
-          step
-        ))
-
-    TransitioningContentControl()
-      .PageTransition(CrossFade(TimeSpan.FromMilliseconds 150.0))
-      .Content(steps.ToBinding())
+  match current.Phase with
+  | Editing -> editingView(props, current, model, culture, dispatch)
+  | Generating -> generatingView(props, culture, dispatch)
+  | Failed(failure, last) -> failedView(props, failure, last, culture, dispatch)
+  | Done(plan, advisories, _) ->
+    doneView(props, plan, advisories, culture, dispatch)
 
 type WizardPage
   (props: WizardPageProps, [<InlineIfLambda>] onOutcome: Outcome -> unit) as this
@@ -752,6 +873,29 @@ type WizardPage
   inherit UserControl()
 
   do
-    let program = Program.mkProgram init (update props onOutcome) (view props)
+    let subscribe(_: Model) : Sub<Msg> =
+      fun dispatch ->
+        Page.listenGate {
+          Control = this
+          Gate = props.Gate
+          OnShown = fun () -> dispatch Shown
+          OnCancel = fun () -> dispatch RunAbandoned
+        }
+
+    let viewWithCulture (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
+      Page.trackPhase(this, props.Gate, model |> Observable.map phaseOf)
+
+      Page.cultureHost {
+        Culture = props.Culture
+        Model = model
+        Build =
+          fun culture current dispatch ->
+            view props culture current model dispatch
+        Dispatch = dispatch
+      }
+
+    let program =
+      Program.mkProgram init (update props onOutcome) viewWithCulture
+      |> Program.withSubscription subscribe
 
     this.Content <- Program.runWith props program

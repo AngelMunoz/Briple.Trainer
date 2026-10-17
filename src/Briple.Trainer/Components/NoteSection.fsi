@@ -5,7 +5,8 @@ module Briple.Trainer.Components.NoteSection
 // out (MemoryConfirmed carries what the trainer confirmed). The note is
 // the only input; the agent maps it to the closed surface of the plan,
 // the proposals render as confirm/discard cards, and every rejection or
-// failure renders next to the field it belongs to.
+// failure renders next to the field it belongs to. The page seeds the
+// model and keeps every transition, so a culture rebuild loses nothing.
 
 open System
 open System.Globalization
@@ -24,21 +25,6 @@ open Briple.Trainer.Stores
 [<Struct>]
 type Event = MemoryConfirmed of MemoryEntity
 
-/// The section inputs.
-[<Struct>]
-type Props = {
-  Culture: CultureInfo
-  Agent: IProvideAgent
-  Memories: MemoryStore
-  AthleteId: Guid
-  /// The plan the note is observed on: its vocabulary closes the
-  /// surface and its id stamps plan-scoped memories.
-  Plan: Plan
-  PlanId: Guid
-  /// The page's token: leaving the review page cancels the reading.
-  Cancel: CancellationToken
-}
-
 /// What the last reading produced, rendered next to the field.
 type Status =
   | Idle
@@ -52,6 +38,27 @@ type Model = {
   Busy: bool
   Proposals: (Guid * Memory) list
   Status: Status
+}
+
+/// The section inputs.
+[<Struct>]
+type Props = {
+  Culture: CultureInfo
+  Agent: IProvideAgent
+  Memories: MemoryStore
+  AthleteId: Guid
+  /// The plan the note is observed on: its vocabulary closes the
+  /// surface and its id stamps plan-scoped memories.
+  Plan: Plan
+  PlanId: Guid
+  /// The page's token: leaving the review page cancels the reading.
+  Cancel: CancellationToken
+  /// The state the page kept from a previous render; the component seeds
+  /// its model from it so a culture rebuild never loses a draft.
+  Initial: Model
+  /// Every transition travels to the page, which keeps the state and
+  /// derives the exit phase from it.
+  OnState: Model -> unit
 }
 
 /// One pass over the agent: the cap verdict or the reading.

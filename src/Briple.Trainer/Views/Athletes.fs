@@ -1,25 +1,19 @@
 module Briple.Trainer.Views.Athletes
 
-// The athlete detail page: the profile and the plan history. The plans
-// section is a store subscription with keyed rows; writes go through the
-// store and the emissions land as refresh messages. Memories belong to
-// the plan context, so they are written and reviewed from the plan
-// review page.
-
 open System
 open System.Globalization
 
 open Avalonia.Controls
 open Avalonia.Controls.Templates
-open Avalonia.Layout
 open Avalonia.Media
 open NXUI.Extensions
 
-open MVUish.Avalonia
 open MVUish.Avalonia.Collections
 
 open Briple.Trainer
+open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Persistence
@@ -29,81 +23,56 @@ open Briple.Trainer.Theme
 
 [<Struct>]
 type DetailPageProps = {
-  Culture: CultureInfo
+  Culture: PageCulture
+  Lead: Control voption
   Plans: PlanStore
   Athlete: AthleteEntity
 }
 
-/// What the page reports to its host.
 [<Struct>]
 type Event =
   | GenerateRequested
   | ReviewRequested of planId: Guid
 
-// --- the page state ---
-
-type Model = { Plans: PlanEntity list }
-
-type Msg = PlansRefreshed of PlanEntity list
-
-let init(_: DetailPageProps) = { Plans = [] }, Cmd.none
-
-let update (msg: Msg) (model: Model) =
-  match msg with
-  | PlansRefreshed plans -> { model with Plans = plans }, Cmd.none
-
-// --- page pieces as module functions ---
+/// The trailing glyph of a row.
+let inline chevron() : Control =
+  PathIcon(Data = Icons.chevronRight, Width = 16.0, Height = 16.0)
+    .Foreground(muted)
 
 /// One plan row: the title and its metadata; the whole row opens the
 /// review.
 let planRow
-  (props: DetailPageProps, onReview: Guid -> unit, entity: PlanEntity)
+  (culture: CultureInfo, onReview: Guid -> unit, entity: PlanEntity)
   : Control =
-  button(entity.Title, (fun () -> onReview entity.Id))
-    .HorizontalContentAlignment(HorizontalAlignment.Left)
-    .Margin(0.0, 0.0, 0.0, 6.0)
-    .Content(
-      StackPanel()
-        .Spacing(2.0)
-        .Children(
-          TextBlock()
-            .Text(entity.Title)
-            .FontSize(14.0)
-            .FontWeight(FontWeight.Bold),
-          TextBlock()
-            .Text($"{entity.Kind} · {entity.CreatedAt.ToLocalTime():g}")
-            .Foreground(muted)
-            .FontFamily(font)
-        )
-    )
-  :> Control
+  let stamp = entity.CreatedAt.ToLocalTime().ToString("g", culture)
+  let detail = $"{entity.Kind} · {stamp}"
+
+  Button()
+    .Content(contentRow(entity.Title, detail, chevron))
+    .OnClickHandler(fun _ _ -> onReview entity.Id)
+    .Margin(0.0, 0.0, 0.0, 4.0)
+    .Classes("row")
 
 let planSection
-  (props: DetailPageProps, model: IObservable<Model>, onReview: Guid -> unit)
-  : Control =
-  let t key = get(props.Culture, key)
-
-  // the keyed binding diffs the store emissions: rows survive
-  let rows =
-    let template =
-      FuncDataTemplate<PlanEntity>(
-        (fun entity _ -> planRow(props, onReview, entity)),
-        false
-      )
-
-    let list = ItemsControl().ItemTemplate(template)
-
-    list.BindItemsSource(
-      model |> Observable.map(fun m -> m.Plans),
-      fun entity -> entity.Id
+  (
+    culture: CultureInfo,
+    plans: IObservable<PlanEntity list>,
+    onReview: Guid -> unit
+  ) : Control =
+  let template =
+    FuncDataTemplate<PlanEntity>(
+      (fun entity _ -> planRow(culture, onReview, entity)),
+      false
     )
-    |> ignore
 
-    list
+  let rows =
+    ItemsControl().ItemTemplate(template)
+    |> stretchItems
+    |> fun list -> list.BindItemsSource(plans, fun entity -> entity.Id)
 
   let emptyState =
-    label(t Keys.athletesEmpty)
-      .IsVisible(model |> Observable.map(fun m -> List.isEmpty m.Plans))
+    label(get(culture, Keys.athletesEmpty))
+      .IsVisible(plans |> Observable.map List.isEmpty)
 
   StackPanel().Spacing(8.0).Children(emptyState, rows)
 
@@ -122,54 +91,49 @@ let profileLine(culture: CultureInfo, athlete: Athlete) : Control =
     .Text(
       [ athlete.Gender |> Gender.toFileToken; goals ] |> String.concat " · "
     )
-    .Foreground(muted)
-    .FontFamily(font)
+    .Classes("caption", "secondary")
 
-// --- the page ---
-
+/// The page at one culture.
 let view
   (props: DetailPageProps)
   (onEvent: Event -> unit)
-  (model: IObservable<Model>)
-  (_: Dispatch<Msg>)
+  (culture: CultureInfo)
   : Control =
-  let t key = get(props.Culture, key)
+  let t key = get(culture, key)
+
+  let plans = props.Plans.Observe props.Athlete.Id
 
   let onReview id = onEvent(Event.ReviewRequested id)
 
-  ScrollViewer()
-    .Content(
+  fluentPage {
+    Lead = props.Lead
+    Title = props.Athlete.Profile.Name
+    Commands = [
+      iconPrimaryButton(
+        t Keys.plansGenerate,
+        Icons.flash,
+        (fun () -> onEvent Event.GenerateRequested)
+      )
+    ]
+    Footer = noFooter
+    Body =
       StackPanel()
-        .Margin(24.0)
         .Spacing(8.0)
         .Children(
-          pageTitle props.Athlete.Profile.Name,
-          profileLine(props.Culture, props.Athlete.Profile),
-          iconPrimaryButton(
-            t Keys.plansGenerate,
-            Icons.flash,
-            (fun () -> onEvent Event.GenerateRequested)
-          )
-            .HorizontalAlignment(HorizontalAlignment.Left),
+          profileLine(culture, props.Athlete.Profile),
           sectionTitle(t Keys.plansTitle),
-          planSection(props, model, onReview)
+          planSection(culture, plans, onReview)
         )
-    )
+    Measure = 760.0
+  }
 
 type AthleteDetailPage
   (props: DetailPageProps, [<InlineIfLambda>] onEvent: Event -> unit) as this =
   inherit UserControl()
 
-  // the plan store in: the BehaviorSubject replay fills the model at
-  // once and every later write lands as a refresh
-  let subscribe(props: DetailPageProps) : Sub<Msg> =
-    fun dispatch ->
-      props.Plans.Observe props.Athlete.Id
-      |> Observable.subscribe(PlansRefreshed >> dispatch)
-
   do
-    let program =
-      Program.mkProgram init update (view props onEvent)
-      |> Program.withSubscription(fun _ -> subscribe props)
-
-    this.Content <- Program.runWith props program
+    this.Content <-
+      Page.cultureView(
+        props.Culture,
+        (fun culture -> view props onEvent culture)
+      )

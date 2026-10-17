@@ -6,26 +6,45 @@ open Avalonia.Controls
 open NXUI.Extensions
 
 open Briple.Trainer
+open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Env
 open Briple.Trainer.Strings
+open Briple.Trainer.Theme
 
-/// What the page needs, as one value.
 [<Struct>]
 type SettingsPageProps = {
-  Culture: CultureInfo
-  Language: Language
-  Theme: ThemeChoice
-  AgentAvailable: bool
+  Culture: PageCulture
+  Lead: Control voption
+  Language: unit -> Language
+  Theme: unit -> ThemeChoice
+  AgentAvailable: unit -> bool
   OnLanguage: Language -> unit
   OnTheme: ThemeChoice -> unit
   OpenLogin: unit -> unit
 }
 
-type SettingsPage(props: SettingsPageProps) as this =
-  inherit UserControl()
+/// A closed dropdown over localized labels; the pick maps the label
+/// back to the value it was built from.
+let picker
+  (options: string list, current: string, pick: string -> unit)
+  : Control =
+  let combo = ComboBox(MinWidth = 140.0)
 
-  let culture = props.Culture
+  options |> List.iter(combo.Items.Add >> ignore)
+
+  combo.SelectedItem <- current
+
+  combo.SelectionChanged.Add(fun _ ->
+    match combo.SelectedItem with
+    | :? string as picked -> pick picked
+    | _ -> ())
+
+  combo
+
+/// The page at one culture.
+let view (props: SettingsPageProps) (culture: CultureInfo) : Control =
   let t key = get(culture, key)
 
   let languageRow =
@@ -33,13 +52,12 @@ type SettingsPage(props: SettingsPageProps) as this =
     let enName = t Keys.settingsLangEn
 
     let current =
-      match props.Language with
+      match props.Language() with
       | Es -> esName
       | En -> enName
 
-    radioRow(
+    picker(
       [ esName; enName ],
-      "settings-language",
       current,
       fun picked -> props.OnLanguage(if picked = enName then En else Es)
     )
@@ -50,7 +68,7 @@ type SettingsPage(props: SettingsPageProps) as this =
     let dark = t Keys.settingsThemeDark
 
     let current =
-      match props.Theme with
+      match props.Theme() with
       | System -> system
       | Light -> light
       | Dark -> dark
@@ -63,33 +81,33 @@ type SettingsPage(props: SettingsPageProps) as this =
         | _ -> System
       )
 
-    radioRow([ system; light; dark ], "settings-theme", current, pick)
+    picker([ system; light; dark ], current, pick)
 
   let providerBody: Control =
-    if props.AgentAvailable then
+    if props.AgentAvailable() then
       label(t Keys.settingsConnected)
     else
+      iconPrimaryButton(t Keys.settingsConnect, Icons.key, props.OpenLogin)
+
+  fluentPage {
+    Lead = props.Lead
+    Title = t Keys.navSettings
+    Commands = []
+    Footer = noFooter
+    Body =
       StackPanel()
         .Spacing(8.0)
         .Children(
-          label(t Keys.settingsMissingToken),
-          iconPrimaryButton(t Keys.settingsConnect, Icons.key, props.OpenLogin)
+          cardRow(t Keys.settingsLanguage, languageRow),
+          cardRow(t Keys.settingsTheme, themeRow),
+          cardRow(t Keys.settingsProvider, providerBody)
         )
+    Measure = 560.0
+  }
+
+type SettingsPage(props: SettingsPageProps) as this =
+  inherit UserControl()
 
   do
-
     this.Content <-
-      fluentPage {
-        Title = t Keys.navSettings
-        Commands = []
-        Footer = noFooter
-        Body =
-          StackPanel()
-            .Spacing(4.0)
-            .Children(
-              field(t Keys.settingsLanguage, (fun () -> languageRow)),
-              field(t Keys.settingsTheme, (fun () -> themeRow)),
-              field(t Keys.settingsProvider, (fun () -> providerBody))
-            )
-        Measure = 560.0
-      }
+      Page.cultureView(props.Culture, (fun culture -> view props culture))

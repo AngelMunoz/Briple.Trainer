@@ -17,25 +17,12 @@ open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Strings
 
-/// What the brief builds on when a previous plan exists: chain on it or
-/// start clean. The choice rides the Submitted event.
 type Mode =
   | Adjust
   | Fresh
 
-type Event =
-  | Submitted of weeks: int * brief: Brief * mode: Mode
-  | Cancelled
-
 [<Struct>]
-type Props = {
-  Culture: CultureInfo
-  Athlete: Athlete
-  /// True when there is a previous plan this generation could adjust.
-  HasPrevious: bool
-}
-
-type Model = {
+type BriefDraft = {
   Weeks: int
   Goal: PlanGoal
   Frequency: VariantFrequency
@@ -43,14 +30,23 @@ type Model = {
   Mode: Mode
 }
 
+[<Struct>]
+type Props = {
+  Culture: CultureInfo
+  Athlete: Athlete
+  HasPrevious: bool
+  Draft: BriefDraft
+  OnChanged: BriefDraft -> unit
+}
+
+type Model = BriefDraft
+
 type Msg =
   | SetWeeks of int
   | SetGoal of PlanGoal
   | SetFrequency of VariantFrequency
   | ToggleEmphasis of Emphasis
   | SetMode of Mode
-  | Submit
-  | Cancel
 
 let goalOptions = [
   Hypertrophy, Keys.goalHypertrophy
@@ -95,225 +91,175 @@ let frequencyOptions = [
   SeisDias, Keys.freq6
 ]
 
-let init(props: Props) =
-  {
-    Weeks = 4
-    Goal =
-      props.Athlete.Goals |> List.tryHead |> Option.defaultValue Hypertrophy
-    Frequency = TresDias
-    Emphasis = []
-    Mode = Adjust
-  },
-  Cmd.none
+/// The default draft of a fresh wizard visit.
+let defaultDraft(athlete: Athlete, hasPrevious: bool) : BriefDraft = {
+  Weeks = 4
+  Goal = athlete.Goals |> List.tryHead |> Option.defaultValue Hypertrophy
+  Frequency = TresDias
+  Emphasis = []
+  Mode = if hasPrevious then Adjust else Fresh
+}
 
-/// The update closes over `onEvent`: the submit and cancel decisions are
-/// one-shot outputs, not model transitions.
-let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
-  match msg with
-  | SetWeeks weeks -> { model with Weeks = weeks }, Cmd.none
+let init(props: Props) = props.Draft, Cmd.none
 
-  | SetGoal goal ->
-    // the emphasis catalog is per goal: a goal change resets the picks
-    {
-      model with
-          Goal = goal
-          Emphasis = []
-    },
-    Cmd.none
+/// Every edit reports the new draft to the page; the page owns it.
+let update (props: Props) (msg: Msg) (model: Model) =
+  let next =
+    match msg with
+    | SetWeeks weeks -> { model with Weeks = weeks }
 
-  | SetFrequency frequency -> { model with Frequency = frequency }, Cmd.none
-
-  | ToggleEmphasis emphasis ->
-    let picked =
-      if List.contains emphasis model.Emphasis then
-        List.except [ emphasis ] model.Emphasis
-      else
-        model.Emphasis @ [ emphasis ]
-
-    { model with Emphasis = picked }, Cmd.none
-
-  | SetMode mode -> { model with Mode = mode }, Cmd.none
-
-  | Submit ->
-    onEvent(
-      Event.Submitted(
-        model.Weeks,
+    | SetGoal goal ->
+        // the emphasis catalog is per goal: a goal change resets the picks
         {
-          Goal = model.Goal
-          Frequency = model.Frequency
-          Emphasis = model.Emphasis
-          Adjustments = []
-        },
-        model.Mode
+          model with
+              Goal = goal
+              Emphasis = []
+        }
+
+    | SetFrequency frequency -> { model with Frequency = frequency }
+
+    | ToggleEmphasis emphasis ->
+      let picked =
+        if List.contains emphasis model.Emphasis then
+          List.except [ emphasis ] model.Emphasis
+        else
+          model.Emphasis @ [ emphasis ]
+
+      { model with Emphasis = picked }
+
+    | SetMode mode -> { model with Mode = mode }
+
+  props.OnChanged next
+  next, Cmd.none
+
+let goalName (culture: CultureInfo) (goal: PlanGoal) =
+  goalOptions
+  |> List.tryPick(fun (candidate, key) ->
+    if candidate = goal then Some(get(culture, key)) else None)
+  |> Option.defaultValue ""
+
+let emphasisName (culture: CultureInfo) (emphasis: Emphasis) =
+  emphasisOptions
+  |> List.tryPick(fun (candidate, key) ->
+    if candidate = emphasis then
+      Some(get(culture, key))
+    else
+      None)
+  |> Option.defaultValue ""
+
+let frequencyName (culture: CultureInfo) (frequency: VariantFrequency) =
+  frequencyOptions
+  |> List.tryPick(fun (candidate, key) ->
+    if candidate = frequency then
+      Some(get(culture, key))
+    else
+      None)
+  |> Option.defaultValue ""
+
+/// The brief form at one culture, over the current draft.
+let view
+  (props: Props)
+  (model: IObservable<Model>)
+  (dispatch: Dispatch<Msg>)
+  : Control =
+  let current = props.Draft
+  let culture = props.Culture
+  let t key = get(culture, key)
+
+  // the goal radio is built from the athlete's own goals
+  let athleteGoals =
+    if List.isEmpty props.Athlete.Goals then
+      [ Hypertrophy ]
+    else
+      props.Athlete.Goals
+
+  let modeRow: Control =
+    if props.HasPrevious then
+      let modeName mode =
+        match mode with
+        | Adjust -> t Keys.wizardModeAdjust
+        | Fresh -> t Keys.wizardModeNew
+
+      field(
+        t Keys.wizardMode,
+        fun () ->
+          radioRow(
+            [ Adjust, modeName Adjust; Fresh, modeName Fresh ],
+            "brief-mode",
+            current.Mode,
+            SetMode >> dispatch
+          )
       )
+    else
+      StackPanel()
+
+  let weeksChips =
+    radioRow(
+      [ for week in 1..4 -> week, string week ],
+      "brief-weeks",
+      current.Weeks,
+      SetWeeks >> dispatch
     )
 
-    model, Cmd.none
+  let goalChips =
+    radioRow(
+      [ for goal in athleteGoals -> goal, goalName culture goal ],
+      "brief-goal",
+      current.Goal,
+      SetGoal >> dispatch
+    )
 
-  | Cancel ->
-    onEvent Event.Cancelled
-    model, Cmd.none
+  let frequencyChips =
+    radioRow(
+      [ for frequency, key in frequencyOptions -> frequency, t key ],
+      "brief-frequency",
+      current.Frequency,
+      SetFrequency >> dispatch
+    )
 
-type WizardBrief(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
-  =
+  // the emphasis catalog follows the picked goal: the keyed binding
+  // diffs the snapshots, so rows survive a goal change
+  let emphasisRow(emphasis: Emphasis) : Control =
+    let isOn =
+      model
+      |> Observable.map(fun current -> List.contains emphasis current.Emphasis)
+
+    checkRow(
+      emphasisName culture emphasis,
+      isOn,
+      fun () -> dispatch(ToggleEmphasis emphasis)
+    )
+
+  let emphasisTemplate =
+    FuncDataTemplate<Emphasis>((fun emphasis _ -> emphasisRow emphasis), false)
+
+  let emphasisSection =
+    let items = model |> Observable.map(fun m -> Emphasis.optionsFor m.Goal)
+
+    // a 24-item catalog cannot be one long column: wrap it in two or
+    // three columns inside the hub section
+    ItemsControl()
+      .ItemTemplate(emphasisTemplate)
+      .ItemsPanel(
+        FuncTemplate<Panel>(fun () ->
+          WrapPanel(Orientation = Orientation.Horizontal))
+      )
+      .BindItemsSource(items, id)
+
+  StackPanel()
+    .Spacing(4.0)
+    .Children(
+      modeRow,
+      field(t Keys.wizardWeeks, (fun () -> weeksChips)),
+      field(t Keys.wizardGoal, (fun () -> goalChips)),
+      field(t Keys.wizardFrequency, (fun () -> frequencyChips)),
+      field(t Keys.wizardEmphasis, (fun () -> emphasisSection))
+    )
+
+type WizardBrief(props: Props) as this =
   inherit UserControl()
-  let t key = get(props.Culture, key)
-
-  let goalName goal =
-    goalOptions
-    |> List.tryPick(fun (candidate, key) ->
-      if candidate = goal then Some(t key) else None)
-    |> Option.defaultValue ""
-
-  let goalByName picked =
-    goalOptions
-    |> List.tryPick(fun (candidate, key) ->
-      if t key = picked then Some candidate else None)
-
-  let emphasisName emphasis =
-    emphasisOptions
-    |> List.tryPick(fun (candidate, key) ->
-      if candidate = emphasis then Some(t key) else None)
-    |> Option.defaultValue ""
-
-  let emphasisByName picked =
-    emphasisOptions
-    |> List.tryPick(fun (candidate, key) ->
-      if t key = picked then Some candidate else None)
-
-  let frequencyName frequency =
-    frequencyOptions
-    |> List.tryPick(fun (candidate, key) ->
-      if candidate = frequency then Some(t key) else None)
-    |> Option.defaultValue ""
-
-  let frequencyByName picked =
-    frequencyOptions
-    |> List.tryPick(fun (candidate, key) ->
-      if t key = picked then Some candidate else None)
 
   do
-
-    let view (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
-      // the goal radio is built from the athlete's own goals; the same
-      // default the init model carries
-      let athleteGoals =
-        if List.isEmpty props.Athlete.Goals then
-          [ Hypertrophy ]
-        else
-          props.Athlete.Goals
-
-      let initialGoal =
-        athleteGoals |> List.tryHead |> Option.defaultValue Hypertrophy
-
-      // the starting point, only when there is a previous plan: silent
-      // adjustment was a surprise the user did not pick
-      let modeRow: Control =
-        if props.HasPrevious then
-          let modeName mode =
-            match mode with
-            | Adjust -> t Keys.wizardModeAdjust
-            | Fresh -> t Keys.wizardModeNew
-
-          field(
-            t Keys.wizardMode,
-            fun () ->
-              radioRow(
-                [ modeName Adjust; modeName Fresh ],
-                "brief-mode",
-                modeName Adjust,
-                fun picked ->
-                  dispatch(
-                    SetMode(if picked = modeName Fresh then Fresh else Adjust)
-                  )
-              )
-          )
-        else
-          StackPanel() :> Control
-
-      let weeksChips =
-        radioRow(
-          [ for week in 1..4 -> $"{week}" ],
-          "brief-weeks",
-          "4",
-          fun picked -> dispatch(SetWeeks(Int32.Parse picked))
-        )
-
-      let goalChips =
-        radioRow(
-          athleteGoals |> List.map goalName,
-          "brief-goal",
-          goalName initialGoal,
-          fun picked -> goalByName picked |> Option.iter(SetGoal >> dispatch)
-        )
-
-      let frequencyChips =
-        radioRow(
-          frequencyOptions |> List.map fst |> List.map frequencyName,
-          "brief-frequency",
-          frequencyName TresDias,
-          fun picked ->
-            frequencyByName picked |> Option.iter(SetFrequency >> dispatch)
-        )
-
-      // the emphasis catalog follows the picked goal: the keyed binding
-      // diffs the snapshots, so rows survive a goal change and only the
-      // catalog's own deltas apply
-      let emphasisRow(emphasis: Emphasis) : Control =
-        let isOn =
-          model
-          |> Observable.map(fun current ->
-            List.contains emphasis current.Emphasis)
-
-        checkRow(
-          emphasisName emphasis,
-          isOn,
-          fun () -> dispatch(ToggleEmphasis emphasis)
-        )
-
-      let emphasisTemplate =
-        FuncDataTemplate<Emphasis>(
-          (fun emphasis _ -> emphasisRow emphasis),
-          false
-        )
-
-      let emphasisSection =
-        let items = model |> Observable.map(fun m -> Emphasis.optionsFor m.Goal)
-
-        let list = ItemsControl().ItemTemplate(emphasisTemplate)
-
-        list.BindItemsSource(items, id) |> ignore
-        list
-
-      let generateButton =
-        iconPrimaryButton(
-          t Keys.wizardGenerate,
-          Icons.play,
-          (fun () -> dispatch Submit)
-        )
-
-      let cancelButton =
-        iconButton(
-          t Keys.athleteCancel,
-          Icons.arrowLeft,
-          (fun () -> dispatch Cancel)
-        )
-
-      StackPanel()
-        .Spacing(4.0)
-        .Children(
-          modeRow,
-          field(t Keys.wizardWeeks, (fun () -> weeksChips)),
-          field(t Keys.wizardGoal, (fun () -> goalChips)),
-          field(t Keys.wizardFrequency, (fun () -> frequencyChips)),
-          field(t Keys.wizardEmphasis, (fun () -> emphasisSection)),
-          StackPanel()
-            .Orientation(Orientation.Horizontal)
-            .Spacing(8.0)
-            .Children(generateButton, cancelButton)
-        )
-      :> Control
-
-    let program = Program.mkProgram init (update props onEvent) view
+    let program = Program.mkProgram init (update props) (view props)
 
     this.Content <- Program.runWith props program

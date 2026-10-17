@@ -58,23 +58,16 @@ let dialogView(request: ConfirmRequest) : Control =
           StackPanel()
             .Spacing(16.0)
             .Children(
-              TextBlock()
-                .Text(request.Title)
-                .FontSize(20.0)
-                .FontWeight(FontWeight.SemiBold)
-                .FontFamily(font),
-              TextBlock()
-                .Text(request.Body)
-                .FontFamily(font)
-                .TextWrapping(TextWrapping.Wrap),
+              TextBlock().Text(request.Title).Classes("subtitle"),
+              TextBlock().Text(request.Body).TextWrapping(TextWrapping.Wrap),
               StackPanel()
                 .Orientation(Orientation.Horizontal)
                 .Spacing(8.0)
                 .HorizontalAlignment(HorizontalAlignment.Right)
                 .Children(
-                  Button(Content = request.Cancel, FontFamily = font)
+                  Button(Content = request.Cancel)
                     .OnClickHandler(fun _ _ -> answer false),
-                  Button(Content = request.Accept, FontFamily = font)
+                  Button(Content = request.Accept)
                     .OnClickHandler(fun _ _ -> answer true)
                 )
             )
@@ -87,20 +80,19 @@ let inline confirmAsync(request: ConfirmRequest) : Async<bool> =
     pending.OnNext(ValueSome(request, onOk)))
 
 /// The overlay layer the shell mounts last; it shows only while a
-/// request is pending.
+/// request is pending. The content is a binding, not a subscription.
 let host: Control =
   let layer =
-    ContentControl().IsVisible(pending |> Observable.map ValueOption.isSome)
-
-  // NXUI's fluent Content would store the observable itself as the
-  // content, so the swap is an explicit subscription
-  pending
-  |> Observable.subscribe(fun current ->
-    layer.Content <-
-      match current with
-      | ValueSome(request, _) -> dialogView request
-      | ValueNone -> Grid())
-  |> ignore
+    ContentControl()
+      .IsVisible(pending |> Observable.map ValueOption.isSome)
+      .Content(
+        (pending
+         |> Observable.map(fun current ->
+           match current with
+           | ValueSome(request, _) -> dialogView request
+           | ValueNone -> Grid()))
+          .ToBinding()
+      )
 
   layer.OnKeyDownHandler(
     (fun _ args ->

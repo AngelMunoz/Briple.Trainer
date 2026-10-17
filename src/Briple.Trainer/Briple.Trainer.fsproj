@@ -55,6 +55,8 @@
     <Compile Include="Env.fs" />
     <Compile Include="Navigation.fsi" />
     <Compile Include="Navigation.fs" />
+    <Compile Include="Components\Page.fsi" />
+    <Compile Include="Components\Page.fs" />
     <Compile Include="Toasts.fsi" />
     <Compile Include="Toasts.fs" />
     <Compile Include="Dialogs.fsi" />
@@ -63,6 +65,8 @@
     <Compile Include="Icons.fs" />
     <Compile Include="Components\Fields.fsi" />
     <Compile Include="Components\Fields.fs" />
+    <Compile Include="Components\Hub.fsi" />
+    <Compile Include="Components\Hub.fs" />
     <Compile Include="Components\AthleteList.fsi" />
     <Compile Include="Components\AthleteList.fs" />
     <Compile Include="Components\NewAthleteForm.fsi" />

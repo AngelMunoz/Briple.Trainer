@@ -147,41 +147,43 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
           | Athlete -> get(culture, Keys.memoryScopeAthlete)
 
         radioRow(
-          [ nameOf Plan; nameOf Athlete ],
+          [ Plan, nameOf Plan; Athlete, nameOf Athlete ],
           $"memory-scope-{props.Id}",
-          nameOf props.Memory.Scope,
-          fun picked ->
-            dispatch(
-              SetScope(if picked = nameOf Athlete then Athlete else Plan)
-            )
+          props.Memory.Scope,
+          SetScope >> dispatch
         )
 
-      StackPanel()
-        .Spacing(6.0)
-        .Margin(0.0, 0.0, 0.0, 12.0)
-        .Children(
-          TextBlock().Text(originText culture props.Memory).FontFamily(font),
-          StackPanel().Spacing(4.0).Children [|
-            for delta in props.Memory.Deltas -> optionRow delta
-          |],
-          scopeRow,
+      // the proposal rides a card: the Fluent content surface
+
+      Border()
+        .Margin(0.0, 0.0, 0.0, 8.0)
+        .Child(
           StackPanel()
-            .Orientation(Orientation.Horizontal)
-            .Spacing(8.0)
+            .Spacing(6.0)
             .Children(
-              iconButton(
-                get(culture, Keys.memoriesConfirm),
-                Icons.check,
-                fun () -> dispatch Accept
-              ),
-              iconButton(
-                get(culture, Keys.memoriesDiscard),
-                Icons.delete,
-                fun () -> dispatch Discard
-              )
+              TextBlock().Text(originText culture props.Memory),
+              StackPanel().Spacing(4.0).Children [|
+                for delta in props.Memory.Deltas -> optionRow delta
+              |],
+              scopeRow,
+              StackPanel()
+                .Orientation(Orientation.Horizontal)
+                .Spacing(8.0)
+                .Children(
+                  iconButton(
+                    get(culture, Keys.memoriesConfirm),
+                    Icons.check,
+                    fun () -> dispatch Accept
+                  ),
+                  iconButton(
+                    get(culture, Keys.memoriesDiscard),
+                    Icons.delete,
+                    fun () -> dispatch Discard
+                  )
+                )
             )
         )
-      :> Control
+        .Classes("card")
 
     let program = Program.mkProgram init (update props onEvent) view
 

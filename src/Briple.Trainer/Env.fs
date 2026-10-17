@@ -113,6 +113,8 @@ type IProvideTheme =
 type IProvideCulture =
   abstract Culture: CultureInfo
 
+  abstract CultureChanged: IObservable<CultureInfo>
+
 type IProvideAgent =
   abstract AgentAvailable: bool
 
@@ -247,7 +249,9 @@ type AppEnv
     let culture = Language.toCulture bootLanguage
 
     CultureInfo.DefaultThreadCurrentUICulture <- culture
+    CultureInfo.DefaultThreadCurrentCulture <- culture
     Thread.CurrentThread.CurrentUICulture <- culture
+    Thread.CurrentThread.CurrentCulture <- culture
 
   // a preference write keeps the provider fields and the key as loaded
   let persistPrefs(language: string, theme: string) =
@@ -305,7 +309,9 @@ type AppEnv
       let culture = Language.toCulture language
 
       CultureInfo.DefaultThreadCurrentUICulture <- culture
+      CultureInfo.DefaultThreadCurrentCulture <- culture
       Thread.CurrentThread.CurrentUICulture <- culture
+      Thread.CurrentThread.CurrentCulture <- culture
 
       persistPrefs(Language.toToken language, ThemeChoice.toToken currentTheme)
 
@@ -319,6 +325,10 @@ type AppEnv
 
   interface IProvideCulture with
     member _.Culture = Language.toCulture currentLanguage
+
+    member _.CultureChanged =
+      languageChanged
+      |> Observable.map(fun language -> Language.toCulture language)
 
   interface IProvideHost with
     member _.Host = host
@@ -386,6 +396,9 @@ type AppEnv
 
   /// The culture of the current language, reachable without a cast.
   member this.Culture = (this :> IProvideCulture).Culture
+
+  /// The culture switches, reachable without a cast.
+  member _.CultureChanged = languageChanged |> Observable.map Language.toCulture
 
   /// The language switches, reachable without a cast.
   member _.LanguageChanged = languageChanged :> IObservable<Language>

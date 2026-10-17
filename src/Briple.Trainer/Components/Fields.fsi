@@ -1,8 +1,8 @@
 module Briple.Trainer.Components.Fields
 
-// The Fluent control kit: the type ramp, buttons, chips, inputs and the
-// page contract. One accent (the app's), hierarchy from type size and
-// weight, page commands in a CommandBar at the top. `field` takes the
+// The Fluent control kit: the type ramp, buttons, inputs and the page
+// contract. One accent (the app's), hierarchy from type size and
+// weight, page commands in the single header row. `field` takes the
 // input as a `unit -> Control` hole (content projection): the caller
 // decides when the control is built.
 
@@ -21,10 +21,13 @@ type FooterBar = {
 /// The empty footer, for pages without flow actions.
 val noFooter: FooterBar
 
-/// The page contract: title, page commands, flow actions and body, read
-/// inside a measure so prose and forms keep a readable width.
+/// The page contract: the shell's back control as the header lead, the
+/// title, the page commands, the flow actions and the body, read inside
+/// a measure so prose and forms keep a readable width.
 [<Struct>]
 type PageChrome = {
+  /// The shell's back control, placed first in the header row.
+  Lead: Control voption
   Title: string
   Commands: Control list
   Footer: FooterBar
@@ -57,9 +60,10 @@ val inline primaryButton:
 val inline hyperlinkButton:
   text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Control
 
-/// One command for the page's CommandBar.
+/// One page command: a plain button for the header row. The primary
+/// action goes last (rightmost); mark it with `accent`.
 val inline command:
-  text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> CommandBarButton
+  text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Button
 
 /// A 20px glyph that takes the text color of its container: PathIcon as
 /// the Fluent theme sizes and colors it.
@@ -86,58 +90,46 @@ val inline iconPrimaryButton:
   [<InlineIfLambda>] onClick: (unit -> unit) ->
     Button
 
-/// One CommandBar command with its glyph left of the label.
+/// One page command with its glyph before the label.
 val inline iconCommand:
   text: string *
   geometry: StreamGeometry *
   [<InlineIfLambda>] onClick: (unit -> unit) ->
-    CommandBarButton
+    Button
 
-/// A single-choice chip row; the selected option renders in accent.
-val inline choiceChips:
-  options: string list *
-  selected: string *
-  [<InlineIfLambda>] onPick: (string -> unit) ->
+/// One content row: a two-line title and detail with a trailing glyph,
+/// in a grid so the glyph stays at the row's end. The caller wraps it
+/// in the tappable surface.
+val inline contentRow:
+  title: string *
+  detail: string *
+  [<InlineIfLambda>] trailing: (unit -> Control) ->
     Control
 
-/// A multi-choice chip row; the selected options render in accent.
-val inline multiChips:
-  options: string list *
-  selected: string list *
-  [<InlineIfLambda>] onToggle: (string -> unit) ->
-    Control
+/// Makes every item container fill the items control's width, so rows of
+/// different lengths share one left edge and one trailing edge.
+val inline stretchItems: items: ItemsControl -> ItemsControl
 
-/// A single-choice chip row whose selection follows an observable; the
-/// row builds once and the chip backgrounds react.
-val inline reactiveChoiceChips:
-  options: string list *
-  selected: IObservable<string> *
-  [<InlineIfLambda>] onPick: (string -> unit) ->
-    Control
-
-/// A multi-choice chip row whose selection follows an observable; the
-/// row builds once and the chip backgrounds react.
-val inline reactiveMultiChips:
-  options: string list *
-  selected: IObservable<string list> *
-  [<InlineIfLambda>] onToggle: (string -> unit) ->
-    Control
-
-/// A single-line text input with a placeholder.
+/// A single-line text input with a placeholder; typing reports the
+/// value, the model owns it.
 val inline entry:
   placeholder: string *
   text: string *
   [<InlineIfLambda>] onChanged: (string -> unit) ->
     TextBox
 
-/// A single-choice row of radio buttons; the control owns the visual
-/// state, so the selection is never ambiguous.
+/// One settings card row: the title left, the control right.
+val inline cardRow: title: string * control: Control -> Control
+
+/// A single-choice row of radio buttons over typed options; the control
+/// owns the visual state, the value comes from the model.
 val inline radioRow:
-  options: string list *
+  options: ('T * string) list *
   group: string *
-  initial: string *
-  [<InlineIfLambda>] onPick: (string -> unit) ->
+  selected: 'T *
+  [<InlineIfLambda>] onPick: ('T -> unit) ->
     Control
+    when 'T: equality
 
 /// One checkbox whose checked state follows an observable; the
 /// subscription is disposed when the control detaches.
@@ -147,12 +139,10 @@ val inline checkRow:
   [<InlineIfLambda>] onToggle: (unit -> unit) ->
     Control
 
-/// The CommandBar of a page: the commands land as primaries, dynamic
-/// overflow takes the rest when the window runs narrow.
-val inline commandBar: commands: Control list -> Control
-
-/// The full page: the CommandBar under the title, the body below, all
-/// inside the measure.
+/// The full page: ONE header row (the shell's back lead, the title
+/// beside it, the page commands to the right with the primary last),
+/// the flow actions (when any) pinned to the bottom, and the body
+/// scrolling in between, centered inside the measure.
 val inline fluentPage: chrome: PageChrome -> Control
 
 /// A body-only page: the page contract without commands.

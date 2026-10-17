@@ -1,6 +1,7 @@
 module Briple.Trainer.Views.Routes
 
 open System
+
 open Avalonia.Controls
 open Microsoft.Extensions.Logging
 open Navs
@@ -13,9 +14,11 @@ open Serilog
 open Briple.Trainer.Components
 open Briple.Trainer.Components.AthleteList
 open Briple.Trainer.Components.NewAthleteForm
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Env
+open Briple.Trainer.Navigation
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 open Briple.Trainer.Strings
@@ -33,22 +36,15 @@ type RouteDeps<'T
   and 'T :> IProvideLogging> = 'T
 
 let inline go(nav: INavigable<Control>, url: string) : unit =
-  // one navigation at a time: a request that lands while another runs
-  // feeds the transition window where cached views re-parent and the
-  // renderer dies ("Visual already has a parent")
-  if nav.StateSnapshot <> NavigationState.Navigating then
-    asyncEx {
-      match! nav.Navigate url with
-      | Ok() -> ()
-      | Error e ->
-        Log.Error("navigation to {Url} failed: {Error}", url, string e)
-    }
-    |> Async.StartImmediate
+  asyncEx {
+    match! nav.Navigate url with
+    | Ok() -> ()
+    | Error e -> Log.Error("navigation to {Url} failed: {Error}", url, string e)
+  }
+  |> Async.StartImmediate
 
 let inline notFound() : Control = TextBlock(Text = "not found")
 
-/// Ok keeps the values; an Error logs and reads as empty, so a failed
-/// load degrades to an empty page instead of crashing the navigation.
 let inline orEmpty(what: string) : Result<'a list, exn> -> 'a list =
   function
   | Ok xs -> xs
@@ -56,20 +52,26 @@ let inline orEmpty(what: string) : Result<'a list, exn> -> 'a list =
     Log.Error(e, "{Que} failed", what)
     []
 
-/// A guid route parameter as an active pattern: `match ctx with GuidParam
-/// athleteId "athleteId" -> ...`.
 [<return: Struct>]
 let inline (|GuidParam|_|) (name: string) (ctx: RouteContext) =
   ctx.getParam<Guid> name
 
-/// The athletes page: the component over the live list; no data loads
-/// here, the store fills it.
+/// The live culture a page reads.
+let inline cultureOf(env: #IProvideCulture) : PageCulture = {
+  Current = fun () -> env.Culture
+  Changed = env.CultureChanged
+}
+
 let athletesPage
-  (env: #IProvideStores & #IProvideCulture, nav: INavigable<Control>)
-  : Control =
+  (
+    env: #IProvideStores & #IProvideCulture,
+    lead: unit -> Control,
+    nav: INavigable<Control>
+  ) : Control =
   AthleteList(
     {
-      Culture = env.Culture
+      Culture = cultureOf env
+      Lead = ValueSome(lead())
       Athletes = env.Stores.Athletes.Observe()
     },
     fun event ->
@@ -79,10 +81,18 @@ let athletesPage
   )
 
 let newAthletePage
-  (env: #IProvideStores & #IProvideCulture, nav: INavigable<Control>)
-  : Control =
+  (
+    env: #IProvideStores & #IProvideCulture,
+    lead: unit -> Control,
+    gate: PageGate,
+    nav: INavigable<Control>
+  ) : Control =
   NewAthleteForm(
-    { Culture = env.Culture },
+    {
+      Culture = cultureOf env
+      Lead = ValueSome(lead())
+      Gate = gate
+    },
     fun event ->
       match event with
       | NewAthleteForm.Saved athlete ->
@@ -107,6 +117,7 @@ let newAthletePage
 let detailPage
   (
     env: #IProvideStore & #IProvideStores & #IProvideCulture,
+    lead: unit -> Control,
     athleteId: Guid,
     nav: INavigable<Control>
   ) : Async<Control> = asyncEx {
@@ -118,11 +129,11 @@ let detailPage
     return TextBlock(Text = string e.Message)
   | Ok ValueNone -> return notFound()
   | Ok(ValueSome athlete) ->
-    // the page subscribes to the plan store; the emissions fill it
     return
       Athletes.AthleteDetailPage(
         {
-          Culture = env.Culture
+          Culture = cultureOf env
+          Lead = ValueSome(lead())
           Plans = env.Stores.Plans
           Athlete = athlete
         },
@@ -138,10 +149,11 @@ let detailPage
 let wizardPage
   (
     env: #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideAgent,
+    lead: unit -> Control,
+    gate: PageGate,
     athleteId: Guid,
     nav: INavigable<Control>
   ) : Async<Control> = asyncEx {
-  // point-in-time snapshots: the wizard works over what exists now
   let! athlete = env.Store.FindAthlete athleteId
   let! memories = env.Store.ListMemories athleteId
   let! plans = env.Store.ListPlans athleteId
@@ -153,8 +165,6 @@ let wizardPage
   let previous =
     plans |> orEmpty "plan list" |> List.tryLast |> ValueOption.ofOption
 
-  // what this generation carries: the athlete-scoped confirmations plus
-  // the plan-scoped ones of the plan being adjusted
   let confirmed =
     relevantMemories(
       entities |> List.map(fun entity -> entity.Memory, entity.PlanId),
@@ -166,7 +176,8 @@ let wizardPage
     return
       Generate.WizardPage(
         {
-          Culture = env.Culture
+          Culture = cultureOf env
+          Lead = ValueSome(lead())
           Store = env.Store
           Memories = env.Stores.Memories
           Plans = env.Stores.Plans
@@ -175,6 +186,7 @@ let wizardPage
           Confirmed = confirmed
           Proposals = proposals
           Previous = previous
+          Gate = gate
         },
         fun outcome ->
           match outcome with
@@ -188,6 +200,8 @@ let wizardPage
 let reviewPage
   (
     env: #IProvideStores & #IProvideCulture & #IProvideHost & #IProvideAgent,
+    lead: unit -> Control,
+    gate: PageGate,
     planId: Guid
   ) : Async<Control> = asyncEx {
   let! plan = env.Stores.Plans.Find planId
@@ -196,21 +210,27 @@ let reviewPage
   | Ok(ValueSome entity) ->
     return
       Review.ReviewPage {
-        Culture = env.Culture
+        Culture = cultureOf env
+        Lead = ValueSome(lead())
         Plans = env.Stores.Plans
         Memories = env.Stores.Memories
         Agent = env
         Host = env.Host
         Entity = entity
+        Gate = gate
       }
   | _ -> return notFound()
 }
 
 let loginPage
-  (env: #IProvideCulture & #IProvideCredentials, nav: INavigable<Control>)
-  : Control =
+  (
+    env: #IProvideCulture & #IProvideCredentials,
+    lead: unit -> Control,
+    nav: INavigable<Control>
+  ) : Control =
   Login.LoginPage {
-    Culture = env.Culture
+    Culture = cultureOf env
+    Lead = ValueSome(lead())
     Save = env.SaveCredentials
     OnDone = fun () -> go(nav, "/")
   }
@@ -218,13 +238,15 @@ let loginPage
 let settingsPage
   (
     env: #IProvideCulture & #IProvideLanguage & #IProvideTheme & #IProvideAgent,
+    lead: unit -> Control,
     nav: INavigable<Control>
   ) : Control =
   Settings.SettingsPage {
-    Culture = env.Culture
-    Language = env.Language
-    Theme = env.Theme
-    AgentAvailable = env.AgentAvailable
+    Culture = cultureOf env
+    Lead = ValueSome(lead())
+    Language = fun () -> env.Language
+    Theme = fun () -> env.Theme
+    AgentAvailable = fun () -> env.AgentAvailable
     OnLanguage = env.SetLanguage
     OnTheme =
       fun theme ->
@@ -233,50 +255,139 @@ let settingsPage
     OpenLogin = fun () -> go(nav, "/login")
   }
 
-/// The agent gate, shared by every data route: the app's data sits
-/// behind the provider token, and without one the navigation sends the
-/// user to connect it. Only the login and the settings stay open. Routes
-/// are cached, and Navs 1.0.1 runs guards on cached URLs too, so the
-/// gate holds on every activation.
+/// The agent gate, shared by every data route.
 let requiresAgent(env: #IProvideAgent) : GuardResponse =
   if env.AgentAvailable then
     GuardResponse.Continue
   else
     GuardResponse.Redirect "/login"
 
-let build(env: RouteDeps<'T>) : IRouter<Control> =
-  // the boot fires at the athletes list; the guard decides whether that
-  // lands or the user goes to connect the provider first.
-  //
-  // The table is definitions built with the DSL and composed with pipes:
-  // guards (and cache, later) attach the same way on every route. The
-  // router is the library's own; the shell mounts it in a RouterOutlet.
+/// The URL family that decides the leave dialog.
+type PageKind =
+  | FormPage
+  | WizardPage
+  | ReviewPage
+  | PlainPage
+
+let kindOf(url: string) : PageKind =
+  if url = "/athletes/new" then
+    FormPage
+  elif url.Contains("/generate", StringComparison.Ordinal) then
+    WizardPage
+  elif url.Contains("/review/", StringComparison.Ordinal) then
+    ReviewPage
+  else
+    PlainPage
+
+[<Struct>]
+type ShellRoutes = {
+  Router: IRouter<Control>
+  AskLeave: string -> Async<bool>
+}
+
+let build(env: RouteDeps<'T>, lead: unit -> Control) =
   let inline gate r =
     r |> Navs.Route.canActivate(fun _ _ -> requiresAgent env)
+
+  // the leave decision, all of it in one place: the page kind and the
+  // phase decide the dialog, and a confirmed leave stops a running job
+  let decide(url: string) : PageGate -> PagePhase -> Async<bool> =
+    let kind = kindOf url
+
+    // the dialog follows the language at the moment it opens
+    let ask titleKey bodyKey =
+      let culture = env.Culture
+      ValueSome(get(culture, titleKey), get(culture, bodyKey))
+
+    let dialogOf(phase: PagePhase) : (string * string) voption =
+      match kind, phase with
+      | FormPage, Ready
+      | WizardPage, Ready
+      | ReviewPage, Ready
+      | PlainPage, _ -> ValueNone
+      | FormPage, _ -> ask Keys.guardAthleteTitle Keys.guardAthleteBody
+      | WizardPage, Working ->
+        ask Keys.guardGenerationTitle Keys.guardGenerationBody
+      | WizardPage, UnsavedChanges -> ask Keys.guardPlanTitle Keys.guardPlanBody
+      | ReviewPage, _ -> ask Keys.guardUnsavedTitle Keys.guardUnsavedBody
+
+    fun exitGate phase -> async {
+      match dialogOf phase with
+      | ValueNone -> return true
+      | ValueSome(title, body) ->
+        let culture = env.Culture
+
+        let! sure =
+          Briple.Trainer.Dialogs.confirmAsync {
+            Title = title
+            Body = body
+            Accept = get(culture, Keys.guardLeave)
+            Cancel = get(culture, Keys.commonCancel)
+          }
+
+        if not sure then
+          return false
+        else
+          // a confirmed leave stops a running generation or a
+          // running note reading
+          match kind, phase with
+          | WizardPage, Working -> exitGate.Push PageCommand.CancelRun
+          | ReviewPage, Working -> exitGate.Push PageCommand.CancelRun
+          | _ -> ()
+
+          return true
+    }
+
+  let gates = PageGates decide
+
+  // every activation marks the gate, cached or not; pages reconcile
+  // their state from that signal
+  let inline shown r =
+    r
+    |> Navs.Route.canActivate(fun _ next ->
+      gates.Gate(next.path).MarkShown()
+      GuardResponse.Continue)
+
+  let inline confirmLeave r =
+    r
+    |> Navs.Route.canDeactivateAsync(fun from _ -> async {
+      match from with
+      | ValueSome active ->
+        let! allowed = gates.Gate(active.path).AskLeave()
+
+        return
+          if allowed then
+            GuardResponse.Continue
+          else
+            GuardResponse.Stop
+      | ValueNone -> return GuardResponse.Continue
+    })
 
   let table: RouteDefinition<Control> list = [
     Navs.Route.define<Control>(
       "athletes",
       "/",
-      fun _ nav -> athletesPage(env, nav)
+      fun _ nav -> athletesPage(env, lead, nav)
     )
     |> gate
+    |> shown
 
     Navs.Route.define<Control>(
       "login",
       "/login",
-      fun _ nav -> loginPage(env, nav)
+      fun _ nav -> loginPage(env, lead, nav)
     )
+    |> Navs.Route.cache CacheStrategy.NoCache
 
     Navs.Route.define<Control>(
       "new-athlete",
       "/athletes/new",
-      fun _ nav -> newAthletePage(env, nav)
+      fun ctx nav -> newAthletePage(env, lead, gates.Gate(ctx.path), nav)
     )
-    // a fresh form every visit: a cached one keeps its model alive and
-    // resubmits the athlete on the next save click
     |> Navs.Route.cache CacheStrategy.NoCache
+    |> confirmLeave
     |> gate
+    |> shown
 
     Navs.Route.define<Control>(
       "athlete",
@@ -284,11 +395,12 @@ let build(env: RouteDeps<'T>) : IRouter<Control> =
       fun context nav -> asyncEx {
         match context with
         | GuidParam "athleteId" athleteId ->
-          return! detailPage(env, athleteId, nav)
+          return! detailPage(env, lead, athleteId, nav)
         | _ -> return notFound()
       }
     )
     |> gate
+    |> shown
 
     Navs.Route.define<Control>(
       "generate",
@@ -296,37 +408,52 @@ let build(env: RouteDeps<'T>) : IRouter<Control> =
       fun context nav -> asyncEx {
         match context with
         | GuidParam "athleteId" athleteId ->
-          return! wizardPage(env, athleteId, nav)
+          return!
+            wizardPage(env, lead, gates.Gate(context.path), athleteId, nav)
         | _ -> return notFound()
       }
     )
+    // a wizard is one visit: the page resets on entry anyway, the
+    // strategy only keeps the router from holding the old run
+    |> Navs.Route.cache CacheStrategy.NoCache
+    |> confirmLeave
     |> gate
+    |> shown
 
     Navs.Route.define<Control>(
       "review",
       "/athletes/:athleteId<guid>/review/:planId<guid>",
       fun context _ -> asyncEx {
         match context with
-        | GuidParam "planId" planId -> return! reviewPage(env, planId)
+        | GuidParam "planId" planId ->
+          return! reviewPage(env, lead, gates.Gate(context.path), planId)
         | _ -> return notFound()
       }
     )
+    // a fresh review on every visit: the stored Raw is the baseline and
+    // a confirmed leave drops the draft, so no cached draft can come back
+    |> Navs.Route.cache CacheStrategy.NoCache
+    |> confirmLeave
     |> gate
+    |> shown
 
     Navs.Route.define<Control>(
       "settings",
       "/settings",
-      fun _ nav -> settingsPage(env, nav)
+      fun _ nav -> settingsPage(env, lead, nav)
     )
+    // the provider status and the preferences are read live; a fresh
+    // page on every visit keeps them honest
+    |> Navs.Route.cache CacheStrategy.NoCache
+    |> shown
   ]
 
-  // the router logs through the app's Serilog pipeline, so its level
-  // follows the app's configuration, not a private default
   let router =
     AvaloniaRouter(table, logger = env.LoggerFactory.CreateLogger "Navs.Router")
 
-  // the boot fires at the athletes list; the guard decides whether that
-  // lands or the user goes to connect the provider first
   go(router, "/")
 
-  router
+  {
+    Router = router
+    AskLeave = fun url -> gates.Gate(url).AskLeave()
+  }

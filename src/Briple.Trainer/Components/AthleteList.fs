@@ -9,11 +9,12 @@ open Avalonia.Layout
 open Avalonia.Media
 open NXUI.Extensions
 
-open MVUish.Avalonia
 open MVUish.Avalonia.Collections
 
 open Briple.Trainer
+open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Persistence
@@ -22,16 +23,11 @@ open Briple.Trainer.Theme
 
 [<Struct>]
 type AthleteListProps = {
-  Culture: CultureInfo
-  /// The live athletes list, straight from the store.
+  Culture: PageCulture
+  Lead: Control voption
   Athletes: IObservable<AthleteEntity list>
 }
 
-type Model = { Athletes: AthleteEntity list }
-
-type Msg = Refreshed of AthleteEntity list
-
-/// What the page reports to its host.
 [<Struct>]
 type Event =
   | NewRequested
@@ -45,65 +41,51 @@ let goalName(culture: CultureInfo, goal: PlanGoal) : string =
   | BasicBodyActivation -> get(culture, Keys.goalActivation)
   | Strength -> get(culture, Keys.goalStrength)
 
+/// The trailing glyph of a row: 16px, muted, centered by the row grid.
+let inline chevron() : Control =
+  PathIcon(Data = Icons.chevronRight, Width = 16.0, Height = 16.0)
+    .Foreground(muted)
+
 /// One row: the name and the profile summary; the whole row opens.
 let athleteRow
-  (props: AthleteListProps, onOpen: Guid -> unit, athlete: AthleteEntity)
+  (culture: CultureInfo, onOpen: Guid -> unit, athlete: AthleteEntity)
   : Control =
   let summary = [
     athlete.Profile.Gender |> Gender.toFileToken
     athlete.Profile.Goals
-    |> List.map(fun goal -> goalName(props.Culture, goal))
+    |> List.map(fun goal -> goalName(culture, goal))
     |> String.concat ", "
   ]
 
-  button(athlete.Profile.Name, (fun () -> onOpen athlete.Id))
-    .HorizontalContentAlignment(HorizontalAlignment.Left)
-    .Margin(0.0, 0.0, 0.0, 8.0)
+  Button()
     .Content(
-      StackPanel()
-        .Spacing(2.0)
-        .Children(
-          TextBlock()
-            .Text(athlete.Profile.Name)
-            .FontSize(16.0)
-            .FontWeight(FontWeight.Bold)
-            .FontFamily(font),
-          TextBlock()
-            .Text(String.concat " · " summary)
-            .FontFamily(font)
-            .Foreground(muted)
-        )
+      contentRow(athlete.Profile.Name, String.concat " · " summary, chevron)
     )
-  :> Control
+    .OnClickHandler(fun _ _ -> onOpen athlete.Id)
+    .Margin(0.0, 0.0, 0.0, 4.0)
+    .Classes("row")
 
+/// The page at one culture.
 let view
   (props: AthleteListProps)
   (onEvent: Event -> unit)
-  (model: IObservable<Model>)
-  (_: Dispatch<Msg>)
+  (culture: CultureInfo)
   : Control =
-  let t key = get(props.Culture, key)
+  let t key = get(culture, key)
 
   let onOpen id = onEvent(Event.OpenRequested id)
 
-  // the keyed binding diffs the store emissions: rows survive, only the
-  // real deltas apply
   let rows =
     let template =
       FuncDataTemplate<AthleteEntity>(
-        (fun athlete _ -> athleteRow(props, onOpen, athlete)),
+        (fun athlete _ -> athleteRow(culture, onOpen, athlete)),
         false
       )
 
-    let list = ItemsControl().ItemTemplate(template)
-
-    list.BindItemsSource(
-      model |> Observable.map(fun m -> m.Athletes),
-      fun athlete -> athlete.Id
-    )
-    |> ignore
-
-    list
+    ItemsControl().ItemTemplate(template)
+    |> stretchItems
+    |> fun list ->
+        list.BindItemsSource(props.Athletes, fun athlete -> athlete.Id)
 
   let emptyState =
     StackPanel()
@@ -112,43 +94,31 @@ let view
         glyph(Icons.accountSearchOutline, 32.0, muted),
         label(t Keys.athletesEmpty)
       )
-      .IsVisible(model |> Observable.map(fun m -> List.isEmpty m.Athletes))
+      .IsVisible(props.Athletes |> Observable.map List.isEmpty)
 
   let newCommand =
-    iconCommand(
+    iconPrimaryButton(
       t Keys.athletesNew,
       Icons.plus,
       (fun () -> onEvent Event.NewRequested)
     )
 
-  fluentPage(
-    {
-      Title = t Keys.athletesTitle
-      Commands = [ newCommand ]
-      Footer = noFooter
-      Body = StackPanel().Spacing(8.0).Children(emptyState, rows)
-      Measure = 760.0
-    }
-  )
+  fluentPage {
+    Lead = props.Lead
+    Title = t Keys.athletesTitle
+    Commands = [ newCommand ]
+    Footer = noFooter
+    Body = StackPanel().Spacing(8.0).Children(emptyState, rows)
+    Measure = 760.0
+  }
 
 type AthleteList
   (props: AthleteListProps, [<InlineIfLambda>] onEvent: Event -> unit) as this =
   inherit UserControl()
 
-  let init(_: AthleteListProps) = { Athletes = [] }, Cmd.none
-
-  let update (msg: Msg) (model: Model) =
-    match msg with
-    | Refreshed athletes -> { Athletes = athletes }, Cmd.none
-
-  // the store is the only input: every emission lands as a refresh
-  let subscribe(_: Model) : Sub<Msg> =
-    fun dispatch ->
-      props.Athletes |> Observable.subscribe(Refreshed >> dispatch)
-
   do
-    let program =
-      Program.mkProgram init update (view props onEvent)
-      |> Program.withSubscription subscribe
-
-    this.Content <- Program.runWith props program
+    this.Content <-
+      Page.cultureView(
+        props.Culture,
+        (fun culture -> view props onEvent culture)
+      )

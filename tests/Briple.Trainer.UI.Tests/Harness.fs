@@ -7,6 +7,8 @@ module Briple.Trainer.UI.Tests.Harness
 // frame pump for dispatcher work queued from other threads.
 
 open System
+open System.Globalization
+open System.Reactive.Subjects
 open System.Threading
 
 open Avalonia
@@ -15,6 +17,7 @@ open Avalonia.Headless
 open Avalonia.Threading
 open Avalonia.VisualTree
 
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Program
 
 type TestApp() =
@@ -25,6 +28,18 @@ let private session =
     typeof<TestApp>,
     AvaloniaTestIsolationLevel.PerAssembly
   )
+
+/// A live page culture a test can switch: the subject drives the pages.
+let liveCulture
+  (culture: CultureInfo)
+  : BehaviorSubject<CultureInfo> * PageCulture =
+  let source = new BehaviorSubject<CultureInfo>(culture)
+
+  source,
+  {
+    Current = fun () -> source.Value
+    Changed = source :> IObservable<CultureInfo>
+  }
 
 /// Runs a unit-of-work on the UI thread and waits for it.
 let onUi(test: unit -> unit) : unit =
@@ -81,12 +96,17 @@ let waitFor(ms: int, probe: unit -> 'T, predicate: 'T -> bool) : bool =
 
   found
 
+/// Attaches a control to a shown window and answers the window, so a
+/// test that mounts a singleton (the dialog host) can detach it again.
+let mountWindow(control: Control) : Window =
+  probeUi(fun () ->
+    let window = Window(Content = control)
+    window.Show() |> ignore
+    window)
+
 /// Attaches a control to a shown window: the visual tree (and therefore
 /// GetVisualDescendants and template parts) only exists once attached.
-let mount(control: Control) : unit =
-  onUi(fun () ->
-    let window = Window(Content = control)
-    window.Show() |> ignore)
+let mount(control: Control) : unit = mountWindow control |> ignore
 
 /// True when a TextBlock under the root carries the text.
 let hasText(root: Control, text: string) : bool =

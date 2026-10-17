@@ -1,22 +1,24 @@
 module Briple.Trainer.Views.Athletes
 
 // The athlete detail page: the profile and the plan history. The plans
-// section is a store subscription with keyed rows, so every write
-// anywhere shows up without navigation and the rows survive. Memories
-// live in the plan context (the review page), not in the profile.
+// section binds straight to the store, so every write shows up without
+// navigation, and the content rebuilds when the culture changes.
+// Memories live in the plan context (the review page), not here.
 
 open System
-open System.Globalization
 
 open Avalonia.Controls
 
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 
 /// The data of the page.
 [<Struct>]
 type DetailPageProps = {
-  Culture: CultureInfo
+  Culture: PageCulture
+  /// The shell's back control, placed in the page header.
+  Lead: Control voption
   Plans: PlanStore
   Athlete: AthleteEntity
 }

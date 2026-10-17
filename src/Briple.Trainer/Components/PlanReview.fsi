@@ -31,28 +31,38 @@ type RowPath = {
   Order: int
 }
 
-/// What the component reports to its parent.
-type Event = PlanChanged of Plan
+/// What the component reports to its parent: the edited tree and the
+/// navigation state the page keeps across rebuilds.
+type Event =
+  | PlanChanged of Plan
+  | ViewChanged of week: int * editing: bool
 
 /// The component inputs.
 [<Struct>]
 type Props = {
   Culture: System.Globalization.CultureInfo
   Parsed: ParsedPlan
+  /// The week the page had shown, when it comes back from a rebuild.
+  Week: int voption
+  /// The edit mode the page had, when it comes back from a rebuild.
+  Editing: bool
 }
 
 type Model = {
   Plan: Plan
   /// The last committed tree: what revert restores.
   Snapshot: Plan
-  /// The row in explicit edit mode.
-  Editing: RowPath voption
+  /// The week the pivot shows, by number.
+  Week: int
+  /// The page-level edit mode: on, every row shows its fields; off,
+  /// the tree reads as prose.
+  Editing: bool
 }
 
 type Msg =
   | SetField of path: RowPath * field: ExerciseField * text: string
-  | BeginEdit of path: RowPath
-  | EndEdit
+  | SetWeek of week: int
+  | SetEditing of on: bool
   | RevertEdit
 
 /// The review of one parsed plan.

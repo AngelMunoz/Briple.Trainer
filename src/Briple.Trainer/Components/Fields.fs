@@ -1,15 +1,17 @@
 module Briple.Trainer.Components.Fields
 
 open System
+open Avalonia
 open Avalonia.Controls
+open Avalonia.Controls.Presenters
+open Avalonia.Controls.Primitives
 open Avalonia.Layout
 open Avalonia.Media
+open Avalonia.Styling
 open NXUI.Extensions
 
 open Briple.Trainer.Theme
 
-/// Flow actions of a page footer: secondaries keep to the left,
-/// primaries claim the right.
 [<Struct>]
 type FooterBar = {
   Secondary: Control list
@@ -19,10 +21,10 @@ type FooterBar = {
 /// The empty footer, for pages without flow actions.
 let noFooter: FooterBar = { Secondary = []; Primary = [] }
 
-/// The page contract: title, page commands, flow actions and body, read
-/// inside a measure so prose and forms keep a readable width.
 [<Struct>]
 type PageChrome = {
+  /// The shell's back control, placed first in the header row.
+  Lead: Control voption
   Title: string
   Commands: Control list
   Footer: FooterBar
@@ -30,27 +32,21 @@ type PageChrome = {
   Measure: float
 }
 
-/// The page title level: 28 SemiBold.
+/// The page title level: the `title` ramp class.
 let inline pageTitle(text: string) : Control =
   TextBlock()
     .Text(text)
-    .FontFamily(font)
-    .FontSize(28.0)
-    .FontWeight(FontWeight.SemiBold)
-    .Margin(0.0, 0.0, 0.0, 8.0)
+    .VerticalAlignment(VerticalAlignment.Center)
+    .TextTrimming(TextTrimming.CharacterEllipsis)
+    .Classes("title")
 
-/// The section header level: 20 SemiBold.
+/// The section header level: the `subtitle` ramp class.
 let inline sectionTitle(text: string) : Control =
-  TextBlock()
-    .Text(text)
-    .FontFamily(font)
-    .FontSize(20.0)
-    .FontWeight(FontWeight.SemiBold)
-    .Margin(0.0, 16.0, 0.0, 8.0)
+  TextBlock().Text(text).Margin(0.0, 16.0, 0.0, 8.0).Classes("subtitle")
 
-/// A secondary-text caption: 12, muted.
+/// A secondary-text caption: the `caption` ramp class, muted.
 let inline label(text: string) : Control =
-  TextBlock().Text(text).FontFamily(font).FontSize(12.0).Foreground(muted)
+  TextBlock().Text(text).Classes("caption", "secondary")
 
 /// One labeled field: label above, input below.
 let inline field
@@ -61,54 +57,41 @@ let inline field
 let inline button
   (text: string, [<InlineIfLambda>] onClick: unit -> unit)
   : Button =
-  Button()
-    .Content(text)
-    .FontFamily(font)
-    .Padding(16.0, 8.0)
-    .OnClickHandler(fun _ _ -> onClick())
+  Button().Content(text).Padding(16.0, 8.0).OnClickHandler(fun _ _ -> onClick())
 
 /// The primary action button: the accent fill.
 let inline primaryButton
   (text: string, [<InlineIfLambda>] onClick: unit -> unit)
   : Button =
-  let flat = button(text, onClick)
-
-  flat.Classes.Add("accent")
-
-  flat
+  button(text, onClick).Classes("accent")
 
 /// A tertiary text action.
 let inline hyperlinkButton
   (text: string, [<InlineIfLambda>] onClick: unit -> unit)
   : Control =
-  HyperlinkButton()
-    .Content(text)
-    .FontFamily(font)
-    .OnClickHandler(fun _ _ -> onClick())
+  HyperlinkButton().Content(text).OnClickHandler(fun _ _ -> onClick())
 
-/// One command for the page's CommandBar.
+/// One page command: a plain button for the header row.
 let inline command
   (text: string, [<InlineIfLambda>] onClick: unit -> unit)
-  : CommandBarButton =
-  CommandBarButton(Label = text).OnClickHandler(fun _ _ -> onClick())
+  : Button =
+  button(text, onClick)
 
 /// A 20px glyph that takes the text color of its container.
-let inline icon(geometry: StreamGeometry) : Control =
-  PathIcon(Data = geometry) :> Control
+let inline icon(geometry: StreamGeometry) : Control = PathIcon(Data = geometry)
 
 /// A glyph at an explicit size and tone, for standalone composition.
 let inline glyph
   (geometry: StreamGeometry, size: float, tone: IBrush)
   : Control =
   PathIcon(Data = geometry, Width = size, Height = size, Foreground = tone)
-  :> Control
 
 /// A glyph before its label: the content of an action control.
 let inline glyphLabel(geometry: StreamGeometry, text: string) : Control =
   StackPanel()
     .Orientation(Orientation.Horizontal)
     .Spacing(8.0)
-    .Children(icon geometry, TextBlock().Text(text).FontFamily(font))
+    .Children(icon geometry, TextBlock().Text(text))
 
 /// A plain button with a glyph before its label.
 let inline iconButton
@@ -126,119 +109,66 @@ let inline iconPrimaryButton
     geometry: StreamGeometry,
     [<InlineIfLambda>] onClick: unit -> unit
   ) : Button =
-  let flat = iconButton(text, geometry, onClick)
+  iconButton(text, geometry, onClick).Classes("accent")
 
-  flat.Classes.Add("accent")
-
-  flat
-
-/// One CommandBar command with its glyph left of the label.
+/// One page command with its glyph before the label.
 let inline iconCommand
   (
     text: string,
     geometry: StreamGeometry,
     [<InlineIfLambda>] onClick: unit -> unit
-  ) : CommandBarButton =
-  CommandBarButton(Label = text, Icon = PathIcon(Data = geometry))
-    .OnClickHandler(fun _ _ -> onClick())
+  ) : Button =
+  iconButton(text, geometry, onClick)
 
-let inline chipButton
-  (text: string, [<InlineIfLambda>] onClick: unit -> unit, isOn: bool)
-  : Button =
-  let flat = button(text, onClick)
+/// One content row: a two-line title and detail with a trailing glyph,
+/// in a grid so the glyph stays at the row's end.
+let inline contentRow
+  (title: string, detail: string, [<InlineIfLambda>] trailing: unit -> Control)
+  : Control =
+  let grid = Grid()
 
-  if isOn then
-    flat.Background(accent).Foreground(Brushes.White)
-  else
-    flat.Background(chip).Foreground(Brushes.Black)
+  grid.ColumnDefinitions <- ColumnDefinitions("*,Auto")
 
-let inline choiceChips
-  (
-    options: string list,
-    selected: string,
-    [<InlineIfLambda>] onPick: string -> unit
-  ) : Control =
-  WrapPanel().Children [|
-    for option in options ->
-      chipButton(option, (fun () -> onPick option), (option = selected))
-        .Margin(0.0, 0.0, 6.0, 6.0)
-      :> Control
-  |]
-
-let inline multiChips
-  (
-    options: string list,
-    selected: string list,
-    [<InlineIfLambda>] onToggle: string -> unit
-  ) : Control =
-  WrapPanel().Children [|
-    for option in options ->
-      chipButton(
-        option,
-        (fun () -> onToggle option),
-        (List.contains option selected)
+  grid.Children(
+    StackPanel()
+      .Spacing(2.0)
+      .VerticalAlignment(VerticalAlignment.Center)
+      .Children(
+        TextBlock()
+          .Text(title)
+          .Classes("body-strong")
+          .TextTrimming(TextTrimming.CharacterEllipsis),
+        TextBlock()
+          .Text(detail)
+          .Classes("caption", "secondary")
+          .TextTrimming(TextTrimming.CharacterEllipsis)
       )
-        .Margin(0.0, 0.0, 6.0, 6.0)
-      :> Control
-  |]
+      .Column(0),
+    (trailing())
+      .VerticalAlignment(VerticalAlignment.Center)
+      .Margin(12.0, 0.0, 0.0, 0.0)
+      .Column(1)
+  )
 
-let inline reactiveChoiceChips
-  (
-    options: string list,
-    selected: IObservable<string>,
-    [<InlineIfLambda>] onPick: string -> unit
-  ) : Control =
-  let rows: Control array = [|
-    for option in options ->
-      let row = button(option, (fun () -> onPick option))
+/// Makes every item container fill the items control's width, so rows of
+/// different lengths share one left edge and one trailing edge.
+let inline stretchItems(items: ItemsControl) : ItemsControl =
+  let style =
+    Style(fun selector -> selector.OfType<ContentPresenter>())
+      .Setters(
+        [|
+          Setter(
+            ContentPresenter.HorizontalContentAlignmentProperty,
+            HorizontalAlignment.Stretch
+          )
+        |]
+      )
 
-      row
-        .Background(
-          selected
-          |> Observable.map(fun current ->
-            if current = option then accent else chip)
-        )
-        .Foreground(
-          selected
-          |> Observable.map(fun current ->
-            if current = option then
-              Brushes.White :> IBrush
-            else
-              Brushes.Black :> IBrush)
-        )
-  |]
+  items.Styles.Add(style)
+  items
 
-  WrapPanel().Children [| for row in rows -> row.Margin(0.0, 0.0, 6.0, 6.0) |]
-
-let inline reactiveMultiChips
-  (
-    options: string list,
-    selected: IObservable<string list>,
-    [<InlineIfLambda>] onToggle: string -> unit
-  ) : Control =
-  let rows: Control array = [|
-    for option in options ->
-      let row = button(option, (fun () -> onToggle option))
-
-      row
-        .Background(
-          selected
-          |> Observable.map(fun current ->
-            if List.contains option current then accent else chip)
-        )
-        .Foreground(
-          selected
-          |> Observable.map(fun current ->
-            if List.contains option current then
-              Brushes.White :> IBrush
-            else
-              Brushes.Black :> IBrush)
-        )
-        .Margin(0.0, 0.0, 6.0, 6.0)
-  |]
-
-  WrapPanel().Children(rows)
-
+/// A single-line text input with a placeholder; typing reports the
+/// value, the model owns it.
 let inline entry
   (
     placeholder: string,
@@ -246,31 +176,45 @@ let inline entry
     [<InlineIfLambda>] onChanged: string -> unit
   ) : TextBox =
   TextBox()
-    .FontFamily(font)
     .Padding(8.0, 6.0)
     .Text(text)
     .PlaceholderText(placeholder)
-    .OnText(fun _ observed ->
-      observed
-      |> Observable.map(fun value ->
-        value |> Option.ofObj |> Option.defaultValue "")
-      |> Observable.subscribe onChanged
-      |> ignore)
+    .OnTextChangedHandler(fun args _ ->
+      args.Text |> Option.ofObj |> Option.defaultValue "" |> onChanged)
 
-/// A radio button per option in one group; the control owns the visual
-/// state, so the active option is always visible.
+/// One settings card row: the title left, the control right.
+let inline cardRow(title: string, control: Control) : Control =
+  Border()
+    .Child(
+      DockPanel()
+        .LastChildFill(false)
+        .Children(
+          TextBlock()
+            .Text(title)
+            .Classes("body")
+            .VerticalAlignment(VerticalAlignment.Center)
+            .DockLeft(),
+          control.VerticalAlignment(VerticalAlignment.Center).DockRight()
+        )
+    )
+    .Classes("card")
+
+/// A radio button per typed option in one group; the selected value
+/// comes from the model.
 let inline radioRow
   (
-    options: string list,
+    options: ('T * string) list,
     group: string,
-    initial: string,
-    [<InlineIfLambda>] onPick: string -> unit
+    selected: 'T,
+    [<InlineIfLambda>] onPick: 'T -> unit
   ) : Control =
-  let row(option: string) : Control =
-    RadioButton(Content = option, GroupName = group, FontFamily = font)
-      .IsChecked(Nullable((option = initial)))
+  let row((choice, label): 'T * string) : Control =
+    let isChecked = choice = selected
+
+    RadioButton(Content = label, GroupName = group)
+      .IsChecked(Nullable isChecked)
       .Margin(0.0, 0.0, 12.0, 4.0)
-      .OnClickHandler(fun _ _ -> onPick option)
+      .OnClickHandler(fun _ _ -> onPick choice)
 
   WrapPanel().Children [| for option in options -> row option |]
 
@@ -281,65 +225,67 @@ let inline checkRow
     isOn: IObservable<bool>,
     [<InlineIfLambda>] onToggle: unit -> unit
   ) : Control =
-  let check = CheckBox(Content = text, FontFamily = font)
+  CheckBox(Content = text)
+    .IsChecked(isOn |> Observable.map(fun on -> Nullable on))
+    .OnClickHandler(fun _ _ -> onToggle())
 
-  let tap =
-    isOn |> Observable.subscribe(fun on -> check.IsChecked <- Nullable on)
-
-  check.DetachedFromVisualTree.Add(fun _ -> tap.Dispose())
-
-  check.OnClickHandler(fun _ _ -> onToggle())
-
-/// The CommandBar of a page: labels ride beside the glyphs (nothing
-/// truncates), the commands land as primaries and dynamic overflow takes
-/// the rest when the window runs narrow.
-let inline commandBar(commands: Control list) : Control =
-  let bar =
-    CommandBar()
-      .IsDynamicOverflowEnabled(true)
-      .DefaultLabelPosition(CommandBarDefaultLabelPosition.Right)
-      .HorizontalAlignment(HorizontalAlignment.Stretch)
-
-  commands
-  |> List.iter(fun command ->
-    match command with
-    | :? CommandBarButton as button ->
-      bar.PrimaryCommands.Add(button :> ICommandBarElement)
-    | _ -> ())
-
-  bar
-
-/// The full page: the title and CommandBar pinned along the top edge,
-/// the flow actions (when any) pinned to the bottom, and the body
-/// scrolling in between, centered inside the measure.
+/// The full page: one header row with the shell's back lead, the title
+/// and the commands, the body scrolling in between, and the flow
+/// actions when a wizard needs them.
 let inline fluentPage(chrome: PageChrome) : Control =
-  let header: Control =
-    match chrome.Commands with
-    | [] ->
+  let commands: Control =
+    if List.isEmpty chrome.Commands then
+      TextBlock().Column(2)
+    else
       StackPanel()
-        .Margin(24.0, 16.0, 24.0, 0.0)
-        .Children(pageTitle chrome.Title)
-    | commands ->
-      StackPanel()
-        .Spacing(12.0)
-        .Margin(24.0, 16.0, 24.0, 0.0)
-        .Children(pageTitle chrome.Title, commandBar commands)
+        .Orientation(Orientation.Horizontal)
+        .Spacing(8.0)
+        .VerticalAlignment(VerticalAlignment.Center)
+        .Children(List.toArray chrome.Commands)
+        .Column(2)
+
+  let header =
+    let grid = Grid()
+
+    grid.ColumnDefinitions <- ColumnDefinitions("Auto,*,Auto")
+    grid.MinHeight <- 48.0
+    grid.Margin <- Thickness(24.0, 8.0, 24.0, 0.0)
+
+    let lead: Control array =
+      match chrome.Lead with
+      | ValueSome control -> [|
+          control
+            .VerticalAlignment(VerticalAlignment.Center)
+            .Margin(0.0, 0.0, 8.0, 0.0)
+            .Column(0)
+        |]
+      | ValueNone -> [||]
+
+    grid.Children(
+      Array.append lead [| (pageTitle chrome.Title).Column(1); commands |]
+    )
+    |> ignore
+
+    grid
 
   let body =
     ScrollViewer()
+      .HorizontalScrollBarVisibility(ScrollBarVisibility.Disabled)
+      // the content fills the viewport and starts at the page margin, so
+      // rows of different lengths share one left edge and one right edge
+      .HorizontalContentAlignment(HorizontalAlignment.Stretch)
       .Content(
         StackPanel()
           .Margin(24.0)
           .Spacing(12.0)
           .MaxWidth(chrome.Measure)
+          .HorizontalAlignment(HorizontalAlignment.Left)
           .Children(chrome.Body)
       )
 
   match chrome.Footer.Secondary, chrome.Footer.Primary with
-  | [], [] ->
-    DockPanel().LastChildFill(true).Children(header.DockTop(), body) :> Control
+  | [], [] -> DockPanel().LastChildFill(true).Children(header.DockTop(), body)
   | secondary, primary ->
-    // flow actions: secondaries keep left, primaries claim the right
     let footer =
       DockPanel()
         .LastChildFill(false)
@@ -360,11 +306,11 @@ let inline fluentPage(chrome: PageChrome) : Control =
     DockPanel()
       .LastChildFill(true)
       .Children(header.DockTop(), footer.DockBottom(), body)
-    :> Control
 
 /// A body-only page: the page contract without commands.
 let inline page(titleText: string, content: Control) : Control =
   fluentPage {
+    Lead = ValueNone
     Title = titleText
     Commands = []
     Footer = noFooter

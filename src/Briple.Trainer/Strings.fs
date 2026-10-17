@@ -524,6 +524,36 @@ module Keys =
   [<Literal>]
   let wizardModeNew = "wizard.mode.new"
 
+  [<Literal>]
+  let wizardStepOf = "wizard.stepOf"
+
+  [<Literal>]
+  let guardAthleteTitle = "guard.athlete.title"
+
+  [<Literal>]
+  let guardAthleteBody = "guard.athlete.body"
+
+  [<Literal>]
+  let guardGenerationTitle = "guard.generation.title"
+
+  [<Literal>]
+  let guardGenerationBody = "guard.generation.body"
+
+  [<Literal>]
+  let guardPlanTitle = "guard.plan.title"
+
+  [<Literal>]
+  let guardPlanBody = "guard.plan.body"
+
+  [<Literal>]
+  let guardUnsavedTitle = "guard.unsaved.title"
+
+  [<Literal>]
+  let guardUnsavedBody = "guard.unsaved.body"
+
+  [<Literal>]
+  let guardLeave = "guard.leave"
+
 /// One user-facing failure line: the action that failed and the cause,
 /// clipped to a readable length. The full detail belongs to the log.
 let friendly(culture: CultureInfo, action: string, reason: string) : string =

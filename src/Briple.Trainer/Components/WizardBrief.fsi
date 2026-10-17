@@ -1,10 +1,10 @@
 module Briple.Trainer.Components.WizardBrief
 
-// Step 2 of the wizard as an MVUish component: props in (the culture and
-// the athlete), events out (Submitted carries the period and the brief).
-// Weeks, goal, frequency and emphasis are all closed selections with
-// standard controls; nothing is typed by hand and nothing derived (RIR,
-// counts) is asked.
+// Step 2 of the wizard as a sealed component: props in (the culture, the
+// athlete and the draft the page owns), changes out through OnChanged.
+// Weeks, goal, frequency and emphasis are closed selections with
+// standard controls; nothing is typed and nothing derived (RIR, counts)
+// is asked. The page owns Generar; the component only edits the draft.
 
 open System
 open System.Globalization
@@ -14,16 +14,23 @@ open Avalonia.Controls
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Requests
 
-/// What the brief builds on when a previous plan exists: chain on it or
-/// start clean. The choice rides the Submitted event.
+/// What the brief builds on when a previous plan exists.
 type Mode =
   | Adjust
   | Fresh
 
-/// What the form reports to its parent.
-type Event =
-  | Submitted of weeks: int * brief: Brief * mode: Mode
-  | Cancelled
+/// The brief draft, owned by the wizard page.
+[<Struct>]
+type BriefDraft = {
+  Weeks: int
+  Goal: PlanGoal
+  Frequency: VariantFrequency
+  Emphasis: Emphasis list
+  Mode: Mode
+}
+
+/// The default draft of a fresh wizard visit.
+val defaultDraft: athlete: Athlete * hasPrevious: bool -> BriefDraft
 
 /// The form inputs.
 [<Struct>]
@@ -32,27 +39,14 @@ type Props = {
   Athlete: Athlete
   /// True when there is a previous plan this generation could adjust.
   HasPrevious: bool
+  /// The current draft, seeded on every rebuild.
+  Draft: BriefDraft
+  /// Every edit travels to the page, which keeps the draft.
+  OnChanged: BriefDraft -> unit
 }
-
-type Model = {
-  Weeks: int
-  Goal: PlanGoal
-  Frequency: VariantFrequency
-  Emphasis: Emphasis list
-  Mode: Mode
-}
-
-type Msg =
-  | SetWeeks of int
-  | SetGoal of PlanGoal
-  | SetFrequency of VariantFrequency
-  | ToggleEmphasis of Emphasis
-  | SetMode of Mode
-  | Submit
-  | Cancel
 
 /// The brief form.
 type WizardBrief =
   inherit UserControl
 
-  new: props: Props * [<InlineIfLambda>] onEvent: (Event -> unit) -> WizardBrief
+  new: props: Props -> WizardBrief

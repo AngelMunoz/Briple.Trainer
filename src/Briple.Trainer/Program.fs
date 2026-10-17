@@ -22,6 +22,7 @@ open NXUI.Extensions
 
 open MVUish.Avalonia.Collections
 open FSharp.Control.Reactive
+open IcedTasks
 open Navs
 open Navs.Avalonia
 open Serilog
@@ -44,6 +45,7 @@ type App() =
     )
 
     this.Styles.Add(FluentTheme())
+    this.Styles.Add(appStyles)
 
 /// Console plus one rolling file a day under %LocalAppData%.
 let configureLogging() : unit =
@@ -74,7 +76,7 @@ let configureLogging() : unit =
 
 let errorWindow(message: string) =
   Window(Title = "Briple Trainer", Width = 640.0, Height = 400.0)
-    .Content(page(message, TextBlock().Text("").FontFamily(font)))
+    .Content(page(message, TextBlock().Text("")))
     .FontFamily(font)
 
 /// One pane entry: the label follows the language, the glyph marks the
@@ -87,28 +89,106 @@ type NavItem = {
 }
 
 let buildShell(env: AppEnv) =
-  let router = Routes.build env
-
   let history = BackStack()
 
+  // the router lands in this cell once the table is built; the boot
+  // navigation builds pages before the cell is filled, and nothing
+  // clicks before the window exists
+  let routerCell = ref ValueNone
+
+  let router() =
+    match routerCell.Value with
+    | ValueSome router -> router
+    | ValueNone -> invalidOp "the router is not built yet"
+
+  let goTo(url: string) = Routes.go(router(), url)
+
+  let goBack() = history.Back() |> Option.iter goTo
+
+  // the shell owns history and draws Back: a 40x40 icon-only flat
+  // button in the page header. Every page gets its own instance; all
+  // of them read the same history.
+  let lead() : Control =
+    let button =
+      Button()
+        .Content(PathIcon(Data = Icons.arrowLeft).Width(16.0).Height(16.0))
+        .IsEnabled(history.CanBack)
+        .OnClickHandler(fun _ _ -> goBack())
+        .Classes("chrome", "back")
+
+    // the Fluent tooltip content is a control; its text follows the
+    // language through the normal binding
+    let tip =
+      TextBlock()
+        .Text(
+          env.LanguageChanged
+          |> Observable.map(fun language ->
+            get(Language.toCulture language, Keys.commonBack))
+        )
+
+    ToolTip.SetTip(button, tip)
+    button
+
+  let shell = Routes.build(env, lead)
+  routerCell.Value <- ValueSome shell.Router
+
   // the current URL as one shared stream: history, pane highlights and
-  // the language refresh all read it
+  // the window title read it. One adapter subscribes the router.
   let currentUrl = new BehaviorSubject<string>("/")
 
-  router.Route
-  |> AVal.toObservable
-  |> Observable.choose(fun route ->
-    route |> ValueOption.toOption |> Option.map _.path)
-  |> Observable.subscribe currentUrl.OnNext
-  |> ignore
-
-  currentUrl |> Observable.subscribe history.Sync |> ignore
+  let routeSubscription =
+    shell.Router.Route
+    |> AVal.toObservable
+    |> Observable.choose(fun route ->
+      route |> ValueOption.toOption |> Option.map _.path)
+    |> Observable.subscribe(fun url ->
+      currentUrl.OnNext url
+      history.Sync url)
 
   // the pane state as one stream: the rows hide their labels, the pane
   // title hides itself and the SplitView follows, all from one source
   let paneOpen = new BehaviorSubject<bool>(true)
 
-  // the pane rows: a button per section, the active one follows the URL
+  // the pane rows: the glyph rides a 48px rail that matches the compact
+  // pane: open, the label shows beside it; collapsed, the glyph centers
+  // on the rail
+  let navRow(item: NavItem) : Control =
+    let active =
+      currentUrl
+      |> Observable.map(fun url ->
+        History.sectionOf url = ValueSome item.Target)
+
+    Button()
+      .Content(
+        DockPanel()
+          .Children(
+            // the selection bar: the Fluent accent strip on the rail
+            Border().Width(3.0).Background(accent).IsVisible(active),
+            Border()
+              .Width(48.0)
+              .Child(
+                PathIcon(Data = item.Icon)
+                  .HorizontalAlignment(HorizontalAlignment.Center)
+              ),
+            TextBlock()
+              .Text(item.Label)
+              .VerticalAlignment(VerticalAlignment.Center)
+              .IsVisible(paneOpen)
+          )
+      )
+      .HorizontalContentAlignment(HorizontalAlignment.Left)
+      .Foreground(
+        active |> Observable.map(fun on -> if on then accent else text)
+      )
+      .FontWeight(
+        active
+        |> Observable.map(fun on ->
+          if on then FontWeight.SemiBold else FontWeight.Normal)
+      )
+      .OnClickHandler(fun _ _ -> goTo item.Target)
+      .Classes("nav-item")
+
+  // the pane's main group: the athletes section follows the language
   let paneList =
     let items =
       env.LanguageChanged
@@ -121,80 +201,26 @@ let buildShell(env: AppEnv) =
             Target = "/"
             Icon = Icons.accountGroup
           }
-          {
-            Label = get(culture, Keys.navSettings)
-            Target = "/settings"
-            Icon = Icons.settings
-          }
         ])
-
-    // the glyph rides a 48px rail that matches the compact pane: open,
-    // the label shows beside it; collapsed, the glyph centers on the rail
-    let navRow(item: NavItem) : Control =
-      let active =
-        currentUrl
-        |> Observable.map(fun url ->
-          History.sectionOf url = ValueSome item.Target)
-
-      Button()
-        .Content(
-          DockPanel()
-            .Children(
-              // the selection bar: the Fluent accent strip on the rail
-              Border().Width(3.0).Background(accent).IsVisible(active),
-              Border()
-                .Width(48.0)
-                .Child(
-                  PathIcon(Data = item.Icon)
-                    .HorizontalAlignment(HorizontalAlignment.Center)
-                ),
-              TextBlock()
-                .Text(item.Label)
-                .FontFamily(font)
-                .VerticalAlignment(VerticalAlignment.Center)
-                .IsVisible(paneOpen)
-            )
-        )
-        .HorizontalContentAlignment(HorizontalAlignment.Left)
-        .Foreground(
-          active |> Observable.map(fun on -> if on then accent else text)
-        )
-        .FontWeight(
-          active
-          |> Observable.map(fun on ->
-            if on then FontWeight.SemiBold else FontWeight.Normal)
-        )
-        .OnClickHandler(fun _ _ -> Routes.go(router, item.Target))
-      :> Control
 
     let template = FuncDataTemplate<NavItem>((fun item _ -> navRow item), false)
 
-    let list = ItemsControl().ItemTemplate(template)
+    ItemsControl().ItemTemplate(template).BindItemsSource(items, id)
 
-    list.BindItemsSource(items, id) |> ignore
-
-    list
-
-  let goBack() =
-    history.Back() |> Option.iter(fun url -> Routes.go(router, url))
-
-  let backButton =
-    let button = Button()
-
-    button.Bind(
-      Button.ContentProperty :> AvaloniaProperty,
-      env.LanguageChanged
-      |> Observable.map(fun language ->
-        box(
-          glyphLabel(
-            Icons.arrowLeft,
-            get(Language.toCulture language, Keys.commonBack)
-          )
-        ))
-    )
-    |> ignore
-
-    button.IsEnabled(history.CanBack).OnClickHandler(fun _ _ -> goBack())
+  // settings rides the pane footer; the language stream rebuilds the
+  // row through its binding
+  let settingsHost =
+    ContentControl()
+      .Content(
+        (env.LanguageChanged
+         |> Observable.map(fun language ->
+           navRow {
+             Label = get(Language.toCulture language, Keys.navSettings)
+             Target = "/settings"
+             Icon = Icons.settings
+           }))
+          .ToBinding()
+      )
 
   let window =
     Window(
@@ -202,11 +228,26 @@ let buildShell(env: AppEnv) =
       Width = 1100.0,
       Height = 800.0
     )
+      .FontFamily(font)
+
+  // the router adapter is the one app-lifetime subscription; the window
+  // owns it and releases it on close
+  window.Closed.Add(fun _ -> routeSubscription.Dispose())
 
   env.SetHost window
   Toasts.init(window)
 
   Env.applyTheme((env :> IProvideTheme).Theme)
+
+  // the tokens follow the live variant: light/dark retints every
+  // consumer without rebinding
+  match Application.Current with
+  | null -> ()
+  | app ->
+    Theme.applyVariant(app.ActualThemeVariant)
+
+    app.ActualThemeVariantChanged.Add(fun _ ->
+      Theme.applyVariant(app.ActualThemeVariant))
 
   // the Fluent window: the content reaches behind the system caption and
   // the surface is Mica where the platform offers it, falling back to
@@ -234,17 +275,11 @@ let buildShell(env: AppEnv) =
     | ValueSome "/settings" -> $"{app} — {get(env.Culture, Keys.navSettings)}"
     | _ -> app
 
-  currentUrl
-  |> Observable.subscribe(fun url -> window.Title <- titleOf url)
-  |> ignore
-
-  // a language switch refreshes the chrome and re-navigates the current
-  // URL; the pages stay cached (the culture snapshot inside them is the
-  // known gap the reactive-culture plan addresses)
-  env.LanguageChanged
-  |> Observable.skip 1
-  |> Observable.subscribe(fun _ -> Routes.go(router, currentUrl.Value))
-  |> ignore
+  let window =
+    window.Title(
+      Observable.combineLatest currentUrl env.LanguageChanged
+      |> Observable.map(fun (url, _) -> titleOf url)
+    )
 
   window.KeyBindings.Add(
     KeyBinding(
@@ -253,39 +288,57 @@ let buildShell(env: AppEnv) =
     )
   )
 
-  let pane =
-    StackPanel()
-      .Children(
-        // the pane toggle: the only way in and out of the compact rail
-        Button()
-          .Content(
-            Border()
-              .Width(48.0)
-              .Child(
-                PathIcon(Data = Icons.menu)
-                  .HorizontalAlignment(HorizontalAlignment.Center)
-              )
-          )
-          .HorizontalContentAlignment(HorizontalAlignment.Left)
-          .OnClickHandler(fun _ _ -> paneOpen.OnNext(not paneOpen.Value)),
-        TextBlock()
-          .Text(
-            env.LanguageChanged
-            |> Observable.map(fun language ->
-              get(Language.toCulture language, Keys.appTitle))
-          )
-          .FontSize(18.0)
-          .FontWeight(FontWeight.SemiBold)
-          .Margin(16.0, 8.0, 16.0, 12.0)
-          .IsVisible(paneOpen),
-        paneList
-      )
+  // the OS close honors the same phases as the route guards: cancel the
+  // close, ask, close again when the answer allows it
+  let mutable closeConfirmed = false
 
-  let chrome =
+  window.Closing.Add(fun args ->
+    if not closeConfirmed then
+      args.Cancel <- true
+
+      asyncEx {
+        let! allowed = shell.AskLeave currentUrl.Value
+
+        if allowed then
+          closeConfirmed <- true
+          window.Close()
+      }
+      |> Async.StartImmediate)
+
+  let pane =
+    // the pane toggle: the only way in and out of the compact rail
+    let toggle =
+      Button()
+        .Content(
+          Border()
+            .Width(48.0)
+            .Child(
+              PathIcon(Data = Icons.menu)
+                .HorizontalAlignment(HorizontalAlignment.Center)
+            )
+        )
+        .HorizontalContentAlignment(HorizontalAlignment.Left)
+        .OnClickHandler(fun _ _ -> paneOpen.OnNext(not paneOpen.Value))
+        .Classes("chrome")
+
     DockPanel()
-      .LastChildFill(false)
-      .Margin(12.0, 8.0)
-      .Children(backButton.DockLeft())
+      .Children(
+        settingsHost.DockBottom(),
+        StackPanel()
+          .Children(
+            toggle,
+            TextBlock()
+              .Text(
+                env.LanguageChanged
+                |> Observable.map(fun language ->
+                  get(Language.toCulture language, Keys.appTitle))
+              )
+              .Classes("pane-title")
+              .Margin(16.0, 8.0, 16.0, 12.0)
+              .IsVisible(paneOpen),
+            paneList
+          )
+      )
 
   // the router outlet swaps cached views with no page transition: the
   // library default crossfade/slide keeps two presenters alive, and
@@ -293,28 +346,19 @@ let buildShell(env: AppEnv) =
   // the renderer ("Visual already has a parent"). An empty composite
   // completes instantly; null here falls back to the library default.
   let outlet = RouterOutlet()
-  outlet.Router <- router
+  outlet.Router <- shell.Router
 
   outlet.PageTransition <-
     CompositePageTransition(PageTransitions = ResizeArray [])
-
-  let content =
-    DockPanel().LastChildFill(true).Children(chrome.DockTop(), outlet)
 
   let split =
     SplitView()
       .DisplayMode(SplitViewDisplayMode.CompactInline)
       .CompactPaneLength(48.0)
       .OpenPaneLength(220.0)
-      .IsPaneOpen(true)
+      .IsPaneOpen(paneOpen)
       .Pane(pane)
-      .Content(content)
-
-  // the pane stream drives the SplitView: the hamburger, the rows and
-  // the open state read one source
-  paneOpen
-  |> Observable.subscribe(fun isOpen -> split.IsPaneOpen <- isOpen)
-  |> ignore
+      .Content(outlet)
 
   // the dialog overlay rides on top of everything; the top margin keeps
   // the content below the extended caption

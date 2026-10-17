@@ -90,6 +90,10 @@ type IProvideTheme =
 type IProvideCulture =
   abstract Culture: CultureInfo
 
+  /// Emits the culture on every language switch, starting with the
+  /// current one. Pages rebuild their text from it.
+  abstract CultureChanged: IObservable<CultureInfo>
+
 type IProvideAgent =
   abstract AgentAvailable: bool
 
@@ -161,6 +165,9 @@ type AppEnv =
 
   /// The culture of the current language, reachable without a cast.
   member Culture: CultureInfo
+
+  /// The culture switches, reachable without a cast.
+  member CultureChanged: IObservable<CultureInfo>
 
   /// The language switches, reachable without a cast.
   member LanguageChanged: IObservable<Language>

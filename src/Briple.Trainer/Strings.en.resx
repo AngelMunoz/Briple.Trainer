@@ -489,4 +489,34 @@
   <data name="wizard.mode.new" xml:space="preserve">
     <value>Fresh plan from scratch</value>
   </data>
+  <data name="wizard.stepOf" xml:space="preserve">
+    <value>Step {0} of {1}</value>
+  </data>
+  <data name="guard.athlete.title" xml:space="preserve">
+    <value>Discard the athlete?</value>
+  </data>
+  <data name="guard.athlete.body" xml:space="preserve">
+    <value>The form has unsaved data; leaving discards it.</value>
+  </data>
+  <data name="guard.generation.title" xml:space="preserve">
+    <value>Cancel the generation?</value>
+  </data>
+  <data name="guard.generation.body" xml:space="preserve">
+    <value>The run in progress stops and its output is lost.</value>
+  </data>
+  <data name="guard.plan.title" xml:space="preserve">
+    <value>Discard the generated plan?</value>
+  </data>
+  <data name="guard.plan.body" xml:space="preserve">
+    <value>The plan awaits your confirmation; leaving discards it.</value>
+  </data>
+  <data name="guard.unsaved.title" xml:space="preserve">
+    <value>Leave without saving?</value>
+  </data>
+  <data name="guard.unsaved.body" xml:space="preserve">
+    <value>The plan has unsaved changes.</value>
+  </data>
+  <data name="guard.leave" xml:space="preserve">
+    <value>Leave</value>
+  </data>
 </root>
