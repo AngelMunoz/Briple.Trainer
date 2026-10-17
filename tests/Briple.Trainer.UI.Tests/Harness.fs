@@ -110,11 +110,14 @@ let mount(control: Control) : unit = mountWindow control |> ignore
 
 /// True when a TextBlock under the root carries the text.
 let hasText(root: Control, text: string) : bool =
-  root.GetVisualDescendants()
-  |> Seq.exists(fun visual ->
-    match visual with
-    | :? TextBlock as textBlock -> textBlock.Text = text
-    | _ -> false)
+  match root with
+  | :? TextBlock as textBlock when textBlock.Text = text -> true
+  | _ ->
+    root.GetVisualDescendants()
+    |> Seq.exists(fun visual ->
+      match visual with
+      | :? TextBlock as textBlock -> textBlock.Text = text
+      | _ -> false)
 
 /// Finds the first button whose content equals the text, whose label
 /// does (CommandBarButton), or whose content subtree carries it (rows

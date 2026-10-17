@@ -14,7 +14,7 @@ open Avalonia.Controls
 /// One hub column: its header, its body, its width.
 [<Struct>]
 type HubSlot = {
-  Header: string
+  Header: Control
   Body: Control
   Width: float
 }
@@ -46,6 +46,9 @@ val gutter: float = 24.0
 
 /// One column at the default width (400): a readable day card.
 val inline slot: header: string * body: Control -> HubSlot
+
+/// One hub column with a control header (a resource-bound label).
+val inline slotView: header: Control * body: Control -> HubSlot
 
 /// Where a wheel nudge lands: the delta applied, clamped to the hub's
 /// scrollable extent.

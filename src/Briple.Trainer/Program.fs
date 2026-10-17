@@ -47,6 +47,10 @@ type App() =
     this.Styles.Add(FluentTheme())
     this.Styles.Add(appStyles)
 
+    // the boot language before the shell knows the persisted one; the
+    // shell installs the user's choice from the environment
+    Localization.install(Language.toCulture Es)
+
 /// Console plus one rolling file a day under %LocalAppData%.
 let configureLogging() : unit =
   let folder =
@@ -83,12 +87,19 @@ let errorWindow(message: string) =
 /// section, the target is a URL.
 [<Struct>]
 type NavItem = {
-  Label: string
+  Key: string
   Target: string
   Icon: StreamGeometry
 }
 
 let buildShell(env: AppEnv) =
+  Localization.install env.Culture
+
+  let languageSubscription =
+    env.LanguageChanged
+    |> Observable.subscribe(fun language ->
+      Localization.install(Language.toCulture language))
+
   let history = BackStack()
 
   // the router lands in this cell once the table is built; the boot
@@ -118,13 +129,7 @@ let buildShell(env: AppEnv) =
 
     // the Fluent tooltip content is a control; its text follows the
     // language through the normal binding
-    let tip =
-      TextBlock()
-        .Text(
-          env.LanguageChanged
-          |> Observable.map(fun language ->
-            get(Language.toCulture language, Keys.commonBack))
-        )
+    let tip = TextBlock().Text(Localization.text Keys.commonBack)
 
     ToolTip.SetTip(button, tip)
     button
@@ -171,7 +176,7 @@ let buildShell(env: AppEnv) =
                   .HorizontalAlignment(HorizontalAlignment.Center)
               ),
             TextBlock()
-              .Text(item.Label)
+              .Text(Localization.text item.Key)
               .VerticalAlignment(VerticalAlignment.Center)
               .IsVisible(paneOpen)
           )
@@ -188,39 +193,30 @@ let buildShell(env: AppEnv) =
       .OnClickHandler(fun _ _ -> goTo item.Target)
       .Classes("nav-item")
 
-  // the pane's main group: the athletes section follows the language
+  // the pane's main group: the label follows the resource dictionary,
+  // so the item itself never changes on a language switch
   let paneList =
-    let items =
-      env.LanguageChanged
-      |> Observable.map(fun language ->
-        let culture = Language.toCulture language
-
+    ItemsControl()
+      .ItemTemplate(
+        FuncDataTemplate<NavItem>((fun item _ -> navRow item), false)
+      )
+      .ItemsSource(
         [
           {
-            Label = get(culture, Keys.navAthletes)
+            Key = Keys.navAthletes
             Target = "/"
             Icon = Icons.accountGroup
           }
-        ])
-
-    let template = FuncDataTemplate<NavItem>((fun item _ -> navRow item), false)
-
-    ItemsControl().ItemTemplate(template).BindItemsSource(items, id)
-
-  // settings rides the pane footer; the language stream rebuilds the
-  // row through its binding
-  let settingsHost =
-    ContentControl()
-      .Content(
-        (env.LanguageChanged
-         |> Observable.map(fun language ->
-           navRow {
-             Label = get(Language.toCulture language, Keys.navSettings)
-             Target = "/settings"
-             Icon = Icons.settings
-           }))
-          .ToBinding()
+        ]
       )
+
+  // settings rides the pane footer; its label is a resource too
+  let settingsHost =
+    navRow {
+      Key = Keys.navSettings
+      Target = "/settings"
+      Icon = Icons.settings
+    }
 
   let window =
     Window(
@@ -230,9 +226,11 @@ let buildShell(env: AppEnv) =
     )
       .FontFamily(font)
 
-  // the router adapter is the one app-lifetime subscription; the window
-  // owns it and releases it on close
-  window.Closed.Add(fun _ -> routeSubscription.Dispose())
+  // the router and the resource installer are the two shell-lifetime
+  // subscriptions; the window owns them and releases them on close
+  window.Closed.Add(fun _ ->
+    routeSubscription.Dispose()
+    languageSubscription.Dispose())
 
   env.SetHost window
   Toasts.init(window)
@@ -328,11 +326,7 @@ let buildShell(env: AppEnv) =
           .Children(
             toggle,
             TextBlock()
-              .Text(
-                env.LanguageChanged
-                |> Observable.map(fun language ->
-                  get(Language.toCulture language, Keys.appTitle))
-              )
+              .Text(Localization.text Keys.appTitle)
               .Classes("pane-title")
               .Margin(16.0, 8.0, 16.0, 12.0)
               .IsVisible(paneOpen),

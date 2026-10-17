@@ -1,9 +1,10 @@
 module Briple.Trainer.Components.Page
 
-// The page contract: the live culture and the view host. A page view is
-// a pure function of the culture and the model; the host rebuilds it
-// when the culture changes, so a language switch needs no navigation
-// and no manual subscription.
+// The page contract: the live culture, the gate inputs and the helpers
+// that tie a page's lifetime to its subscriptions. Static text reads the
+// resource dictionary; composed text reads the culture stream where it
+// is rendered. A page is built once, so a language switch never rebuilds
+// it or navigates.
 
 open System
 open System.Globalization
@@ -22,16 +23,6 @@ type PageCulture = {
   Changed: IObservable<CultureInfo>
 }
 
-/// What a model-backed page needs to render: the culture, the model
-/// stream, the build function and the dispatch.
-[<Struct>]
-type PageView<'Model, 'Msg> = {
-  Culture: PageCulture
-  Model: IObservable<'Model>
-  Build: CultureInfo -> 'Model -> Dispatch<'Msg> -> Control
-  Dispatch: Dispatch<'Msg>
-}
-
 /// The two gate inputs a page listens to. The control is the page, so
 /// the listener dies with it.
 [<Struct>]
@@ -41,14 +32,6 @@ type GateInputs = {
   OnShown: unit -> unit
   OnCancel: unit -> unit
 }
-
-/// A stateless page whose content follows the culture.
-val inline cultureView:
-  culture: PageCulture * [<InlineIfLambda>] build: (CultureInfo -> Control) ->
-    Control
-
-/// A page with a model; the content rebuilds on culture changes only.
-val cultureHost: view: PageView<'Model, 'Msg> -> Control
 
 /// Follows the page's phase for its gate and stops when the page leaves
 /// the tree. Gated pages are transient, so detach is the end of their

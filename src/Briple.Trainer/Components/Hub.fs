@@ -16,7 +16,7 @@ open Briple.Trainer.Theme
 
 [<Struct>]
 type HubSlot = {
-  Header: string
+  Header: Control
   Body: Control
   Width: float
 }
@@ -37,11 +37,14 @@ type WheelStep =
 [<Literal>]
 let gutter = 24.0
 
-let inline slot(header: string, body: Control) : HubSlot = {
+let inline slotView(header: Control, body: Control) : HubSlot = {
   Header = header
   Body = body
   Width = 400.0
 }
+
+let inline slot(header: string, body: Control) : HubSlot =
+  slotView(TextBlock().Text(header), body)
 
 let inline wheelOffset(current: float, delta: float, max: float) : float =
   Math.Clamp(current + delta, 0.0, Math.Max(0.0, max))

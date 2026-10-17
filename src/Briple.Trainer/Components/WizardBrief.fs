@@ -1,7 +1,6 @@
 module Briple.Trainer.Components.WizardBrief
 
 open System
-open System.Globalization
 
 open Avalonia.Controls
 open Avalonia.Controls.Templates
@@ -32,7 +31,6 @@ type BriefDraft = {
 
 [<Struct>]
 type Props = {
-  Culture: CultureInfo
   Athlete: Athlete
   HasPrevious: bool
   Draft: BriefDraft
@@ -132,39 +130,25 @@ let update (props: Props) (msg: Msg) (model: Model) =
   props.OnChanged next
   next, Cmd.none
 
-let goalName (culture: CultureInfo) (goal: PlanGoal) =
+let goalKey(goal: PlanGoal) =
   goalOptions
-  |> List.tryPick(fun (candidate, key) ->
-    if candidate = goal then Some(get(culture, key)) else None)
-  |> Option.defaultValue ""
+  |> List.tryFind(fun (candidate, _) -> candidate = goal)
+  |> Option.map snd
+  |> Option.defaultValue Keys.goalHypertrophy
 
-let emphasisName (culture: CultureInfo) (emphasis: Emphasis) =
+let emphasisKey(emphasis: Emphasis) =
   emphasisOptions
-  |> List.tryPick(fun (candidate, key) ->
-    if candidate = emphasis then
-      Some(get(culture, key))
-    else
-      None)
-  |> Option.defaultValue ""
+  |> List.tryFind(fun (candidate, _) -> candidate = emphasis)
+  |> Option.map snd
+  |> Option.defaultValue Keys.emphasisArms
 
-let frequencyName (culture: CultureInfo) (frequency: VariantFrequency) =
-  frequencyOptions
-  |> List.tryPick(fun (candidate, key) ->
-    if candidate = frequency then
-      Some(get(culture, key))
-    else
-      None)
-  |> Option.defaultValue ""
-
-/// The brief form at one culture, over the current draft.
+/// The brief form: every label is a resource key; the draft is the model.
 let view
   (props: Props)
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
   let current = props.Draft
-  let culture = props.Culture
-  let t key = get(culture, key)
 
   // the goal radio is built from the athlete's own goals
   let athleteGoals =
@@ -175,16 +159,11 @@ let view
 
   let modeRow: Control =
     if props.HasPrevious then
-      let modeName mode =
-        match mode with
-        | Adjust -> t Keys.wizardModeAdjust
-        | Fresh -> t Keys.wizardModeNew
-
-      field(
-        t Keys.wizardMode,
+      fieldKey(
+        Keys.wizardMode,
         fun () ->
-          radioRow(
-            [ Adjust, modeName Adjust; Fresh, modeName Fresh ],
+          radioRowKeys(
+            [ Adjust, Keys.wizardModeAdjust; Fresh, Keys.wizardModeNew ],
             "brief-mode",
             current.Mode,
             SetMode >> dispatch
@@ -202,16 +181,16 @@ let view
     )
 
   let goalChips =
-    radioRow(
-      [ for goal in athleteGoals -> goal, goalName culture goal ],
+    radioRowKeys(
+      [ for goal in athleteGoals -> goal, goalKey goal ],
       "brief-goal",
       current.Goal,
       SetGoal >> dispatch
     )
 
   let frequencyChips =
-    radioRow(
-      [ for frequency, key in frequencyOptions -> frequency, t key ],
+    radioRowKeys(
+      frequencyOptions,
       "brief-frequency",
       current.Frequency,
       SetFrequency >> dispatch
@@ -224,8 +203,8 @@ let view
       model
       |> Observable.map(fun current -> List.contains emphasis current.Emphasis)
 
-    checkRow(
-      emphasisName culture emphasis,
+    checkRowKey(
+      emphasisKey emphasis,
       isOn,
       fun () -> dispatch(ToggleEmphasis emphasis)
     )
@@ -250,10 +229,10 @@ let view
     .Spacing(4.0)
     .Children(
       modeRow,
-      field(t Keys.wizardWeeks, (fun () -> weeksChips)),
-      field(t Keys.wizardGoal, (fun () -> goalChips)),
-      field(t Keys.wizardFrequency, (fun () -> frequencyChips)),
-      field(t Keys.wizardEmphasis, (fun () -> emphasisSection))
+      fieldKey(Keys.wizardWeeks, (fun () -> weeksChips)),
+      fieldKey(Keys.wizardGoal, (fun () -> goalChips)),
+      fieldKey(Keys.wizardFrequency, (fun () -> frequencyChips)),
+      fieldKey(Keys.wizardEmphasis, (fun () -> emphasisSection))
     )
 
 type WizardBrief(props: Props) as this =

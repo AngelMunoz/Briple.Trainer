@@ -14,6 +14,7 @@ open System.Threading
 
 open Avalonia.Controls
 
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
@@ -43,7 +44,7 @@ type Model = {
 /// The section inputs.
 [<Struct>]
 type Props = {
-  Culture: CultureInfo
+  Culture: PageCulture
   Agent: IProvideAgent
   Memories: MemoryStore
   AthleteId: Guid

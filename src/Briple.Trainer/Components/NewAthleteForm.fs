@@ -119,26 +119,35 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
     onEvent Cancelled
     model, Cmd.none
 
-/// The page at one culture, over the current model.
+/// The page: static text comes from resources; the model owns the name,
+/// the gender and the goals.
 let view
   (props: Props)
-  (culture: System.Globalization.CultureInfo)
-  (current: Model)
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
-  let t key = get(culture, key)
+  let initial, _ = init props
 
   let saveEnabled =
     model |> Observable.map(fun m -> isValid m && m.Phase = Filling)
 
-  let nameEntry = entry(t Keys.athleteName, current.Name, (SetName >> dispatch))
+  let nameEntry =
+    TextBox()
+      .Padding(8.0, 6.0)
+      .Text(model |> Observable.map _.Name)
+      .PlaceholderText(Localization.text Keys.athleteName)
+      .OnTextChangedHandler(fun args _ ->
+        args.Text
+        |> Option.ofObj
+        |> Option.defaultValue ""
+        |> SetName
+        |> dispatch)
 
   let genderRadios =
-    radioRow(
-      [ Male, t Keys.genderMale; Female, t Keys.genderFemale ],
+    radioRowKeys(
+      [ Male, Keys.genderMale; Female, Keys.genderFemale ],
       "new-athlete-gender",
-      current.Gender,
+      initial.Gender,
       PickGender >> dispatch
     )
 
@@ -148,15 +157,15 @@ let view
         let isOn =
           model |> Observable.map(fun m -> List.contains candidate m.Goals)
 
-        checkRow(t key, isOn, (fun () -> dispatch(ToggleGoal candidate)))
+        checkRowKey(key, isOn, (fun () -> dispatch(ToggleGoal candidate)))
     |]
 
     StackPanel().Spacing(6.0).Children rows
 
   let saveCommand =
     let save =
-      iconCommand(
-        t Keys.athleteSave,
+      iconCommandKey(
+        Keys.athleteSave,
         Icons.contentSave,
         (fun () -> dispatch Save)
       )
@@ -165,17 +174,17 @@ let view
 
   fluentPage {
     Lead = props.Lead
-    Title = t Keys.athletesNew
+    Title = pageTitleKey Keys.athletesNew
     Commands = [ saveCommand ]
     Footer = noFooter
     Body =
       StackPanel()
         .Spacing(4.0)
         .Children(
-          field(t Keys.athleteName, (fun () -> nameEntry)),
-          field(t Keys.athleteGender, (fun () -> genderRadios)),
-          field(t Keys.athleteGoals, (fun () -> goalChecks)),
-          hyperlinkButton(t Keys.athleteCancel, (fun () -> dispatch Cancel))
+          fieldKey(Keys.athleteName, (fun () -> nameEntry)),
+          fieldKey(Keys.athleteGender, (fun () -> genderRadios)),
+          fieldKey(Keys.athleteGoals, (fun () -> goalChecks)),
+          hyperlinkButtonKey(Keys.athleteCancel, (fun () -> dispatch Cancel))
         )
     Measure = 560.0
   }
@@ -185,18 +194,11 @@ type NewAthleteForm(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as 
   inherit UserControl()
 
   do
-    let viewWithCulture (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
+    let render (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
       Page.trackPhase(this, props.Gate, model |> Observable.map phaseOf)
 
-      Page.cultureHost {
-        Culture = props.Culture
-        Model = model
-        Build =
-          fun culture current dispatch ->
-            view props culture current model dispatch
-        Dispatch = dispatch
-      }
+      view props model dispatch
 
-    let program = Program.mkProgram init (update props onEvent) viewWithCulture
+    let program = Program.mkProgram init (update props onEvent) render
 
     this.Content <- Program.runWith props program

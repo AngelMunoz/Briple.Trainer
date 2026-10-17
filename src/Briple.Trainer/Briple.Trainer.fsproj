@@ -45,6 +45,8 @@
     <Compile Include="Theme.fs" />
     <Compile Include="Strings.fsi" />
     <Compile Include="Strings.fs" />
+    <Compile Include="Localization.fsi" />
+    <Compile Include="Localization.fs" />
     <Compile Include="Persistence.fsi" />
     <Compile Include="Persistence.fs" />
     <Compile Include="Stores.fsi" />

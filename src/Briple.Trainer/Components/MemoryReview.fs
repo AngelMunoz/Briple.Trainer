@@ -11,6 +11,7 @@ open MVUish.Avalonia
 
 open Briple.Trainer
 open Briple.Trainer.Components.Fields
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Strings
 open Briple.Trainer.Theme
@@ -22,7 +23,7 @@ type Event =
 
 [<Struct>]
 type Props = {
-  Culture: CultureInfo
+  Culture: PageCulture
   Id: Guid
   Memory: Memory
 }
@@ -133,21 +134,16 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
         let selected =
           model |> Observable.map(fun m -> List.contains delta m.Selected)
 
-        checkRow(
-          deltaText culture delta,
-          selected,
-          fun () -> dispatch(Toggle delta)
-        )
+        let text =
+          culture.Changed
+          |> Observable.map(fun current -> deltaText current delta)
+
+        checkRowObs(text, selected, fun () -> dispatch(Toggle delta))
 
       // how far the confirmed memory travels: this plan or the athlete
       let scopeRow =
-        let nameOf scope =
-          match scope with
-          | Plan -> get(culture, Keys.memoryScopePlan)
-          | Athlete -> get(culture, Keys.memoryScopeAthlete)
-
-        radioRow(
-          [ Plan, nameOf Plan; Athlete, nameOf Athlete ],
+        radioRowKeys(
+          [ Plan, Keys.memoryScopePlan; Athlete, Keys.memoryScopeAthlete ],
           $"memory-scope-{props.Id}",
           props.Memory.Scope,
           SetScope >> dispatch
@@ -161,7 +157,12 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
           StackPanel()
             .Spacing(6.0)
             .Children(
-              TextBlock().Text(originText culture props.Memory),
+              TextBlock()
+                .Text(
+                  culture.Changed
+                  |> Observable.map(fun current ->
+                    originText current props.Memory)
+                ),
               StackPanel().Spacing(4.0).Children [|
                 for delta in props.Memory.Deltas -> optionRow delta
               |],
@@ -170,13 +171,13 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
                 .Orientation(Orientation.Horizontal)
                 .Spacing(8.0)
                 .Children(
-                  iconButton(
-                    get(culture, Keys.memoriesConfirm),
+                  iconButtonKey(
+                    Keys.memoriesConfirm,
                     Icons.check,
                     fun () -> dispatch Accept
                   ),
-                  iconButton(
-                    get(culture, Keys.memoriesDiscard),
+                  iconButtonKey(
+                    Keys.memoriesDiscard,
                     Icons.delete,
                     fun () -> dispatch Discard
                   )

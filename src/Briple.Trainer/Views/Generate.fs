@@ -566,26 +566,34 @@ let inline statusLine(text: string, isError: bool) : Control =
 
   TextBlock().Text(text).Classes("body", tone).TextWrapping(TextWrapping.Wrap)
 
+let inline statusLineKey(key: string, isError: bool) : Control =
+  let tone = if isError then "danger" else "secondary"
+
+  TextBlock()
+    .Text(Localization.text key)
+    .Classes("body", tone)
+    .TextWrapping(TextWrapping.Wrap)
+
 let inline linesPanel(lines: Control array) : Control =
   StackPanel().Spacing(4.0).Children(lines)
 
-let inline stepCaption(culture: CultureInfo, number: int) : Control =
-  label(getf(culture, Keys.wizardStepOf, [ number :> obj; 2 :> obj ]))
+let inline stepCaption(culture: PageCulture, number: int) : Control =
+  TextBlock()
+    .Text(
+      culture.Changed
+      |> Observable.map(fun current ->
+        getf(current, Keys.wizardStepOf, [ number :> obj; 2 :> obj ]))
+    )
+    .Classes("caption", "secondary")
 
 let memoriesColumn
-  (
-    props: WizardPageProps,
-    model: IObservable<Model>,
-    culture: CultureInfo,
-    dispatch: Dispatch<Msg>
-  ) : Control =
-  let t key = get(culture, key)
-
+  (props: WizardPageProps, model: IObservable<Model>, dispatch: Dispatch<Msg>)
+  : Control =
   let cards: Control array = [|
     for entity in props.Proposals ->
       MemoryReview.MemoryReview(
         {
-          Culture = culture
+          Culture = props.Culture
           Id = entity.Id
           Memory = entity.Memory
         },
@@ -604,8 +612,8 @@ let memoriesColumn
 
   let next =
     let button =
-      iconPrimaryButton(
-        t Keys.wizardNext,
+      iconPrimaryButtonKey(
+        Keys.wizardNext,
         Icons.chevronRight,
         (fun () -> dispatch(GoSection BriefSection))
       )
@@ -615,15 +623,15 @@ let memoriesColumn
   StackPanel()
     .Spacing(8.0)
     .Children(
-      stepCaption(culture, 1),
+      stepCaption(props.Culture, 1),
       (if Array.isEmpty cards then
-         label(t Keys.memoriesEmpty)
+         labelKey Keys.memoriesEmpty
        else
          linesPanel cards),
       (if List.isEmpty props.Confirmed then
          StackPanel() :> Control
        else
-         sectionTitle(t Keys.wizardApplies)),
+         sectionTitleKey Keys.wizardApplies),
       confirmedRows,
       next.HorizontalAlignment(HorizontalAlignment.Left)
     )
@@ -633,15 +641,11 @@ let briefColumn
     props: WizardPageProps,
     draft: Draft,
     model: IObservable<Model>,
-    culture: CultureInfo,
     dispatch: Dispatch<Msg>
   ) : Control =
-  let t key = get(culture, key)
-
   let brief =
     WizardBrief.WizardBrief(
       {
-        Culture = culture
         Athlete = props.Athlete.Profile
         HasPrevious = props.Previous.IsSome
         Draft = draft
@@ -651,8 +655,8 @@ let briefColumn
 
   let generate =
     let button =
-      iconPrimaryButton(
-        t Keys.wizardGenerate,
+      iconPrimaryButtonKey(
+        Keys.wizardGenerate,
         Icons.play,
         (fun () -> dispatch GenerateRequested)
       )
@@ -662,7 +666,7 @@ let briefColumn
   StackPanel()
     .Spacing(8.0)
     .Children(
-      stepCaption(culture, 2),
+      stepCaption(props.Culture, 2),
       brief,
       generate.HorizontalAlignment(HorizontalAlignment.Left)
     )
@@ -679,22 +683,19 @@ let editingView
     props: WizardPageProps,
     current: Model,
     model: IObservable<Model>,
-    culture: CultureInfo,
     dispatch: Dispatch<Msg>
   ) : Control =
-  let t key = get(culture, key)
-
   let hub =
     Hub.hub {
       Title = ""
       Slots = [
-        Hub.slot(
-          t Keys.wizardStepMemories,
-          memoriesColumn(props, model, culture, dispatch)
+        Hub.slotView(
+          Localization.textBlock Keys.wizardStepMemories,
+          memoriesColumn(props, model, dispatch)
         )
-        Hub.slot(
-          t Keys.wizardStepBrief,
-          briefColumn(props, current.Brief, model, culture, dispatch)
+        Hub.slotView(
+          Localization.textBlock Keys.wizardStepBrief,
+          briefColumn(props, current.Brief, model, dispatch)
         )
       ]
       Active =
@@ -705,28 +706,24 @@ let editingView
 
   fluentPage {
     Lead = props.Lead
-    Title = t Keys.wizardTitle
+    Title = pageTitleKey Keys.wizardTitle
     Commands = []
     Footer = noFooter
     Body = hub
     Measure = 760.0
   }
 
-let generatingView
-  (props: WizardPageProps, culture: CultureInfo, dispatch: Dispatch<Msg>)
-  : Control =
-  let t key = get(culture, key)
-
+let generatingView(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
   let cancel =
-    iconButton(
-      t Keys.wizardCancelGeneration,
+    iconButtonKey(
+      Keys.wizardCancelGeneration,
       Icons.stop,
       (fun () -> dispatch Exit)
     )
 
   fluentPage {
     Lead = props.Lead
-    Title = t Keys.wizardTitle
+    Title = pageTitleKey Keys.wizardTitle
     Commands = []
     Footer = noFooter
     Body =
@@ -740,7 +737,7 @@ let generatingView
             Width = 240.0,
             HorizontalAlignment = HorizontalAlignment.Center
           ),
-          statusLine(t Keys.wizardGenerating, false)
+          statusLineKey(Keys.wizardGenerating, false)
             .HorizontalAlignment(HorizontalAlignment.Center),
           actionRow [ cancel ]
         )
@@ -752,12 +749,9 @@ let failedView
     props: WizardPageProps,
     failure: Failure,
     last: Draft voption,
-    culture: CultureInfo,
     dispatch: Dispatch<Msg>
   ) : Control =
-  let t key = get(culture, key)
-
-  let reasons =
+  let reasonsFor(culture: CultureInfo) =
     match failure with
     | RejectedPlan violations ->
       violations
@@ -767,8 +761,8 @@ let failedView
 
   let retry =
     let button =
-      iconPrimaryButton(
-        t Keys.wizardRetry,
+      iconPrimaryButtonKey(
+        Keys.wizardRetry,
         Icons.refresh,
         (fun () -> dispatch Retry)
       )
@@ -776,14 +770,22 @@ let failedView
     button.IsEnabled(ValueOption.isSome last)
 
   let exit =
-    iconButton(t Keys.wizardExit, Icons.logout, (fun () -> dispatch Exit))
+    iconButtonKey(Keys.wizardExit, Icons.logout, (fun () -> dispatch Exit))
 
   let reasonsPanel =
-    linesPanel [| for reason in reasons -> statusLine(reason, true) |]
+    ContentControl()
+      .Content(
+        (props.Culture.Changed
+         |> Observable.map(fun culture ->
+           linesPanel [|
+             for reason in reasonsFor culture -> statusLine(reason, true)
+           |]))
+          .ToBinding()
+      )
 
   fluentPage {
     Lead = props.Lead
-    Title = t Keys.errorTitle
+    Title = pageTitleKey Keys.errorTitle
     Commands = []
     Footer = noFooter
     Body =
@@ -798,21 +800,25 @@ let doneView
     props: WizardPageProps,
     plan: Plan,
     advisories: Violation list,
-    culture: CultureInfo,
     dispatch: Dispatch<Msg>
   ) : Control =
-  let t key = get(culture, key)
-
-  let advisoryLines =
-    advisories
-    |> List.map(fun advisory ->
-      statusLine(describeViolation(culture, advisory), true))
-    |> Array.ofList
+  let advisoryPanel =
+    ContentControl()
+      .Content(
+        (props.Culture.Changed
+         |> Observable.map(fun culture ->
+           advisories
+           |> List.map(fun advisory ->
+             statusLine(describeViolation(culture, advisory), true))
+           |> Array.ofList
+           |> linesPanel))
+          .ToBinding()
+      )
 
   let preview =
     PlanReview.PlanReview(
       {
-        Culture = culture
+        Culture = props.Culture
         Parsed = { Plan = plan; Warnings = [] }
         Week = ValueNone
         Editing = false
@@ -821,51 +827,67 @@ let doneView
     )
 
   let discard =
-    iconButton(
-      t Keys.wizardDiscard,
+    iconButtonKey(
+      Keys.wizardDiscard,
       Icons.delete,
       (fun () -> dispatch DiscardRequested)
     )
 
   let confirm =
-    iconPrimaryButton(
-      t Keys.wizardConfirm,
+    iconPrimaryButtonKey(
+      Keys.wizardConfirm,
       Icons.check,
       (fun () -> dispatch ConfirmPlan)
     )
 
   fluentPage {
     Lead = props.Lead
-    Title = t Keys.wizardTitle
+    Title = pageTitleKey Keys.wizardTitle
     Commands = []
     Footer = noFooter
     Body =
       StackPanel()
         .Spacing(8.0)
-        .Children(
-          preview,
-          (if Array.isEmpty advisoryLines then
-             StackPanel() :> Control
-           else
-             linesPanel advisoryLines),
-          actionRow [ discard; confirm ]
-        )
+        .Children(preview, advisoryPanel, actionRow [ discard; confirm ])
     Measure = 760.0
   }
 
-let view
+let phaseKey(model: Model) =
+  match model.Phase with
+  | Editing -> 0
+  | Generating -> 1
+  | Failed _ -> 2
+  | Done _ -> 3
+
+let phaseView
   (props: WizardPageProps)
-  (culture: CultureInfo)
   (current: Model)
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
   match current.Phase with
-  | Editing -> editingView(props, current, model, culture, dispatch)
-  | Generating -> generatingView(props, culture, dispatch)
-  | Failed(failure, last) -> failedView(props, failure, last, culture, dispatch)
-  | Done(plan, advisories, _) ->
-    doneView(props, plan, advisories, culture, dispatch)
+  | Editing -> editingView(props, current, model, dispatch)
+  | Generating -> generatingView(props, dispatch)
+  | Failed(failure, last) -> failedView(props, failure, last, dispatch)
+  | Done(plan, advisories, _) -> doneView(props, plan, advisories, dispatch)
+
+/// The phase switches when the model enters another phase; the edits
+/// inside a phase stay in the components, so the brief and the hub keep
+/// their state.
+let view
+  (props: WizardPageProps)
+  (model: IObservable<Model>)
+  (dispatch: Dispatch<Msg>)
+  : Control =
+  ContentControl()
+    .Content(
+      (model
+       |> Observable.map(fun current -> phaseKey current, current)
+       |> Observable.distinctUntilChangedKey fst
+       |> Observable.map(fun (_, current) ->
+         phaseView props current model dispatch))
+        .ToBinding()
+    )
 
 type WizardPage
   (props: WizardPageProps, [<InlineIfLambda>] onOutcome: Outcome -> unit) as this
@@ -882,20 +904,13 @@ type WizardPage
           OnCancel = fun () -> dispatch RunAbandoned
         }
 
-    let viewWithCulture (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
+    let render (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
       Page.trackPhase(this, props.Gate, model |> Observable.map phaseOf)
 
-      Page.cultureHost {
-        Culture = props.Culture
-        Model = model
-        Build =
-          fun culture current dispatch ->
-            view props culture current model dispatch
-        Dispatch = dispatch
-      }
+      view props model dispatch
 
     let program =
-      Program.mkProgram init (update props onOutcome) viewWithCulture
+      Program.mkProgram init (update props onOutcome) render
       |> Program.withSubscription subscribe
 
     this.Content <- Program.runWith props program

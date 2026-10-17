@@ -41,38 +41,44 @@ let goalName(culture: CultureInfo, goal: PlanGoal) : string =
   | BasicBodyActivation -> get(culture, Keys.goalActivation)
   | Strength -> get(culture, Keys.goalStrength)
 
+let genderName(culture: CultureInfo, gender: Gender) : string =
+  match gender with
+  | Male -> get(culture, Keys.genderMale)
+  | Female -> get(culture, Keys.genderFemale)
+
+let summary(culture: CultureInfo, athlete: AthleteEntity) : string =
+  [
+    genderName(culture, athlete.Profile.Gender)
+    athlete.Profile.Goals
+    |> List.map(fun goal -> goalName(culture, goal))
+    |> String.concat ", "
+  ]
+  |> String.concat " · "
+
 /// The trailing glyph of a row: 16px, muted, centered by the row grid.
 let inline chevron() : Control =
   PathIcon(Data = Icons.chevronRight, Width = 16.0, Height = 16.0)
     .Foreground(muted)
 
-/// One row: the name and the profile summary; the whole row opens.
+/// One row: the name and the profile summary; the whole row opens. The
+/// summary is composed text, so it follows the live culture; the name is
+/// data and never changes.
 let athleteRow
-  (culture: CultureInfo, onOpen: Guid -> unit, athlete: AthleteEntity)
+  (culture: PageCulture, onOpen: Guid -> unit, athlete: AthleteEntity)
   : Control =
-  let summary = [
-    athlete.Profile.Gender |> Gender.toFileToken
-    athlete.Profile.Goals
-    |> List.map(fun goal -> goalName(culture, goal))
-    |> String.concat ", "
-  ]
+  let detail =
+    culture.Changed |> Observable.map(fun current -> summary(current, athlete))
 
   Button()
-    .Content(
-      contentRow(athlete.Profile.Name, String.concat " · " summary, chevron)
-    )
+    .Content(contentRowObs(athlete.Profile.Name, detail, chevron))
     .OnClickHandler(fun _ _ -> onOpen athlete.Id)
     .Margin(0.0, 0.0, 0.0, 4.0)
     .Classes("row")
 
-/// The page at one culture.
-let view
-  (props: AthleteListProps)
-  (onEvent: Event -> unit)
-  (culture: CultureInfo)
-  : Control =
-  let t key = get(culture, key)
-
+/// The page: static text comes from the resource dictionary; the row
+/// summaries follow the culture stream.
+let view (props: AthleteListProps) (onEvent: Event -> unit) : Control =
+  let culture = props.Culture
   let onOpen id = onEvent(Event.OpenRequested id)
 
   let rows =
@@ -92,20 +98,20 @@ let view
       .Spacing(8.0)
       .Children(
         glyph(Icons.accountSearchOutline, 32.0, muted),
-        label(t Keys.athletesEmpty)
+        labelKey Keys.athletesEmpty
       )
       .IsVisible(props.Athletes |> Observable.map List.isEmpty)
 
   let newCommand =
-    iconPrimaryButton(
-      t Keys.athletesNew,
+    iconPrimaryButtonKey(
+      Keys.athletesNew,
       Icons.plus,
       (fun () -> onEvent Event.NewRequested)
     )
 
   fluentPage {
     Lead = props.Lead
-    Title = t Keys.athletesTitle
+    Title = pageTitleKey Keys.athletesTitle
     Commands = [ newCommand ]
     Footer = noFooter
     Body = StackPanel().Spacing(8.0).Children(emptyState, rows)
@@ -116,9 +122,4 @@ type AthleteList
   (props: AthleteListProps, [<InlineIfLambda>] onEvent: Event -> unit) as this =
   inherit UserControl()
 
-  do
-    this.Content <-
-      Page.cultureView(
-        props.Culture,
-        (fun culture -> view props onEvent culture)
-      )
+  do this.Content <- view props onEvent

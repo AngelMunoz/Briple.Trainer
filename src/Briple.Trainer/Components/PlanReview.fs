@@ -16,6 +16,7 @@ open MVUish.Avalonia
 open Briple.Trainer
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Components.Hub
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Plan.Projection
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
@@ -44,7 +45,7 @@ type Event =
 
 [<Struct>]
 type Props = {
-  Culture: CultureInfo
+  Culture: PageCulture
   Parsed: ParsedPlan
   Week: int voption
   Editing: bool
@@ -292,10 +293,12 @@ let dayBody(ctx: SectionContext, path: RowPath, day: Day) : Control =
     for (circuit, laps), exercises in circuitGroupsOf day do
       TextBlock()
         .Text(
-          if String.IsNullOrWhiteSpace laps then
-            circuit
-          else
-            $"{circuit} × {laps} {get(ctx.Props.Culture, Keys.planLaps)}"
+          ctx.Props.Culture.Changed
+          |> Observable.map(fun current ->
+            if String.IsNullOrWhiteSpace laps then
+              circuit
+            else
+              $"{circuit} × {laps} {get(current, Keys.planLaps)}")
         )
         .Classes("caption-strong", "secondary")
 
@@ -319,14 +322,16 @@ let variantSection(ctx: SectionContext, path: RowPath, variant: Variant) =
 
   let rir = tryMesocycleRir plan week.Number
 
-  let weekLabel = getf(ctx.Props.Culture, Keys.planWeek, [ week.Number :> obj ])
-
   let caption =
     TextBlock()
       .Text(
-        match rir with
-        | Some rir -> $"{weekLabel} · RIR {rir}"
-        | None -> weekLabel
+        ctx.Props.Culture.Changed
+        |> Observable.map(fun current ->
+          let weekLabel = getf(current, Keys.planWeek, [ week.Number :> obj ])
+
+          match rir with
+          | Some rir -> $"{weekLabel} · RIR {rir}"
+          | None -> weekLabel)
       )
       .Classes("caption-strong", "accent-text")
       .HorizontalAlignment(HorizontalAlignment.Left)
@@ -400,7 +405,13 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) =
         let active = model |> Observable.map(fun m -> m.Week = weekNumber)
 
         Button(
-          Content = getf(props.Culture, Keys.planWeek, [ weekNumber :> obj ])
+          Content =
+            TextBlock()
+              .Text(
+                props.Culture.Changed
+                |> Observable.map(fun current ->
+                  getf(current, Keys.planWeek, [ weekNumber :> obj ]))
+              )
         )
           .Foreground(
             active |> Observable.map(fun on -> if on then accent else muted)
@@ -458,20 +469,20 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) =
                      .Orientation(Orientation.Horizontal)
                      .Spacing(8.0)
                      .Children(
-                       iconButton(
-                         get(props.Culture, Keys.planRevert),
+                       iconButtonKey(
+                         Keys.planRevert,
                          Icons.undo,
                          fun () -> dispatch RevertEdit
                        ),
-                       iconButton(
-                         get(props.Culture, Keys.planDone),
+                       iconButtonKey(
+                         Keys.planDone,
                          Icons.check,
                          fun () -> dispatch(SetEditing false)
                        )
                      )
                  else
-                   iconButton(
-                     get(props.Culture, Keys.planEdit),
+                   iconButtonKey(
+                     Keys.planEdit,
                      Icons.pencil,
                      fun () -> dispatch(SetEditing true)
                    )

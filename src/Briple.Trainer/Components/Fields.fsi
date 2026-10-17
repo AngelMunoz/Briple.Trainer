@@ -28,7 +28,9 @@ val noFooter: FooterBar
 type PageChrome = {
   /// The shell's back control, placed first in the header row.
   Lead: Control voption
-  Title: string
+  /// The title control: a resource-bound title for a fixed page, or a
+  /// plain title for data (an athlete name).
+  Title: Control
   Commands: Control list
   Footer: FooterBar
   Body: Control
@@ -38,27 +40,52 @@ type PageChrome = {
 /// The page title level: 28 SemiBold.
 val inline pageTitle: text: string -> Control
 
+/// The page title for a resource key; the text follows the dictionary.
+val inline pageTitleKey: key: string -> Control
+
 /// The section header level: 20 SemiBold.
 val inline sectionTitle: text: string -> Control
 
+/// The section header for a resource key.
+val inline sectionTitleKey: key: string -> Control
+
 /// A secondary-text caption: 12, muted.
 val inline label: text: string -> Control
+
+/// A secondary-text caption for a resource key.
+val inline labelKey: key: string -> Control
 
 /// One labeled field: label above, input below.
 val inline field:
   labelText: string * [<InlineIfLambda>] input: (unit -> Control) -> Control
 
+/// One labeled field whose label is a resource key.
+val inline fieldKey:
+  labelKeyText: string * [<InlineIfLambda>] input: (unit -> Control) -> Control
+
 /// A plain button.
 val inline button:
   text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Button
+
+/// A plain button whose label is a resource key.
+val inline buttonKey:
+  key: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Button
 
 /// The primary action button: the accent fill.
 val inline primaryButton:
   text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Button
 
+/// The primary action button for a resource key.
+val inline primaryButtonKey:
+  key: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Button
+
 /// A tertiary text action.
 val inline hyperlinkButton:
   text: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Control
+
+/// A tertiary text action for a resource key.
+val inline hyperlinkButtonKey:
+  key: string * [<InlineIfLambda>] onClick: (unit -> unit) -> Control
 
 /// One page command: a plain button for the header row. The primary
 /// action goes last (rightmost); mark it with `accent`.
@@ -76,9 +103,19 @@ val inline glyph:
 /// A glyph before its label: the content of an action control.
 val inline glyphLabel: geometry: StreamGeometry * text: string -> Control
 
+/// A glyph before a resource-key label.
+val inline glyphLabelKey: geometry: StreamGeometry * key: string -> Control
+
 /// A plain button with a glyph before its label.
 val inline iconButton:
   text: string *
+  geometry: StreamGeometry *
+  [<InlineIfLambda>] onClick: (unit -> unit) ->
+    Button
+
+/// A glyph button whose label is a resource key.
+val inline iconButtonKey:
+  key: string *
   geometry: StreamGeometry *
   [<InlineIfLambda>] onClick: (unit -> unit) ->
     Button
@@ -90,9 +127,23 @@ val inline iconPrimaryButton:
   [<InlineIfLambda>] onClick: (unit -> unit) ->
     Button
 
+/// The primary glyph button for a resource key.
+val inline iconPrimaryButtonKey:
+  key: string *
+  geometry: StreamGeometry *
+  [<InlineIfLambda>] onClick: (unit -> unit) ->
+    Button
+
 /// One page command with its glyph before the label.
 val inline iconCommand:
   text: string *
+  geometry: StreamGeometry *
+  [<InlineIfLambda>] onClick: (unit -> unit) ->
+    Button
+
+/// One page command for a resource key.
+val inline iconCommandKey:
+  key: string *
   geometry: StreamGeometry *
   [<InlineIfLambda>] onClick: (unit -> unit) ->
     Button
@@ -103,6 +154,13 @@ val inline iconCommand:
 val inline contentRow:
   title: string *
   detail: string *
+  [<InlineIfLambda>] trailing: (unit -> Control) ->
+    Control
+
+/// One content row whose detail is a live text (data plus labels).
+val inline contentRowObs:
+  title: string *
+  detail: IObservable<string> *
   [<InlineIfLambda>] trailing: (unit -> Control) ->
     Control
 
@@ -118,8 +176,18 @@ val inline entry:
   [<InlineIfLambda>] onChanged: (string -> unit) ->
     TextBox
 
+/// A single-line input whose placeholder is a resource key.
+val inline entryKey:
+  placeholderKey: string *
+  text: string *
+  [<InlineIfLambda>] onChanged: (string -> unit) ->
+    TextBox
+
 /// One settings card row: the title left, the control right.
 val inline cardRow: title: string * control: Control -> Control
+
+/// One settings card row whose title is a resource key.
+val inline cardRowKey: key: string * control: Control -> Control
 
 /// A single-choice row of radio buttons over typed options; the control
 /// owns the visual state, the value comes from the model.
@@ -131,10 +199,33 @@ val inline radioRow:
     Control
     when 'T: equality
 
+/// Radio options whose labels are resource keys.
+val inline radioRowKeys:
+  options: ('T * string) list *
+  group: string *
+  selected: 'T *
+  [<InlineIfLambda>] onPick: ('T -> unit) ->
+    Control
+    when 'T: equality
+
 /// One checkbox whose checked state follows an observable; the
 /// subscription is disposed when the control detaches.
 val inline checkRow:
   text: string *
+  isOn: IObservable<bool> *
+  [<InlineIfLambda>] onToggle: (unit -> unit) ->
+    Control
+
+/// One checkbox whose label is a resource key.
+val inline checkRowKey:
+  key: string *
+  isOn: IObservable<bool> *
+  [<InlineIfLambda>] onToggle: (unit -> unit) ->
+    Control
+
+/// One checkbox whose label is live text (data plus localized labels).
+val inline checkRowObs:
+  text: IObservable<string> *
   isOn: IObservable<bool> *
   [<InlineIfLambda>] onToggle: (unit -> unit) ->
     Control

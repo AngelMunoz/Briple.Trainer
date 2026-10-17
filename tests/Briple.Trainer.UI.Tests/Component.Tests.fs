@@ -118,6 +118,7 @@ let tests =
     testCase "memory review confirms with the accepted deltas"
     <| fun () ->
       let events = ResizeArray<Briple.Trainer.Components.MemoryReview.Event>()
+      let _, culture = liveCulture es
 
       let memory =
         consolidate {
@@ -130,7 +131,7 @@ let tests =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
             {
-              Culture = es
+              Culture = culture
               Id = Guid.NewGuid()
               Memory = memory
             },
@@ -165,6 +166,7 @@ let tests =
     testCase "memory review discards"
     <| fun () ->
       let events = ResizeArray<Briple.Trainer.Components.MemoryReview.Event>()
+      let _, culture = liveCulture es
 
       let memory =
         consolidate {
@@ -179,7 +181,7 @@ let tests =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
             {
-              Culture = es
+              Culture = culture
               Id = id
               Memory = memory
             },
@@ -209,12 +211,13 @@ let tests =
       | Error e -> failtest $"the sample plan does not parse: {e}"
       | Ok parsed ->
         let events = ResizeArray<Briple.Trainer.Components.PlanReview.Event>()
+        let _, culture = liveCulture es
 
         let review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
               {
-                Culture = es
+                Culture = culture
                 Parsed = parsed
                 Week = ValueNone
                 Editing = false
@@ -327,7 +330,6 @@ let tests =
       let brief =
         probeUi(fun () ->
           Briple.Trainer.Components.WizardBrief.WizardBrief {
-            Culture = es
             Athlete = sampleAthlete
             HasPrevious = false
             Draft = draft
@@ -564,6 +566,7 @@ let noteTests =
           failtest $"the sample plan broke: {Parse.describe error}"
 
       let planId = Guid.NewGuid()
+      let _, culture = liveCulture es
 
       let reading: NoteInterpretation = {
         Memories = [
@@ -587,7 +590,7 @@ let noteTests =
         probeUi(fun () ->
           Briple.Trainer.Components.NoteSection.NoteSection(
             {
-              Culture = es
+              Culture = culture
               Agent = FakeAgent(reading)
               Memories = stores.Memories
               AthleteId = athleteId
@@ -797,19 +800,14 @@ let reviewTests =
 
       Expect.isTrue persisted "the edited raw reached the store"
 
-      // a culture switch rebuilds the page from its model; the draft and
-      // the edit mode survive
+      // a culture switch updates the composed plan text in place; the
+      // static title stays in the app language and the draft survives
       onUi(fun () -> source.OnNext(Language.toCulture En))
 
       let retitled =
-        waitFor(
-          2000,
-          (fun () -> page),
-          fun root ->
-            hasText(root, get(Language.toCulture En, Keys.reviewTitle))
-        )
+        waitFor(2000, (fun () -> page), fun root -> hasText(root, "A × 3 laps"))
 
-      Expect.isTrue retitled "the review rebuilt in the new language"
+      Expect.isTrue retitled "the composed plan text changed language"
 
       let repsAfter =
         probeUi(fun () ->

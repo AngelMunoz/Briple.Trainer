@@ -35,11 +35,10 @@ val defaultDraft: athlete: Athlete * hasPrevious: bool -> BriefDraft
 /// The form inputs.
 [<Struct>]
 type Props = {
-  Culture: CultureInfo
   Athlete: Athlete
   /// True when there is a previous plan this generation could adjust.
   HasPrevious: bool
-  /// The current draft, seeded on every rebuild.
+  /// The initial draft of this visit.
   Draft: BriefDraft
   /// Every edit travels to the page, which keeps the draft.
   OnChanged: BriefDraft -> unit

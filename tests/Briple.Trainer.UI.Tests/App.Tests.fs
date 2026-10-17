@@ -96,6 +96,36 @@ let tests =
       }
     ]
 
+    testList "localization resources" [
+      test "a resource dictionary updates static text without a rebuild" {
+        // a local host: the test never mutates the app dictionary that
+        // the other parallel tests read
+        let host =
+          probeUi(fun () ->
+            let host = Border()
+            host.Resources["athletes.title"] <- "Atletas"
+            host)
+
+        let text =
+          probeUi(fun () ->
+            Briple.Trainer.Localization.textBlockFor(host, Keys.athletesTitle))
+
+        mount text
+
+        let spanish =
+          waitFor(2000, (fun () -> text), fun block -> block.Text = "Atletas")
+
+        Expect.isTrue spanish "the initial resource dictionary"
+
+        onUi(fun () -> host.Resources["athletes.title"] <- "Athletes")
+
+        let english =
+          waitFor(2000, (fun () -> text), fun block -> block.Text = "Athletes")
+
+        Expect.isTrue english "the swapped dictionary updated the bound text"
+      }
+    ]
+
     testList "athlete list" [
       test "the empty page renders the empty-state text" {
         let _, culture = liveCulture es
@@ -328,23 +358,36 @@ let tests =
         mount control
         settle()
 
-        let lead =
-          probeUi(fun () ->
-            control.GetVisualDescendants()
-            |> Seq.choose(fun visual ->
-              match visual with
-              | :? TextBlock as text when text.Text = "back" -> Some text
-              | _ -> None)
-            |> Seq.tryHead)
+        let header =
+          waitFor(
+            2000,
+            (fun () -> control),
+            fun current ->
+              let texts =
+                current.GetVisualDescendants()
+                |> Seq.choose(fun visual ->
+                  match visual with
+                  | :? TextBlock as text -> text.Text |> Option.ofObj
+                  | _ -> None)
+                |> Seq.toList
 
-        let title =
+              List.contains "back" texts && List.contains "Atletas" texts
+          )
+
+        Expect.isTrue header "the lead and the title rendered"
+
+        let lead, title =
           probeUi(fun () ->
-            control.GetVisualDescendants()
-            |> Seq.choose(fun visual ->
-              match visual with
-              | :? TextBlock as text when text.Text = "Atletas" -> Some text
-              | _ -> None)
-            |> Seq.tryHead)
+            let blocks =
+              control.GetVisualDescendants()
+              |> Seq.choose(fun visual ->
+                match visual with
+                | :? TextBlock as text -> Some text
+                | _ -> None)
+              |> Seq.toList
+
+            blocks |> List.tryFind(fun text -> text.Text = "back"),
+            blocks |> List.tryFind(fun text -> text.Text = "Atletas"))
 
         match lead, title with
         | Some lead, Some title ->
@@ -640,15 +683,7 @@ let tests =
         settle()
 
         onUi(fun () -> source.OnNext en)
-
-        let retitled =
-          waitFor(
-            2000,
-            (fun () -> form),
-            (fun current -> hasText(current, get(en, Keys.athletesNew)))
-          )
-
-        Expect.isTrue retitled "the page rebuilt in the new language"
+        settle()
 
         let nameStillThere =
           probeUi(fun () ->

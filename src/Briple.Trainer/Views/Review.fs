@@ -3,6 +3,7 @@ module Briple.Trainer.Views.Review
 open System
 open System.Globalization
 
+open Avalonia
 open Avalonia.Controls
 open Avalonia.Layout
 open Avalonia.Platform.Storage
@@ -303,12 +304,10 @@ let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
     Log.Error(e, "plan reload failed")
     model, Cmd.none
 
-let invalidBody
-  (props: ReviewPageProps, culture: CultureInfo, failure: PlanFailure)
-  : Control =
+let invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
   fluentPage {
     Lead = props.Lead
-    Title = get(culture, Keys.reviewTitle)
+    Title = pageTitleKey Keys.reviewTitle
     Commands = []
     Footer = noFooter
     Body =
@@ -318,11 +317,13 @@ let invalidBody
           glyph(Icons.alertCircle, 24.0, errorBrush),
           TextBlock()
             .Text(
-              getf(
-                culture,
-                Keys.reviewInvalid,
-                [ Parse.describe failure :> obj ]
-              )
+              props.Culture.Changed
+              |> Observable.map(fun current ->
+                getf(
+                  current,
+                  Keys.reviewInvalid,
+                  [ Parse.describe failure :> obj ]
+                ))
             )
             .Classes("body", "danger")
         )
@@ -333,23 +334,20 @@ let invalidBody
 let view
   (props: ReviewPageProps)
   (notes: Threading.CancellationToken)
-  (culture: CultureInfo)
   (current: Model)
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
-  let t key = get(culture, key)
-
   match current.Document with
-  | Broken failure -> invalidBody(props, culture, failure)
+  | Broken failure -> invalidBody(props, failure)
   | Loaded(parsed, draft) ->
     let plan = draft |> Option.defaultValue parsed.Plan
     let dirty = model |> Observable.map(fun m -> isDirty m.Document)
 
     let save =
       let button =
-        iconPrimaryButton(
-          t Keys.reviewSave,
+        iconPrimaryButtonKey(
+          Keys.reviewSave,
           Icons.contentSave,
           (fun () -> dispatch SaveRequested)
         )
@@ -357,27 +355,30 @@ let view
       button.IsEnabled(dirty)
 
     let export =
-      iconCommand(
-        t Keys.reviewExport,
+      iconCommandKey(
+        Keys.reviewExport,
         Icons.download,
         (fun () -> dispatch ExportRequested)
       )
 
     let status =
       TextBlock()
-        .Text(model |> Observable.map(fun m -> statusText(culture, m.Status)))
+        .Text(
+          Observable.combineLatest model props.Culture.Changed
+          |> Observable.map(fun (m, culture) -> statusText(culture, m.Status))
+        )
         .Classes("caption", "secondary")
 
     let pending =
       TextBlock()
-        .Text(t Keys.reviewUnsaved)
+        .Text(Localization.text Keys.reviewUnsaved)
         .Classes("caption", "secondary")
         .IsVisible(dirty)
 
     let review =
       PlanReview.PlanReview(
         {
-          Culture = culture
+          Culture = props.Culture
           Parsed = { parsed with Plan = plan }
           Week = current.Week
           Editing = current.Editing
@@ -391,7 +392,7 @@ let view
     let notes =
       NoteSection.NoteSection(
         {
-          Culture = culture
+          Culture = props.Culture
           Agent = props.Agent
           Memories = props.Memories
           AthleteId = props.Entity.AthleteId
@@ -406,7 +407,7 @@ let view
 
     fluentPage {
       Lead = props.Lead
-      Title = t Keys.reviewTitle
+      Title = pageTitleKey Keys.reviewTitle
       Commands = [ export; save ]
       Footer = noFooter
       Body = StackPanel().Spacing(8.0).Children(status, pending, review, notes)
@@ -430,20 +431,20 @@ type ReviewPage(props: ReviewPageProps) as this =
           OnCancel = fun () -> notesCts.Cancel()
         }
 
-    let viewWithCulture (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
+    let render (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
       Page.trackPhase(this, props.Gate, model |> Observable.map phaseOf)
 
-      Page.cultureHost {
-        Culture = props.Culture
-        Model = model
-        Build =
-          fun culture current dispatch ->
-            view props notesCts.Token culture current model dispatch
-        Dispatch = dispatch
-      }
+      ContentControl()
+        .Content(
+          (model
+           |> Observable.take 1
+           |> Observable.map(fun current ->
+             view props notesCts.Token current model dispatch))
+            .ToBinding()
+        )
 
     let program =
-      Program.mkProgram init (update props) viewWithCulture
+      Program.mkProgram init (update props) render
       |> Program.withSubscription subscribe
 
     this.Content <- Program.runWith props program

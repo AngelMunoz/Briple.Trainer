@@ -23,6 +23,7 @@ open Serilog
 open Briple.Trainer
 open Briple.Trainer.Components
 open Briple.Trainer.Components.Fields
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
@@ -53,7 +54,7 @@ type Model = {
 
 [<Struct>]
 type Props = {
-  Culture: CultureInfo
+  Culture: PageCulture
   Agent: IProvideAgent
   Memories: MemoryStore
   AthleteId: Guid
@@ -262,8 +263,6 @@ let view
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
-  let t key = get(props.Culture, key)
-
   // the note is prose: a multiline box, not a single line. The text
   // binds both ways: typing dispatches, the model's distinct values
   // redraw — so a cleared model clears the box.
@@ -272,7 +271,7 @@ let view
       .AcceptsReturn(true)
       .TextWrapping(TextWrapping.Wrap)
       .Height(60.0)
-      .PlaceholderText(t Keys.reviewNotePlaceholder)
+      .PlaceholderText(Localization.text Keys.reviewNotePlaceholder)
       .Text(model |> Observable.map _.Note |> Observable.distinctUntilChanged)
       .OnTextChangedHandler(fun args observed ->
         args.Text
@@ -283,8 +282,8 @@ let view
 
   let interpret =
     let primary =
-      iconPrimaryButton(
-        t Keys.reviewNoteInterpret,
+      iconPrimaryButtonKey(
+        Keys.reviewNoteInterpret,
         Icons.commentText,
         (fun () -> dispatch InterpretRequested)
       )
@@ -298,7 +297,8 @@ let view
   // one named stream, two bindings: the status reaches the text and the
   // tone (the lookup is a string format, computing it twice is free)
   let statusStream =
-    model |> Observable.map(fun m -> statusText(props.Culture, m.Status))
+    Observable.combineLatest model props.Culture.Changed
+    |> Observable.map(fun (m, culture) -> statusText(culture, m.Status))
 
   let status =
     TextBlock()
@@ -331,8 +331,8 @@ let view
       .ItemTemplate(template)
       .BindItemsSource(model |> Observable.map(fun m -> m.Proposals), fst)
 
-  field(
-    t Keys.reviewNoteTitle,
+  fieldKey(
+    Keys.reviewNoteTitle,
     fun () ->
       StackPanel()
         .Spacing(6.0)

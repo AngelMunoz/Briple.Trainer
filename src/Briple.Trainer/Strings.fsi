@@ -37,6 +37,10 @@ val get: culture: CultureInfo * key: string -> string
 /// A formatted entry; `String.Format` over the culture's text.
 val getf: culture: CultureInfo * key: string * args: obj list -> string
 
+/// Every key and value of the resx under a culture; the source of the
+/// localization resource dictionary.
+val all: culture: CultureInfo -> (string * string) list
+
 module Keys =
   [<Literal>]
   val appTitle: string = "app.title"

@@ -10,6 +10,7 @@ open System.Globalization
 
 open Avalonia.Controls
 
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Memories
 
 /// What the card reports to its parent.
@@ -21,7 +22,7 @@ type Event =
 /// The card inputs.
 [<Struct>]
 type Props = {
-  Culture: CultureInfo
+  Culture: PageCulture
   Id: Guid
   Memory: Memory
 }

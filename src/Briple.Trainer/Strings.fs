@@ -44,6 +44,19 @@ let get(culture: CultureInfo, key: string) : string =
 let getf(culture: CultureInfo, key: string, args: obj list) : string =
   System.String.Format(culture, get(culture, key), List.toArray args)
 
+let all(culture: CultureInfo) : (string * string) list =
+  let set = resourceManager.Force().GetResourceSet(culture, true, true)
+
+  [
+    for entry in set do
+      match entry with
+      | :? System.Collections.DictionaryEntry as entry ->
+        match entry.Key, entry.Value with
+        | (:? string as key), (:? string as value) -> key, value
+        | _ -> ()
+      | _ -> ()
+  ]
+
 module Keys =
   [<Literal>]
   let appTitle = "app.title"

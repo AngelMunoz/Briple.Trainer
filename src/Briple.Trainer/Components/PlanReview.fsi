@@ -10,6 +10,7 @@ module Briple.Trainer.Components.PlanReview
 
 open Avalonia.Controls
 
+open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
 
@@ -40,7 +41,7 @@ type Event =
 /// The component inputs.
 [<Struct>]
 type Props = {
-  Culture: System.Globalization.CultureInfo
+  Culture: PageCulture
   Parsed: ParsedPlan
   /// The week the page had shown, when it comes back from a rebuild.
   Week: int voption

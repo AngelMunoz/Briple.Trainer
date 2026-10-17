@@ -10,6 +10,8 @@ open Avalonia.Media
 open Avalonia.Styling
 open NXUI.Extensions
 
+open Briple.Trainer
+open Briple.Trainer.Localization
 open Briple.Trainer.Theme
 
 [<Struct>]
@@ -25,7 +27,7 @@ let noFooter: FooterBar = { Secondary = []; Primary = [] }
 type PageChrome = {
   /// The shell's back control, placed first in the header row.
   Lead: Control voption
-  Title: string
+  Title: Control
   Commands: Control list
   Footer: FooterBar
   Body: Control
@@ -40,13 +42,32 @@ let inline pageTitle(text: string) : Control =
     .TextTrimming(TextTrimming.CharacterEllipsis)
     .Classes("title")
 
+/// The page title for a resource key.
+let inline pageTitleKey(key: string) : Control =
+  TextBlock()
+    .Text(Localization.text key)
+    .VerticalAlignment(VerticalAlignment.Center)
+    .TextTrimming(TextTrimming.CharacterEllipsis)
+    .Classes("title")
+
 /// The section header level: the `subtitle` ramp class.
 let inline sectionTitle(text: string) : Control =
   TextBlock().Text(text).Margin(0.0, 16.0, 0.0, 8.0).Classes("subtitle")
 
+/// The section header for a resource key.
+let inline sectionTitleKey(key: string) : Control =
+  TextBlock()
+    .Text(Localization.text key)
+    .Margin(0.0, 16.0, 0.0, 8.0)
+    .Classes("subtitle")
+
 /// A secondary-text caption: the `caption` ramp class, muted.
 let inline label(text: string) : Control =
   TextBlock().Text(text).Classes("caption", "secondary")
+
+/// A secondary-text caption for a resource key.
+let inline labelKey(key: string) : Control =
+  TextBlock().Text(Localization.text key).Classes("caption", "secondary")
 
 /// One labeled field: label above, input below.
 let inline field
@@ -54,10 +75,28 @@ let inline field
   : Control =
   StackPanel().Spacing(4.0).Margin(0.0, 8.0).Children(label labelText, input())
 
+/// One labeled field whose label is a resource key.
+let inline fieldKey
+  (labelKeyText: string, [<InlineIfLambda>] input: unit -> Control)
+  : Control =
+  StackPanel()
+    .Spacing(4.0)
+    .Margin(0.0, 8.0)
+    .Children(labelKey labelKeyText, input())
+
 let inline button
   (text: string, [<InlineIfLambda>] onClick: unit -> unit)
   : Button =
   Button().Content(text).Padding(16.0, 8.0).OnClickHandler(fun _ _ -> onClick())
+
+/// A plain button whose label is a resource key.
+let inline buttonKey
+  (key: string, [<InlineIfLambda>] onClick: unit -> unit)
+  : Button =
+  Button()
+    .Content(TextBlock().Text(Localization.text key))
+    .Padding(16.0, 8.0)
+    .OnClickHandler(fun _ _ -> onClick())
 
 /// The primary action button: the accent fill.
 let inline primaryButton
@@ -65,11 +104,25 @@ let inline primaryButton
   : Button =
   button(text, onClick).Classes("accent")
 
+/// The primary action button for a resource key.
+let inline primaryButtonKey
+  (key: string, [<InlineIfLambda>] onClick: unit -> unit)
+  : Button =
+  buttonKey(key, onClick).Classes("accent")
+
 /// A tertiary text action.
 let inline hyperlinkButton
   (text: string, [<InlineIfLambda>] onClick: unit -> unit)
   : Control =
   HyperlinkButton().Content(text).OnClickHandler(fun _ _ -> onClick())
+
+/// A tertiary text action for a resource key.
+let inline hyperlinkButtonKey
+  (key: string, [<InlineIfLambda>] onClick: unit -> unit)
+  : Control =
+  HyperlinkButton()
+    .Content(TextBlock().Text(Localization.text key))
+    .OnClickHandler(fun _ _ -> onClick())
 
 /// One page command: a plain button for the header row.
 let inline command
@@ -93,6 +146,13 @@ let inline glyphLabel(geometry: StreamGeometry, text: string) : Control =
     .Spacing(8.0)
     .Children(icon geometry, TextBlock().Text(text))
 
+/// A glyph before a resource-key label.
+let inline glyphLabelKey(geometry: StreamGeometry, key: string) : Control =
+  StackPanel()
+    .Orientation(Orientation.Horizontal)
+    .Spacing(8.0)
+    .Children(icon geometry, TextBlock().Text(Localization.text key))
+
 /// A plain button with a glyph before its label.
 let inline iconButton
   (
@@ -101,6 +161,15 @@ let inline iconButton
     [<InlineIfLambda>] onClick: unit -> unit
   ) : Button =
   button(text, onClick).Content(glyphLabel(geometry, text))
+
+/// A glyph button whose label is a resource key.
+let inline iconButtonKey
+  (
+    key: string,
+    geometry: StreamGeometry,
+    [<InlineIfLambda>] onClick: unit -> unit
+  ) : Button =
+  buttonKey(key, onClick).Content(glyphLabelKey(geometry, key))
 
 /// The primary action button with a glyph before its label.
 let inline iconPrimaryButton
@@ -111,6 +180,15 @@ let inline iconPrimaryButton
   ) : Button =
   iconButton(text, geometry, onClick).Classes("accent")
 
+/// The primary glyph button for a resource key.
+let inline iconPrimaryButtonKey
+  (
+    key: string,
+    geometry: StreamGeometry,
+    [<InlineIfLambda>] onClick: unit -> unit
+  ) : Button =
+  iconButtonKey(key, geometry, onClick).Classes("accent")
+
 /// One page command with its glyph before the label.
 let inline iconCommand
   (
@@ -120,11 +198,23 @@ let inline iconCommand
   ) : Button =
   iconButton(text, geometry, onClick)
 
+/// One page command for a resource key.
+let inline iconCommandKey
+  (
+    key: string,
+    geometry: StreamGeometry,
+    [<InlineIfLambda>] onClick: unit -> unit
+  ) : Button =
+  iconButtonKey(key, geometry, onClick)
+
 /// One content row: a two-line title and detail with a trailing glyph,
 /// in a grid so the glyph stays at the row's end.
-let inline contentRow
-  (title: string, detail: string, [<InlineIfLambda>] trailing: unit -> Control)
-  : Control =
+let inline contentRowObs
+  (
+    title: string,
+    detail: IObservable<string>,
+    [<InlineIfLambda>] trailing: unit -> Control
+  ) : Control =
   let grid = Grid()
 
   grid.ColumnDefinitions <- ColumnDefinitions("*,Auto")
@@ -149,6 +239,13 @@ let inline contentRow
       .Margin(12.0, 0.0, 0.0, 0.0)
       .Column(1)
   )
+
+/// One content row: a two-line title and detail with a trailing glyph,
+/// in a grid so the glyph stays at the row's end.
+let inline contentRow
+  (title: string, detail: string, [<InlineIfLambda>] trailing: unit -> Control)
+  : Control =
+  contentRowObs(title, System.Reactive.Linq.Observable.Return detail, trailing)
 
 /// Makes every item container fill the items control's width, so rows of
 /// different lengths share one left edge and one trailing edge.
@@ -182,6 +279,20 @@ let inline entry
     .OnTextChangedHandler(fun args _ ->
       args.Text |> Option.ofObj |> Option.defaultValue "" |> onChanged)
 
+/// A single-line input whose placeholder is a resource key.
+let inline entryKey
+  (
+    placeholderKey: string,
+    text: string,
+    [<InlineIfLambda>] onChanged: string -> unit
+  ) : TextBox =
+  TextBox()
+    .Padding(8.0, 6.0)
+    .Text(text)
+    .PlaceholderText(Localization.text placeholderKey)
+    .OnTextChangedHandler(fun args _ ->
+      args.Text |> Option.ofObj |> Option.defaultValue "" |> onChanged)
+
 /// One settings card row: the title left, the control right.
 let inline cardRow(title: string, control: Control) : Control =
   Border()
@@ -191,6 +302,23 @@ let inline cardRow(title: string, control: Control) : Control =
         .Children(
           TextBlock()
             .Text(title)
+            .Classes("body")
+            .VerticalAlignment(VerticalAlignment.Center)
+            .DockLeft(),
+          control.VerticalAlignment(VerticalAlignment.Center).DockRight()
+        )
+    )
+    .Classes("card")
+
+/// One settings card row whose title is a resource key.
+let inline cardRowKey(key: string, control: Control) : Control =
+  Border()
+    .Child(
+      DockPanel()
+        .LastChildFill(false)
+        .Children(
+          TextBlock()
+            .Text(Localization.text key)
             .Classes("body")
             .VerticalAlignment(VerticalAlignment.Center)
             .DockLeft(),
@@ -218,6 +346,27 @@ let inline radioRow
 
   WrapPanel().Children [| for option in options -> row option |]
 
+/// Radio options whose labels are resource keys.
+let inline radioRowKeys
+  (
+    options: ('T * string) list,
+    group: string,
+    selected: 'T,
+    [<InlineIfLambda>] onPick: 'T -> unit
+  ) : Control =
+  let row((choice, key): 'T * string) : Control =
+    let isChecked = choice = selected
+
+    RadioButton(
+      Content = TextBlock().Text(Localization.text key),
+      GroupName = group
+    )
+      .IsChecked(Nullable isChecked)
+      .Margin(0.0, 0.0, 12.0, 4.0)
+      .OnClickHandler(fun _ _ -> onPick choice)
+
+  WrapPanel().Children [| for option in options -> row option |]
+
 /// One checkbox whose checked state follows an observable.
 let inline checkRow
   (
@@ -226,6 +375,28 @@ let inline checkRow
     [<InlineIfLambda>] onToggle: unit -> unit
   ) : Control =
   CheckBox(Content = text)
+    .IsChecked(isOn |> Observable.map(fun on -> Nullable on))
+    .OnClickHandler(fun _ _ -> onToggle())
+
+/// One checkbox whose label is a resource key.
+let inline checkRowKey
+  (
+    key: string,
+    isOn: IObservable<bool>,
+    [<InlineIfLambda>] onToggle: unit -> unit
+  ) : Control =
+  CheckBox(Content = TextBlock().Text(Localization.text key))
+    .IsChecked(isOn |> Observable.map(fun on -> Nullable on))
+    .OnClickHandler(fun _ _ -> onToggle())
+
+/// One checkbox whose label is live text.
+let inline checkRowObs
+  (
+    text: IObservable<string>,
+    isOn: IObservable<bool>,
+    [<InlineIfLambda>] onToggle: unit -> unit
+  ) : Control =
+  CheckBox(Content = TextBlock().Text(text))
     .IsChecked(isOn |> Observable.map(fun on -> Nullable on))
     .OnClickHandler(fun _ _ -> onToggle())
 
@@ -261,9 +432,7 @@ let inline fluentPage(chrome: PageChrome) : Control =
         |]
       | ValueNone -> [||]
 
-    grid.Children(
-      Array.append lead [| (pageTitle chrome.Title).Column(1); commands |]
-    )
+    grid.Children(Array.append lead [| chrome.Title.Column(1); commands |])
     |> ignore
 
     grid
@@ -311,7 +480,7 @@ let inline fluentPage(chrome: PageChrome) : Control =
 let inline page(titleText: string, content: Control) : Control =
   fluentPage {
     Lead = ValueNone
-    Title = titleText
+    Title = pageTitle titleText
     Commands = []
     Footer = noFooter
     Body = content
