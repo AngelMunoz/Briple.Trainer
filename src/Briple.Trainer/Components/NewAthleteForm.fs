@@ -134,6 +134,7 @@ let view
   let nameEntry =
     TextBox()
       .Padding(8.0, 6.0)
+      .MaxLength(60)
       .Text(model |> Observable.map _.Name)
       .PlaceholderText(Localization.text Keys.athleteName)
       .OnTextChangedHandler(fun args _ ->

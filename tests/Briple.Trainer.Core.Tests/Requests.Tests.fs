@@ -40,6 +40,7 @@ let private manBrief = {
   Frequency = TresDias
   Emphasis = []
   Adjustments = []
+  Language = Spanish
 }
 
 let tests =

@@ -19,6 +19,17 @@ type Event =
   | Confirmed of id: Guid * memory: Memory
   | Discarded of discardedId: Guid
 
+/// The delta the trainer is about to add.
+type DeltaKind =
+  | RirKind
+  | RepsKind
+  | SetsKind
+  | LoadKind
+  | VariantKind
+  | DurationKind
+  | ZoneKind
+  | ModalityKind
+
 /// The card inputs.
 [<Struct>]
 type Props = {
@@ -28,13 +39,22 @@ type Props = {
 }
 
 type Model = {
+  /// The deltas the model proposed; a toggle removes or restores one.
   Selected: Delta list
+  /// The deltas the trainer added in this card.
+  Added: Delta list
   Scope: MemoryScope
+  Kind: DeltaKind
+  Value: string
 }
 
 type Msg =
   | Toggle of Delta
   | SetScope of MemoryScope
+  | SetKind of DeltaKind
+  | SetValue of string
+  | AddDelta
+  | RemoveAdded of Delta
   | Accept
   | Discard
 

@@ -25,6 +25,7 @@ let private brief = {
   Frequency = TresDias
   Emphasis = []
   Adjustments = []
+  Language = Spanish
 }
 
 /// One male block, variant 3dias, one week, `perDay` exercises per day.
@@ -75,7 +76,6 @@ let private planWith perDay : Plan = {
 
 let private agentFields = [
   Title
-  Generated
   FileOrigin
   VariantTitle
   DayTitle

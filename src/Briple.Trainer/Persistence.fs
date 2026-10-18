@@ -581,6 +581,8 @@ type SqliteStore(dbPath: string) =
 
     member _.AddPlan(insert: PlanInsert, plan: Plan) =
       withConn(fun conn -> task {
+        let plan = Briple.Trainer.Core.Plan.Sanitize.normalize plan
+
         let entity = {
           Id = Guid.NewGuid()
           AthleteId = insert.AthleteId

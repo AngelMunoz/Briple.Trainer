@@ -2,6 +2,7 @@ module Briple.Trainer.Views.Generate
 
 open System
 open System.Globalization
+open System.Text.Json.Nodes
 open System.Threading
 
 open Avalonia
@@ -12,6 +13,7 @@ open NXUI.Extensions
 
 open FSharp.Control.Reactive
 open IcedTasks
+open JDeck
 open MVUish.Avalonia
 
 open Serilog
@@ -144,11 +146,24 @@ let inline kindOf kind =
   | Generation.NewPlan _ -> "new"
   | Generation.PlanAdjustment _ -> "adjust"
 
+let contentLanguage(culture: PageCulture) : ContentLanguage =
+  match culture.Current().TwoLetterISOLanguageName with
+  | "en" -> ContentLanguage.English
+  | _ -> ContentLanguage.Spanish
+
 let inline briefOf(draft: Draft) : Brief = {
   Goal = draft.Goal
   Frequency = draft.Frequency
   Emphasis = draft.Emphasis
   Adjustments = []
+  Language = draft.Language
+}
+
+/// The app owns the generation date: the model may write a placeholder,
+/// the confirmed tree carries the local date.
+let withGenerationDate (date: DateOnly) (plan: Plan) : Plan = {
+  plan with
+      Generated = date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
 }
 
 let genderName(culture: CultureInfo, gender: Gender) =
@@ -282,6 +297,55 @@ let addRequest
   =
   store.AddRequest(athleteId, kind, payload)
 
+let goalToken(goal: PlanGoal) =
+  match goal with
+  | Hypertrophy -> "hypertrophy"
+  | Strength -> "strength"
+  | WeightLoss -> "weight loss"
+  | CardioVascularHealth -> "cardiovascular health"
+  | BasicBodyActivation -> "basic body activation"
+
+let deltaToken(delta: Delta) =
+  match delta with
+  | Rir change -> $"rir {change}"
+  | Reps change -> $"reps {change}"
+  | Sets change -> $"sets {change}"
+  | Load percentage -> $"load {percentage}"
+  | PatternVariant name -> $"variant {name}"
+  | Duration minutes -> $"duration {minutes}"
+  | Zone change -> $"zone {change}"
+  | Modality name -> $"modality {name}"
+
+let memoryJson(memory: Memory) : JsonNode =
+  Json.object [
+    "summary", Encode.string memory.Summary
+    "scope",
+    Encode.string(
+      match memory.Scope with
+      | Plan -> "plan"
+      | Athlete -> "athlete"
+    )
+    "deltas", Json.sequence(memory.Deltas, deltaToken >> Encode.string)
+  ]
+  :> JsonNode
+
+/// The audit line: the full brief, the applied memories and the period.
+let auditPayload(draft: Draft, request: Generation) =
+  let memories =
+    match request with
+    | Generation.NewPlan current -> current.Memories
+    | Generation.PlanAdjustment current -> current.Memories
+
+  Json.object [
+    "goal", Encode.string(goalToken draft.Goal)
+    "frequency", Encode.string(VariantFrequency.toFileToken draft.Frequency)
+    "emphasis",
+    Json.sequence(draft.Emphasis |> List.map Emphasis.toToken, Encode.string)
+    "memories", Json.sequence(memories, memoryJson)
+    "weeks", Encode.int draft.Weeks
+  ]
+  |> fun node -> node.ToJsonString()
+
 // --- the page state machine ---
 
 let init(props: WizardPageProps) =
@@ -291,7 +355,11 @@ let init(props: WizardPageProps) =
     Decided = []
     Confirmed = []
     Brief =
-      WizardBrief.defaultDraft(props.Athlete.Profile, props.Previous.IsSome)
+      WizardBrief.defaultDraft(
+        props.Athlete.Profile,
+        props.Previous.IsSome,
+        contentLanguage props.Culture
+      )
     Last = ValueNone
     Token = ValueNone
   },
@@ -322,11 +390,22 @@ let cancel(token: CancellationTokenSource voption) =
     source.Dispose())
 
 let requestFor(props: WizardPageProps, model: Model, draft: Draft) =
+  let memories = props.Confirmed @ (model.Confirmed |> List.map snd)
+
+  let memories =
+    match draft.Mode with
+    | WizardBrief.Mode.Adjust -> memories
+    | WizardBrief.Mode.Fresh ->
+      memories |> List.filter(fun memory -> memory.Scope = MemoryScope.Athlete)
+
   requestOf {
     Athlete = props.Athlete.Profile
-    Memories = props.Confirmed @ (model.Confirmed |> List.map snd)
+    Memories = memories
     Weeks = draft.Weeks
-    Brief = briefOf draft
+    Brief = {
+      briefOf draft with
+          Language = contentLanguage props.Culture
+    }
     Previous =
       match props.Previous, draft.Mode with
       | ValueSome entity, WizardBrief.Mode.Adjust -> ValueSome entity
@@ -346,9 +425,7 @@ let startRun
   let record =
     Cmd.OfTask.perform
       (addRequest props.Store)
-      (props.Athlete.Id,
-       kind,
-       $"weeks={draft.Weeks};freq={VariantFrequency.toFileToken draft.Frequency}")
+      (props.Athlete.Id, kind, auditPayload(draft, request))
       (fun _ -> Recorded)
 
   let run =
@@ -392,7 +469,11 @@ let update
           (updateMemory props.Memories)
           {
             entity with
-                Memory = confirm memory.Deltas entity.Memory
+                Memory =
+                  confirm memory.Deltas {
+                    entity.Memory with
+                        Scope = memory.Scope
+                  }
           }
           (fun _ -> Recorded))
       |> Option.defaultValue Cmd.none
@@ -454,6 +535,8 @@ let update
       },
       Cmd.none
     | Valid(plan, advisories) ->
+      let plan = withGenerationDate (DateOnly.FromDateTime DateTime.Now) plan
+
       {
         model with
             Phase = Done(plan, advisories, kind)
@@ -577,7 +660,11 @@ let update
       Decided = []
       Confirmed = []
       Brief =
-        WizardBrief.defaultDraft(props.Athlete.Profile, props.Previous.IsSome)
+        WizardBrief.defaultDraft(
+          props.Athlete.Profile,
+          props.Previous.IsSome,
+          contentLanguage props.Culture
+        )
       Last = ValueNone
       Token = ValueNone
     },
@@ -636,6 +723,12 @@ let memoriesColumn(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
     |> Array.ofList
     |> linesPanel
 
+  let appliesHeading: Control =
+    if List.isEmpty props.Confirmed then
+      StackPanel()
+    else
+      sectionTitleKey Keys.wizardApplies
+
   StackPanel()
     .Spacing(8.0)
     .Children(
@@ -644,10 +737,7 @@ let memoriesColumn(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
          labelKey Keys.memoriesEmpty
        else
          linesPanel cards),
-      (if List.isEmpty props.Confirmed then
-         StackPanel() :> Control
-       else
-         sectionTitleKey Keys.wizardApplies),
+      appliesHeading,
       confirmedRows
     )
 

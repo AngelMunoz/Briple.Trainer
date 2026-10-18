@@ -26,11 +26,14 @@ type BriefDraft = {
   Goal: PlanGoal
   Frequency: VariantFrequency
   Emphasis: Emphasis list
+  /// The language of the plan content.
+  Language: ContentLanguage
   Mode: Mode
 }
 
 /// The default draft of a fresh wizard visit.
-val defaultDraft: athlete: Athlete * hasPrevious: bool -> BriefDraft
+val defaultDraft:
+  athlete: Athlete * hasPrevious: bool * language: ContentLanguage -> BriefDraft
 
 /// The form inputs.
 [<Struct>]

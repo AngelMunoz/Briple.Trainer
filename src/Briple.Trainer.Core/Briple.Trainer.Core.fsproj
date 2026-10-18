@@ -21,6 +21,8 @@
     <Compile Include="Athletes.fs" />
     <Compile Include="Memories.fsi" />
     <Compile Include="Memories.fs" />
+    <Compile Include="PromptText.fsi" />
+    <Compile Include="PromptText.fs" />
     <Compile Include="Goals.fsi" />
     <Compile Include="Goals.fs" />
     <Compile Include="Parameters.fsi" />
@@ -31,6 +33,8 @@
     <Compile Include="Instructions.fs" />
     <Compile Include="Wizard.fsi" />
     <Compile Include="Wizard.fs" />
+    <Compile Include="Plan.Sanitize.fsi" />
+    <Compile Include="Plan.Sanitize.fs" />
     <Compile Include="Plan.Writer.fsi" />
     <Compile Include="Plan.Writer.fs" />
     <Compile Include="Plan.Data.fsi" />

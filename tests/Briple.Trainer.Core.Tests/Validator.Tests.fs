@@ -28,6 +28,7 @@ let private brief = {
   Frequency = TresDias
   Emphasis = []
   Adjustments = []
+  Language = Spanish
 }
 
 let private dayIds = [ "Lunes"; "Martes"; "Miercoles"; "Jueves"; "Viernes" ]
@@ -628,6 +629,7 @@ let tests =
         Frequency = TresDias
         Emphasis = []
         Adjustments = []
+        Language = Spanish
       }
 
       let request = {

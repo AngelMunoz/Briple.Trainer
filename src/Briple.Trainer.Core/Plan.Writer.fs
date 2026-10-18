@@ -1,5 +1,6 @@
 module Briple.Trainer.Core.Plan.Writer
 
+open Briple.Trainer.Core.Plan.Sanitize
 open Briple.Trainer.Core.Plan.Types
 
 let metaLine key value = $"#meta {key} {value}"
@@ -8,58 +9,60 @@ let exerciseLine(exercise: Exercise) =
   $"#ej {exercise.Circuit}|{exercise.Laps}|{exercise.Order}|{exercise.Name}|{exercise.Reps}|{exercise.Rir}|{exercise.Rest}|{exercise.Notes}"
 
 let dayLines(day: Day) = [
-  yield $"#start dia {day.Id}"
+  $"#start dia {day.Id}"
 
   yield! day.Title |> Option.toList |> List.map(metaLine "titulo")
 
   for exercise in day.Exercises do
-    yield exerciseLine exercise
+    exerciseLine exercise
 
-  yield "#end dia"
+  "#end dia"
 ]
 
 let variantLines(variant: Variant) = [
-  yield $"#start opcion {variant.Id}"
+  $"#start opcion {variant.Id}"
 
   yield! variant.Title |> Option.toList |> List.map(metaLine "titulo")
 
   for week in variant.Weeks do
-    yield $"#start semana {week.Number}"
+    $"#start semana {week.Number}"
 
     for day in week.Days do
       yield! dayLines day
 
-    yield "#end semana"
+    "#end semana"
 
-  yield "#end opcion"
+  "#end opcion"
 ]
 
 let blockLines(block: Block) = [
-  yield $"#start genero {Gender.toFileToken block.Gender}"
+  $"#start genero {Gender.toFileToken block.Gender}"
 
   for variant in block.Variants do
     yield! variantLines variant
 
-  yield "#end genero"
+  "#end genero"
 ]
 
 /// Writes the full plan as format text, one block per line with fixed
-/// indentation.
+/// indentation. Every string passes the write sanitizer first.
 let write(plan: Plan) : string =
+  let plan = normalize plan
+
   let lines = [
-    yield $"#start plan v{plan.Version}"
-    yield metaLine "titulo" plan.Title
-    yield metaLine "semanas" plan.Weeks
-    yield metaLine "generado" plan.Generated
-    yield metaLine "origen" plan.Origin
+    $"#start plan v{plan.Version}"
+    metaLine "titulo" plan.Title
+    metaLine "semanas" plan.Weeks
+    metaLine "generado" plan.Generated
+    metaLine "origen" plan.Origin
 
     for block in plan.Blocks do
       yield! blockLines block
 
     for extra in plan.Extras do
-      yield $"#x {extra}"
+      $"#x {extra}"
 
-    yield "#end plan"
+    "#end plan"
   ]
 
   String.concat "\n" lines

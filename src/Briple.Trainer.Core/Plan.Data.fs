@@ -9,6 +9,7 @@ open FsToolkit.ErrorHandling
 open JDeck
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.PromptText
 
 // --- tolerantly decoded data -------------------------------------------------
 
@@ -373,20 +374,20 @@ let toJson(gender: Gender, plan: Plan) : string option =
 
   let exerciseEntity(exercise: Exercise) : JsonNode =
     Json.object [
-      "circuit", Encode.string exercise.Circuit
-      "laps", Encode.string exercise.Laps
+      "circuit", Encode.string(line 8 exercise.Circuit)
+      "laps", Encode.string(line 40 exercise.Laps)
       "order", Encode.int exercise.Order
-      "name", Encode.string exercise.Name
-      "reps", Encode.string exercise.Reps
-      "rir", Encode.string exercise.Rir
-      "rest", Encode.string exercise.Rest
-      "notes", Encode.string exercise.Notes
+      "name", Encode.string(line 120 exercise.Name)
+      "reps", Encode.string(line 40 exercise.Reps)
+      "rir", Encode.string(line 40 exercise.Rir)
+      "rest", Encode.string(line 40 exercise.Rest)
+      "notes", Encode.string(line 200 exercise.Notes)
     ]
 
   let dayEntity(day: Day) : JsonNode =
     Json.object [
-      "id", Encode.string day.Id
-      yield! field("title", day.Title)
+      "id", Encode.string(line 40 day.Id)
+      yield! field("title", day.Title |> Option.map(line 200))
       "exercises", Json.sequence(day.Exercises, exerciseEntity)
     ]
 
@@ -398,8 +399,8 @@ let toJson(gender: Gender, plan: Plan) : string option =
 
   let variantEntity(variant: Variant) : JsonNode =
     Json.object [
-      "id", Encode.string variant.Id
-      yield! field("title", variant.Title)
+      "id", Encode.string(line 40 variant.Id)
+      yield! field("title", variant.Title |> Option.map(line 200))
       "weeks", Json.sequence(variant.Weeks, weekEntity)
     ]
 
@@ -408,13 +409,17 @@ let toJson(gender: Gender, plan: Plan) : string option =
   |> Option.map(fun block ->
     let data =
       Json.object [
-        "title", Encode.string plan.Title
+        "title", Encode.string(line 200 plan.Title)
         "weeks", Encode.int plan.Weeks
-        "generated", Encode.string plan.Generated
-        "origin", Encode.string plan.Origin
+        "generated", Encode.string(line 40 plan.Generated)
+        "origin", Encode.string(line 500 plan.Origin)
         "gender", Encode.string(Gender.toProtocol block.Gender)
         "variants", Json.sequence(block.Variants, variantEntity)
-        "extras", Json.sequence(plan.Extras, Encode.string)
+        "extras",
+        Json.sequence(
+          plan.Extras |> List.map(Briple.Trainer.Core.PromptText.block 500),
+          Encode.string
+        )
       ]
 
     data.ToJsonString(JsonSerializerOptions(WriteIndented = true)))

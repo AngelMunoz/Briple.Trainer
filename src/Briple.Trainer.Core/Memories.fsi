@@ -80,6 +80,13 @@ type Memory = {
   Scope: MemoryScope
 }
 
+/// The cardio modalities a memory may name.
+val modalities: string list
+
+/// True when the text names one of the modalities, ignoring case and the
+/// unaccented variants.
+val isModality: text: string -> bool
+
 /// The automatic adjustment of each label for the plan's goal: a light
 /// mark raises load on strength goals and duration on cardio goals; heavy
 /// lowers them. Pain and no equipment have no automatic adjustment. The

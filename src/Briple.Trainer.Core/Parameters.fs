@@ -51,7 +51,7 @@ let originsFor(field: Field) : OriginClass list =
   match field with
   | Title -> [ FromAgent; FromBrief ]
   | Weeks -> [ FromBrief ]
-  | Generated -> [ FromAgent ]
+  | Generated -> [ FromDerived ]
   | FileOrigin -> [ FromAgent ]
   | Variants -> [ FromProfile; FromBrief ]
   | VariantTitle -> [ FromAgent ]

@@ -12,6 +12,7 @@ open Avalonia.Controls
 
 open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Env
 open Briple.Trainer.Navigation
 open Briple.Trainer.Persistence
@@ -41,6 +42,10 @@ type WizardPageProps = {
 type Outcome =
   | PlanFinished of Guid
   | WizardCancelled
+
+/// The app writes the generation date; the model's value is a
+/// placeholder. The format is ISO, independent of the culture.
+val withGenerationDate: date: DateOnly -> plan: Plan -> Plan
 
 /// The wizard page.
 type WizardPage =

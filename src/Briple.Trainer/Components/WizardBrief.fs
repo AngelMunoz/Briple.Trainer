@@ -26,6 +26,7 @@ type BriefDraft = {
   Goal: PlanGoal
   Frequency: VariantFrequency
   Emphasis: Emphasis list
+  Language: ContentLanguage
   Mode: Mode
 }
 
@@ -90,11 +91,14 @@ let frequencyOptions = [
 ]
 
 /// The default draft of a fresh wizard visit.
-let defaultDraft(athlete: Athlete, hasPrevious: bool) : BriefDraft = {
+let defaultDraft
+  (athlete: Athlete, hasPrevious: bool, language: ContentLanguage)
+  : BriefDraft = {
   Weeks = 4
   Goal = athlete.Goals |> List.tryHead |> Option.defaultValue Hypertrophy
   Frequency = TresDias
   Emphasis = []
+  Language = language
   Mode = if hasPrevious then Adjust else Fresh
 }
 

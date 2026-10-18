@@ -21,9 +21,11 @@ open OpenAI
 open Briple.Trainer.Core.Goals
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Data
+open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Writer
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Prompts
+open Briple.Trainer.Core.PromptText
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Validator
 
@@ -165,7 +167,28 @@ let run (context: RunContext) (response: string) : Run =
     }
   | Ok rawPlan ->
     let plan = appendMesocycle context.RirPerWeek rawPlan
-    let violations = context.Check plan
+    let output = write plan
+
+    let formatViolations: Violation list =
+      match (parsePlan output: Result<ParsedPlan, Violation>) with
+      | Error failure -> [ failure ]
+      | Ok reparsed ->
+        let warnings =
+          reparsed.Warnings |> List.map(fun warning -> FormatWarning warning)
+
+        if reparsed.Plan = plan then
+          warnings
+        else
+          warnings
+          @ [
+            FormatWarning {
+              Line = 0
+              Kind = UnknownLine
+              Message = "the written plan does not round-trip"
+            }
+          ]
+
+    let violations = formatViolations @ context.Check plan
 
     let verdict =
       match violations with
@@ -178,7 +201,7 @@ let run (context: RunContext) (response: string) : Run =
 
     {
       Response = response
-      Output = write plan
+      Output = output
       Verdict = verdict
     }
 
@@ -193,7 +216,12 @@ let generateNew
     request.Athlete.Name
   )
 
-  let! response = ask(env, system request.Brief.Goal, newPlanPrompt request)
+  let! response =
+    ask(
+      env,
+      systemFor(request.Brief.Language, request.Brief.Goal),
+      newPlanPrompt request
+    )
 
   let profile = profileOf request.Brief.Goal
 
@@ -227,7 +255,12 @@ let generateAdjustment
     request.Athlete.Name
   )
 
-  let! response = ask(env, system request.Brief.Goal, adjustmentPrompt request)
+  let! response =
+    ask(
+      env,
+      systemFor(request.Brief.Language, request.Brief.Goal),
+      adjustmentPrompt request
+    )
 
   let profile = profileOf request.Brief.Goal
 
@@ -258,11 +291,20 @@ let generateAdjustment
 let inline cleanNumber(text: string) = text.Trim().TrimStart('+').TrimEnd('%')
 
 let deltaOf(text: string) : Delta option =
-  let parts = text.Trim().Split(' ', 2)
+  let parts = text |> line 200 |> fun value -> value.Split(' ', 2)
 
   match parts.[0].ToLowerInvariant(), parts |> Array.tryItem 1 with
-  | "variant", Some name -> Some(PatternVariant(name.Trim()))
-  | "modality", Some name -> Some(Modality(name.Trim()))
+  | "variant", Some name ->
+    let value = token 60 name
+
+    if value = "" then None else Some(PatternVariant value)
+  | "modality", Some name ->
+    let value = token 60 name
+
+    if value = "" || not(isModality value) then
+      None
+    else
+      Some(Modality value)
   | kind, Some numberText ->
     match numberText |> cleanNumber |> Int32.TryParse with
     | true, number ->
@@ -285,14 +327,16 @@ let labelOf(text: string) =
   | "no-equipment" -> Some NoEquipment
   | _ -> None
 
+let normalizeTarget(text: string) =
+  line 200 text |> fun value -> value.ToLowerInvariant()
+
 let targetMatches (text: string) (target: Target) =
-  let normalized = text.Trim().ToLowerInvariant()
+  let normalized = normalizeTarget text
 
   match target with
-  | Exercise name ->
-    normalized = name.ToLowerInvariant()
-    || normalized.EndsWith(name.ToLowerInvariant())
-  | Day id -> normalized.Contains(id.ToLowerInvariant())
+  | Exercise name -> normalized = normalizeTarget name
+  | Day id ->
+    normalized = normalizeTarget id || normalized = normalizeTarget $"day {id}"
 
 let memoryOf (marks: FeedbackMark list) (line: string) =
   match line.Split('|') |> Array.map(fun part -> part.Trim()) with
@@ -309,7 +353,7 @@ let memoryOf (marks: FeedbackMark list) (line: string) =
         None
       else
         Some {
-          Summary = summary
+          Summary = PromptText.line 200 summary
           Deltas = deltas
           Origin = Mark mark
           Status = Proposed
@@ -411,8 +455,14 @@ let inline scopeOf(text: string option) =
   | Some "athlete" -> Athlete
   | _ -> Plan
 
-let inline findTarget (targets: Target list) (text: string) =
-  targets |> List.tryFind(fun target -> targetMatches text target)
+let findTarget (targets: Target list) (text: string) =
+  match
+    targets
+    |> List.filter(fun target -> targetMatches text target)
+    |> List.distinct
+  with
+  | [ target ] -> Some target
+  | _ -> None
 
 /// The pure reading of an interpretation response.
 let interpretationOf
@@ -439,11 +489,7 @@ let interpretationOf
           let deltas =
             item.deltas |> Option.defaultValue [] |> List.choose deltaOf
 
-          let summary =
-            item.summary
-            |> Option.defaultValue ""
-            |> fun text ->
-                if text.Length > 200 then text.Substring(0, 200) else text
+          let summary = item.summary |> Option.defaultValue "" |> line 200
 
           Ok {
             Summary = summary
@@ -482,11 +528,13 @@ let interpretationOf
 let interpretNote
   ((env: #IProvideChat & #IProvideLog), reading: NoteAsk)
   : CancellableTask<NoteInterpretation> = cancellableTask {
+  let nonce = Guid.NewGuid().ToString("N")
+
   let! response =
     ask(
       env,
-      interpretationSystem reading.Targets,
-      interpretationNote reading.Note
+      interpretationSystem,
+      interpretationPrompt(nonce, reading.Targets, reading.Note)
     )
 
   return interpretationOf(reading.Targets, reading.Date, response)

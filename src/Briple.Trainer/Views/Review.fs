@@ -6,6 +6,7 @@ open System.Globalization
 open Avalonia
 open Avalonia.Controls
 open Avalonia.Layout
+open Avalonia.Media
 open Avalonia.Platform.Storage
 open NXUI.Extensions
 
@@ -329,6 +330,53 @@ let invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
         )
   }
 
+/// Splits a "#x key | body" extra into its key and body.
+let splitExtra(text: string) : string * string =
+  match text.IndexOf '|' with
+  | -1 -> "", text.Trim()
+  | index -> text.Substring(0, index).Trim(), text.Substring(index + 1).Trim()
+
+/// The extras the day card does not show: everything except the two
+/// trailer keys and the mesocycle lines already in the week badge. A
+/// bare extra has no heading of its own.
+let guideGroups(plan: Plan) : (string option * string list) list =
+  plan.Extras
+  |> List.map splitExtra
+  |> List.filter(fun (key, _) ->
+    key <> "mesociclo" && key <> "descansos" && key <> "regla-circuito")
+  |> List.groupBy fst
+  |> List.map(fun (key, rows) ->
+    (if key = "" then None else Some key), rows |> List.map snd)
+
+/// The full plan guide, one heading per key and the body lines below.
+let guideSection(culture: PageCulture, plan: Plan) : Control =
+  let groups = guideGroups plan
+
+  if List.isEmpty groups then
+    StackPanel()
+  else
+    let children: Control array = [|
+      yield sectionTitleKey Keys.planGuide
+
+      for key, lines in groups do
+        match key with
+        | Some key ->
+          yield
+            TextBlock()
+              .Text(culture.Changed |> Observable.map(fun current -> key))
+              .Classes("body-strong")
+        | None -> ()
+
+        for line in lines do
+          yield
+            TextBlock()
+              .Text(line)
+              .Classes("caption", "secondary")
+              .TextWrapping(TextWrapping.Wrap)
+    |]
+
+    StackPanel().Spacing(8.0).Children(children)
+
 /// The page at one culture, over the current model.
 let view
   (props: ReviewPageProps)
@@ -409,7 +457,16 @@ let view
       Title = pageTitleKey Keys.reviewTitle
       Commands = [ export; save ]
       Footer = noFooter
-      Body = StackPanel().Spacing(8.0).Children(status, pending, review, notes)
+      Body =
+        StackPanel()
+          .Spacing(8.0)
+          .Children(
+            status,
+            pending,
+            review,
+            guideSection(props.Culture, plan),
+            notes
+          )
     }
 
 type ReviewPage(props: ReviewPageProps) as this =

@@ -269,6 +269,7 @@ let view
   let noteEntry =
     TextBox()
       .AcceptsReturn(true)
+      .MaxLength(200)
       .TextWrapping(TextWrapping.Wrap)
       .Height(60.0)
       .PlaceholderText(Localization.text Keys.reviewNotePlaceholder)

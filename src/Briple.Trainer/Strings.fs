@@ -176,6 +176,21 @@ module Keys =
   let deltaModality = "delta.modality"
 
   [<Literal>]
+  let deltaSets = "delta.sets"
+
+  [<Literal>]
+  let deltaLoad = "delta.load"
+
+  [<Literal>]
+  let deltaVariant = "delta.variant"
+
+  [<Literal>]
+  let memoryAddAdjustment = "memory.addAdjustment"
+
+  [<Literal>]
+  let memoryAddValue = "memory.addValue"
+
+  [<Literal>]
   let plansTitle = "plans.title"
 
   [<Literal>]
@@ -366,6 +381,51 @@ module Keys =
 
   [<Literal>]
   let reviewNoteFull = "review.noteFull"
+
+  [<Literal>]
+  let reviewCircuit = "review.circuit"
+
+  [<Literal>]
+  let reviewCircuitOne = "review.circuitOne"
+
+  [<Literal>]
+  let reviewCircuitOnly = "review.circuitOnly"
+
+  [<Literal>]
+  let reviewDayBadge = "review.dayBadge"
+
+  [<Literal>]
+  let reviewExercisesOne = "review.exercises.one"
+
+  [<Literal>]
+  let reviewExercisesMany = "review.exercises.many"
+
+  [<Literal>]
+  let reviewCircuitsOne = "review.circuits.one"
+
+  [<Literal>]
+  let reviewCircuitsMany = "review.circuits.many"
+
+  [<Literal>]
+  let reviewWeekBadge = "review.weekBadge"
+
+  [<Literal>]
+  let reviewDays = "review.days"
+
+  [<Literal>]
+  let reviewContentWarning = "review.contentWarning"
+
+  [<Literal>]
+  let reviewFieldTitle = "review.fieldTitle"
+
+  [<Literal>]
+  let reviewFieldOrigin = "review.fieldOrigin"
+
+  [<Literal>]
+  let reviewFieldName = "review.fieldName"
+
+  [<Literal>]
+  let reviewFieldNotes = "review.fieldNotes"
 
   [<Literal>]
   let planGuide = "plan.guide"

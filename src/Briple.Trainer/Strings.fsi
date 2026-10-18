@@ -162,6 +162,26 @@ module Keys =
   [<Literal>]
   val deltaModality: string = "delta.modality"
 
+  /// Series in a memory's sets delta.
+  [<Literal>]
+  val deltaSets: string = "delta.sets"
+
+  /// Load in a memory's load delta.
+  [<Literal>]
+  val deltaLoad: string = "delta.load"
+
+  /// Movement variant in a memory's variant delta.
+  [<Literal>]
+  val deltaVariant: string = "delta.variant"
+
+  /// The button that adds a manual memory adjustment.
+  [<Literal>]
+  val memoryAddAdjustment: string = "memory.addAdjustment"
+
+  /// The placeholder of the manual adjustment value.
+  [<Literal>]
+  val memoryAddValue: string = "memory.addValue"
+
   [<Literal>]
   val plansTitle: string = "plans.title"
 
@@ -353,6 +373,58 @@ module Keys =
 
   [<Literal>]
   val reviewNoteFull: string = "review.noteFull"
+
+  /// Circuit heading with more than one lap.
+  [<Literal>]
+  val reviewCircuit: string = "review.circuit"
+
+  /// Circuit heading with exactly one lap.
+  [<Literal>]
+  val reviewCircuitOne: string = "review.circuitOne"
+
+  /// Circuit heading without laps.
+  [<Literal>]
+  val reviewCircuitOnly: string = "review.circuitOnly"
+
+  /// The day badge: exercises and circuits.
+  [<Literal>]
+  val reviewDayBadge: string = "review.dayBadge"
+
+  [<Literal>]
+  val reviewExercisesOne: string = "review.exercises.one"
+
+  [<Literal>]
+  val reviewExercisesMany: string = "review.exercises.many"
+
+  [<Literal>]
+  val reviewCircuitsOne: string = "review.circuits.one"
+
+  [<Literal>]
+  val reviewCircuitsMany: string = "review.circuits.many"
+
+  /// The week badge: current week of the plan.
+  [<Literal>]
+  val reviewWeekBadge: string = "review.weekBadge"
+
+  /// The variant frequency in days.
+  [<Literal>]
+  val reviewDays: string = "review.days"
+
+  /// One possible instruction in a plan field.
+  [<Literal>]
+  val reviewContentWarning: string = "review.contentWarning"
+
+  [<Literal>]
+  val reviewFieldTitle: string = "review.fieldTitle"
+
+  [<Literal>]
+  val reviewFieldOrigin: string = "review.fieldOrigin"
+
+  [<Literal>]
+  val reviewFieldName: string = "review.fieldName"
+
+  [<Literal>]
+  val reviewFieldNotes: string = "review.fieldNotes"
 
   [<Literal>]
   val planGuide: string = "plan.guide"

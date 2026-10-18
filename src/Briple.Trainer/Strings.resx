@@ -129,6 +129,21 @@
   <data name="delta.modality" xml:space="preserve">
     <value>modalidad</value>
   </data>
+  <data name="delta.sets" xml:space="preserve">
+    <value>series</value>
+  </data>
+  <data name="delta.load" xml:space="preserve">
+    <value>carga</value>
+  </data>
+  <data name="delta.variant" xml:space="preserve">
+    <value>variante</value>
+  </data>
+  <data name="memory.addAdjustment" xml:space="preserve">
+    <value>Agregar ajuste</value>
+  </data>
+  <data name="memory.addValue" xml:space="preserve">
+    <value>valor</value>
+  </data>
   <data name="plans.title" xml:space="preserve">
     <value>Planes</value>
   </data>
@@ -320,6 +335,51 @@
   </data>
   <data name="review.noteFull" xml:space="preserve">
     <value>Este plan ya tiene 10 memorias; descarta alguna antes de agregar más.</value>
+  </data>
+  <data name="review.circuit" xml:space="preserve">
+    <value>Circuito {0} · {1} vueltas</value>
+  </data>
+  <data name="review.circuitOne" xml:space="preserve">
+    <value>Circuito {0} · 1 vuelta</value>
+  </data>
+  <data name="review.circuitOnly" xml:space="preserve">
+    <value>Circuito {0}</value>
+  </data>
+  <data name="review.dayBadge" xml:space="preserve">
+    <value>{0} {1} · {2} {3}</value>
+  </data>
+  <data name="review.exercises.one" xml:space="preserve">
+    <value>ejercicio</value>
+  </data>
+  <data name="review.exercises.many" xml:space="preserve">
+    <value>ejercicios</value>
+  </data>
+  <data name="review.circuits.one" xml:space="preserve">
+    <value>circuito</value>
+  </data>
+  <data name="review.circuits.many" xml:space="preserve">
+    <value>circuitos</value>
+  </data>
+  <data name="review.weekBadge" xml:space="preserve">
+    <value>Semana {0} de {1}</value>
+  </data>
+  <data name="review.days" xml:space="preserve">
+    <value>{0} días</value>
+  </data>
+  <data name="review.contentWarning" xml:space="preserve">
+    <value>Posible instrucción en {0}: {1}</value>
+  </data>
+  <data name="review.fieldTitle" xml:space="preserve">
+    <value>el título</value>
+  </data>
+  <data name="review.fieldOrigin" xml:space="preserve">
+    <value>el origen</value>
+  </data>
+  <data name="review.fieldName" xml:space="preserve">
+    <value>el nombre de {0}</value>
+  </data>
+  <data name="review.fieldNotes" xml:space="preserve">
+    <value>las notas de {0}</value>
   </data>
   <data name="plan.guide" xml:space="preserve">
     <value>Guía</value>

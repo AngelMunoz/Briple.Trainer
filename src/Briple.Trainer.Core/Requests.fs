@@ -138,11 +138,16 @@ module Emphasis =
     | Stability -> Some "timed holds at rpe 3-5"
     | _ -> None
 
+type ContentLanguage =
+  | Spanish
+  | English
+
 type Brief = {
   Goal: PlanGoal
   Frequency: VariantFrequency
   Emphasis: Emphasis list
   Adjustments: (Target * Delta list) list
+  Language: ContentLanguage
 }
 
 type NewPlanRequest = {

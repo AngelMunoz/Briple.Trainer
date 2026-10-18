@@ -70,6 +70,26 @@ type Memory = {
   Scope: MemoryScope
 }
 
+/// The cardio modalities a memory may name. The aliases cover a plan
+/// written without accents.
+let modalities = [
+  "caminata"
+  "cinta"
+  "bicicleta"
+  "elíptica"
+  "remo ergómetro"
+  "natación"
+  "escaladora"
+]
+
+let modalityAliases = [ "eliptica"; "remo ergometro"; "natacion" ]
+
+let isModality(text: string) : bool =
+  let normalized = text.Trim().ToLowerInvariant()
+
+  List.contains normalized modalities
+  || List.contains normalized modalityAliases
+
 let automaticAdjustmentsFor (goal: PlanGoal) (label: Label) : Delta list =
   match label with
   | Light ->

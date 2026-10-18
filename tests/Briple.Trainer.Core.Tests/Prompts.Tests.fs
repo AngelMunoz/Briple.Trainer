@@ -23,6 +23,7 @@ let private brief = {
   Frequency = TresDias
   Emphasis = []
   Adjustments = []
+  Language = Spanish
 }
 
 /// One male block, variant 3dias, one week, one exercise.
@@ -138,7 +139,17 @@ let tests =
         Expect.stringContains
           (system Hypertrophy)
           "Respond with the JSON only"
-          "the output instruction goes in the system")
+          "the output instruction goes in the system"
+
+        Expect.stringContains
+          (system Hypertrophy)
+          "in Spanish"
+          "the Spanish system asks for Spanish content"
+
+        Expect.stringContains
+          (systemFor(English, Hypertrophy))
+          "in English"
+          "the English system asks for English content")
 
     testCase "the athlete line carries the goals and no focus" (fun () ->
       let prompt =

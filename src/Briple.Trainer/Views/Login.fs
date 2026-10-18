@@ -125,6 +125,7 @@ let view
     TextBox()
       .CornerRadius(4.0)
       .Padding(8.0, 4.0)
+      .MaxLength(256)
       .PasswordChar(char "•")
       .Text(model |> Observable.map _.Token)
       .PlaceholderText(Localization.text Keys.loginToken)

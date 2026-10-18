@@ -16,7 +16,7 @@
     <value>Briple Trainer</value>
   </data>
   <data name="nav.athletes" xml:space="preserve">
-    <value>Atletas</value>
+    <value>Athletes</value>
   </data>
   <data name="nav.settings" xml:space="preserve">
     <value>Settings</value>
@@ -128,6 +128,21 @@
   </data>
   <data name="delta.modality" xml:space="preserve">
     <value>modality</value>
+  </data>
+  <data name="delta.sets" xml:space="preserve">
+    <value>sets</value>
+  </data>
+  <data name="delta.load" xml:space="preserve">
+    <value>load</value>
+  </data>
+  <data name="delta.variant" xml:space="preserve">
+    <value>variant</value>
+  </data>
+  <data name="memory.addAdjustment" xml:space="preserve">
+    <value>Add adjustment</value>
+  </data>
+  <data name="memory.addValue" xml:space="preserve">
+    <value>value</value>
   </data>
   <data name="plans.title" xml:space="preserve">
     <value>Plans</value>
@@ -320,6 +335,51 @@
   </data>
   <data name="review.noteFull" xml:space="preserve">
     <value>This plan already holds 10 memories; discard one before adding more.</value>
+  </data>
+  <data name="review.circuit" xml:space="preserve">
+    <value>Circuit {0} · {1} rounds</value>
+  </data>
+  <data name="review.circuitOne" xml:space="preserve">
+    <value>Circuit {0} · 1 round</value>
+  </data>
+  <data name="review.circuitOnly" xml:space="preserve">
+    <value>Circuit {0}</value>
+  </data>
+  <data name="review.dayBadge" xml:space="preserve">
+    <value>{0} {1} · {2} {3}</value>
+  </data>
+  <data name="review.exercises.one" xml:space="preserve">
+    <value>exercise</value>
+  </data>
+  <data name="review.exercises.many" xml:space="preserve">
+    <value>exercises</value>
+  </data>
+  <data name="review.circuits.one" xml:space="preserve">
+    <value>circuit</value>
+  </data>
+  <data name="review.circuits.many" xml:space="preserve">
+    <value>circuits</value>
+  </data>
+  <data name="review.weekBadge" xml:space="preserve">
+    <value>Week {0} of {1}</value>
+  </data>
+  <data name="review.days" xml:space="preserve">
+    <value>{0} days</value>
+  </data>
+  <data name="review.contentWarning" xml:space="preserve">
+    <value>Possible instruction in {0}: {1}</value>
+  </data>
+  <data name="review.fieldTitle" xml:space="preserve">
+    <value>the title</value>
+  </data>
+  <data name="review.fieldOrigin" xml:space="preserve">
+    <value>the origin</value>
+  </data>
+  <data name="review.fieldName" xml:space="preserve">
+    <value>the name of {0}</value>
+  </data>
+  <data name="review.fieldNotes" xml:space="preserve">
+    <value>the notes of {0}</value>
   </data>
   <data name="plan.guide" xml:space="preserve">
     <value>Guide</value>

@@ -57,16 +57,23 @@ type Model = {
   Snapshot: Plan
   /// The week the pivot shows, by number.
   Week: int
-  /// The page-level edit mode: on, every row shows its fields; off,
-  /// the tree reads as prose.
+  /// The row that is open, when one is.
+  ActiveRow: RowPath voption
+  /// The page-level edit mode: on, one row can be open; off, the tree
+  /// reads as prose.
   Editing: bool
 }
 
 type Msg =
   | SetField of path: RowPath * field: ExerciseField * text: string
   | SetWeek of week: int
+  | BeginEdit of path: RowPath
+  | EndEdit
+  | RemoveRow of path: RowPath
+  | AdjustLaps of path: RowPath * delta: int
   | SetEditing of on: bool
   | RevertEdit
+  | Undo
 
 /// The review of one parsed plan.
 type PlanReview =

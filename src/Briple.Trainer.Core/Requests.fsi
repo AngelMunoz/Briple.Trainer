@@ -76,6 +76,12 @@ module Emphasis =
   /// one: a circuit, intervals, a continuous block, timed holds.
   val structureHint: emphasis: Emphasis -> string option
 
+/// The language of the generated plan content. The format's day ids
+/// stay Spanish; the titles, names, notes and extras follow this value.
+type ContentLanguage =
+  | Spanish
+  | English
+
 /// The trainer's brief: the goal, the weekly frequency and the emphasis
 /// of this plan; the confirmed memories arrive as adjustments.
 type Brief = {
@@ -83,6 +89,7 @@ type Brief = {
   Frequency: VariantFrequency
   Emphasis: Emphasis list
   Adjustments: (Target * Delta list) list
+  Language: ContentLanguage
 }
 
 /// Brand-new plan.

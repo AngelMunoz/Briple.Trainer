@@ -34,6 +34,7 @@ let private brief = {
   Frequency = TresDias
   Emphasis = []
   Adjustments = []
+  Language = Spanish
 }
 
 let tests =

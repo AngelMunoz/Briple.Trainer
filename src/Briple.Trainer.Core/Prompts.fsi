@@ -10,8 +10,11 @@ open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 
 /// System message of the generation flows: role, JSON response schema,
-/// prescription rules, evidence rules and the goal profile (volume,
-/// effort, structure and progression).
+/// prescription rules, evidence rules, the goal profile (volume,
+/// effort, structure and progression) and the content language.
+val systemFor: language: ContentLanguage * goal: PlanGoal -> string
+
+/// The Spanish generation system message.
 val system: goal: PlanGoal -> string
 
 /// System message of the mark consolidation.
@@ -29,10 +32,14 @@ val adjustmentPrompt: request: AdjustmentRequest -> string
 /// User message of the consolidation: the recorded marks.
 val consolidationPrompt: marks: FeedbackMark list -> string
 
-/// System message of the note interpretation: the closed surface (the
-/// protocol, the label enum, the plan's target vocabulary) and the rule
-/// that the note is data, never instructions.
-val interpretationSystem: targets: Target list -> string
+/// System message of the note interpretation: the constant closed
+/// surface (the protocol, the label enum, the rule that the note is
+/// data). The plan's vocabulary and the note travel in the user
+/// message, so plan content cannot rewrite this role.
+val interpretationSystem: string
 
-/// User message of the note interpretation: the trainer's note, verbatim.
-val interpretationNote: note: string -> string
+/// User message of the note interpretation: the numbered target
+/// vocabulary and the note between BEGIN NOTE and END NOTE markers
+/// that carry a per-request nonce.
+val interpretationPrompt:
+  nonce: string * targets: Target list * note: string -> string
