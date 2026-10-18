@@ -1,10 +1,9 @@
 module Briple.Trainer.Views.Routes
 
 // The route table: pivots with Navs. Route factories load what they need
-// from the env and build the pages; `go` is the one imperative
-// navigation helper. The shell owns history and hands every page a fresh
-// back control through `lead`. Navs keeps no history, so "back" is a
-// plain Navigate.
+// from the env and build the pages; `go` and `back` are the imperative
+// navigation helpers. `leadOf` builds a fresh back-control factory for
+// the navigable that renders the page; "back" uses router history.
 
 open Avalonia.Controls
 open Navs
@@ -24,7 +23,10 @@ type RouteDeps<'T
   and 'T :> IProvideLogging> = 'T
 
 /// Navigates and reports a failure through the log.
-val inline go: nav: INavigable<Control> * url: string -> unit
+val inline go: nav: INavigable * url: string -> unit
+
+/// Navigates back through the router history and reports a failure.
+val inline back: nav: INavigable -> unit
 
 /// The router plus the page-phase surface the shell needs.
 [<Struct>]
@@ -35,6 +37,7 @@ type ShellRoutes = {
   AskLeave: string -> Async<bool>
 }
 
-/// The route table over the environment. `lead` builds one back
-/// control per page; the shell owns its behavior and its history.
-val build: env: RouteDeps<'T> * lead: (unit -> Control) -> ShellRoutes
+/// The route table over the environment. `leadOf` builds one back
+/// control per page for the navigable that renders it.
+val build:
+  env: RouteDeps<'T> * leadOf: (INavigable -> (unit -> Control)) -> ShellRoutes

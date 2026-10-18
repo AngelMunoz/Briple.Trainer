@@ -6,58 +6,17 @@ open System.Windows.Input
 
 open FSharp.Control.Reactive
 
-/// Pure back-stack operations over a most-recent-first URL list.
-module History =
-
-  let push (url: string) (stack: string list) : string list =
-    match stack with
-    | current :: _ when current = url -> stack
-    | _ -> url :: List.truncate 99 stack
-
-  /// Records a completed navigation. A URL that is the entry below the
-  /// current top is a completed back navigation: the top collapses.
-  let settle (url: string) (stack: string list) : string list =
-    match stack with
-    | _ :: previous :: _ when previous = url -> List.tail stack
-    | _ -> push url stack
-
-  /// The URL a back navigation goes to, without changing the stack.
-  let back(stack: string list) : string option =
-    match stack with
-    | _ :: previous :: _ -> Some previous
-    | _ -> None
-
-  let canBack(stack: string list) : bool =
-    match stack with
-    | _ :: _ :: _ -> true
-    | _ -> false
+/// URL-to-section mapping for the nav pane.
+module Sections =
 
   /// The pane section a URL belongs to.
   let sectionOf(url: string) : string voption =
-    if url = "/" || url.StartsWith("/athletes", StringComparison.Ordinal) then
+    match url with
+    | "/" -> ValueSome "/"
+    | url when url.StartsWith("/athletes", StringComparison.Ordinal) ->
       ValueSome "/"
-    elif url = "/settings" then
-      ValueSome "/settings"
-    else
-      ValueNone
-
-/// The live back stack: URLs of completed navigations land in `Sync`,
-/// `Back` reads where a back navigation goes.
-type BackStack() =
-  let stacks = new BehaviorSubject<string list>([])
-
-  member _.Sync(url: string) =
-    let current = stacks.Value
-    let next = History.settle url current
-
-    if next <> current then
-      stacks.OnNext next
-
-  member _.Back() : string option = History.back stacks.Value
-
-  member _.Current: string option = stacks.Value |> List.tryHead
-
-  member _.CanBack: IObservable<bool> = stacks |> Observable.map History.canBack
+    | "/settings" -> ValueSome "/settings"
+    | _ -> ValueNone
 
 /// The lifecycle state of a page the shell protects on exit.
 type PagePhase =

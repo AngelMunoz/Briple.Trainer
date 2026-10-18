@@ -18,7 +18,7 @@ open Avalonia.Threading
 open Avalonia.VisualTree
 
 open Briple.Trainer.Components.Page
-open Briple.Trainer.Program
+open Briple.Trainer.Startup
 
 type TestApp() =
   inherit App()

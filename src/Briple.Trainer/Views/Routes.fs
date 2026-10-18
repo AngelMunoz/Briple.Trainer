@@ -1,6 +1,7 @@
 module Briple.Trainer.Views.Routes
 
 open System
+open System.Threading
 
 open Avalonia.Controls
 open Microsoft.Extensions.Logging
@@ -35,11 +36,19 @@ type RouteDeps<'T
   and 'T :> IProvideCredentials
   and 'T :> IProvideLogging> = 'T
 
-let inline go(nav: INavigable<Control>, url: string) : unit =
+let inline go(nav: INavigable, url: string) : unit =
   asyncEx {
-    match! nav.Navigate url with
-    | Ok() -> ()
+    match! nav.Navigate url CancellationToken.None with
+    | Ok _ -> ()
     | Error e -> Log.Error("navigation to {Url} failed: {Error}", url, string e)
+  }
+  |> Async.StartImmediate
+
+let inline back(nav: INavigable) : unit =
+  asyncEx {
+    match! nav.Back () CancellationToken.None with
+    | Ok _ -> ()
+    | Error e -> Log.Error("back navigation failed: {Error}", string e)
   }
   |> Async.StartImmediate
 
@@ -54,7 +63,7 @@ let inline orEmpty(what: string) : Result<'a list, exn> -> 'a list =
 
 [<return: Struct>]
 let inline (|GuidParam|_|) (name: string) (ctx: RouteContext) =
-  ctx.getParam<Guid> name
+  ctx.GetParam<Guid>(name)
 
 /// The live culture a page reads.
 let inline cultureOf(env: #IProvideCulture) : PageCulture = {
@@ -66,7 +75,7 @@ let athletesPage
   (
     env: #IProvideStores & #IProvideCulture,
     lead: unit -> Control,
-    nav: INavigable<Control>
+    nav: INavigable
   ) : Control =
   AthleteList(
     {
@@ -85,7 +94,7 @@ let newAthletePage
     env: #IProvideStores & #IProvideCulture,
     lead: unit -> Control,
     gate: PageGate,
-    nav: INavigable<Control>
+    nav: INavigable
   ) : Control =
   NewAthleteForm(
     {
@@ -119,7 +128,7 @@ let detailPage
     env: #IProvideStore & #IProvideStores & #IProvideCulture,
     lead: unit -> Control,
     athleteId: Guid,
-    nav: INavigable<Control>
+    nav: INavigable
   ) : Async<Control> = asyncEx {
   let! athlete = env.Store.FindAthlete athleteId
 
@@ -152,7 +161,7 @@ let wizardPage
     lead: unit -> Control,
     gate: PageGate,
     athleteId: Guid,
-    nav: INavigable<Control>
+    nav: INavigable
   ) : Async<Control> = asyncEx {
   let! athlete = env.Store.FindAthlete athleteId
   let! memories = env.Store.ListMemories athleteId
@@ -226,7 +235,7 @@ let loginPage
   (
     env: #IProvideCulture & #IProvideCredentials,
     lead: unit -> Control,
-    nav: INavigable<Control>
+    nav: INavigable
   ) : Control =
   Login.LoginPage {
     Culture = cultureOf env
@@ -239,7 +248,7 @@ let settingsPage
   (
     env: #IProvideCulture & #IProvideLanguage & #IProvideTheme & #IProvideAgent,
     lead: unit -> Control,
-    nav: INavigable<Control>
+    nav: INavigable
   ) : Control =
   Settings.SettingsPage {
     Culture = cultureOf env
@@ -256,11 +265,11 @@ let settingsPage
   }
 
 /// The agent gate, shared by every data route.
-let requiresAgent(env: #IProvideAgent) : GuardResponse =
+let requiresAgent(env: #IProvideAgent) : GuardResult =
   if env.AgentAvailable then
-    GuardResponse.Continue
+    GuardResult.Continue
   else
-    GuardResponse.Redirect "/login"
+    GuardResult.Redirect "/login"
 
 /// The URL family that decides the leave dialog.
 type PageKind =
@@ -285,9 +294,9 @@ type ShellRoutes = {
   AskLeave: string -> Async<bool>
 }
 
-let build(env: RouteDeps<'T>, lead: unit -> Control) =
+let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
   let inline gate r =
-    r |> Navs.Route.canActivate(fun _ _ -> requiresAgent env)
+    r |> Route.canActivate(fun _ _ -> requiresAgent env)
 
   // the leave decision, all of it in one place: the page kind and the
   // phase decide the dialog, and a confirmed leave stops a running job
@@ -344,107 +353,109 @@ let build(env: RouteDeps<'T>, lead: unit -> Control) =
   // their state from that signal
   let inline shown r =
     r
-    |> Navs.Route.canActivate(fun _ next ->
-      gates.Gate(next.path).MarkShown()
-      GuardResponse.Continue)
+    |> Route.canActivate(fun _ next ->
+      gates.Gate(next.Path).MarkShown()
+      GuardResult.Continue)
 
   let inline confirmLeave r =
     r
-    |> Navs.Route.canDeactivateAsync(fun from _ -> async {
+    |> Route.canDeactivateAsync(fun from _ -> async {
       match from with
       | ValueSome active ->
-        let! allowed = gates.Gate(active.path).AskLeave()
+        let! allowed = gates.Gate(active.Path).AskLeave()
 
-        return
-          if allowed then
-            GuardResponse.Continue
-          else
-            GuardResponse.Stop
-      | ValueNone -> return GuardResponse.Continue
+        return if allowed then GuardResult.Continue else GuardResult.Stop
+      | ValueNone -> return GuardResult.Continue
     })
 
   let table: RouteDefinition<Control> list = [
-    Navs.Route.define<Control>(
+    Route.define<Control>(
       "athletes",
       "/",
-      fun _ nav -> athletesPage(env, lead, nav)
+      fun _ nav -> athletesPage(env, leadOf nav, nav)
     )
     |> gate
     |> shown
 
-    Navs.Route.define<Control>(
+    Route.define<Control>(
       "login",
       "/login",
-      fun _ nav -> loginPage(env, lead, nav)
+      fun _ nav -> loginPage(env, leadOf nav, nav)
     )
-    |> Navs.Route.cache CacheStrategy.NoCache
+    |> Route.cache CachePolicy.NoCache
 
-    Navs.Route.define<Control>(
+    Route.define<Control>(
       "new-athlete",
       "/athletes/new",
-      fun ctx nav -> newAthletePage(env, lead, gates.Gate(ctx.path), nav)
+      fun ctx nav -> newAthletePage(env, leadOf nav, gates.Gate(ctx.Path), nav)
     )
-    |> Navs.Route.cache CacheStrategy.NoCache
+    |> Route.cache CachePolicy.NoCache
     |> confirmLeave
     |> gate
     |> shown
 
-    Navs.Route.define<Control>(
+    Route.define<Control>(
       "athlete",
       "/athletes/:athleteId<guid>",
       fun context nav -> asyncEx {
         match context with
         | GuidParam "athleteId" athleteId ->
-          return! detailPage(env, lead, athleteId, nav)
+          return! detailPage(env, leadOf nav, athleteId, nav)
         | _ -> return notFound()
       }
     )
     |> gate
     |> shown
 
-    Navs.Route.define<Control>(
+    Route.define<Control>(
       "generate",
       "/athletes/:athleteId<guid>/generate",
       fun context nav -> asyncEx {
         match context with
         | GuidParam "athleteId" athleteId ->
           return!
-            wizardPage(env, lead, gates.Gate(context.path), athleteId, nav)
+            wizardPage(
+              env,
+              leadOf nav,
+              gates.Gate(context.Path),
+              athleteId,
+              nav
+            )
         | _ -> return notFound()
       }
     )
     // a wizard is one visit: the page resets on entry anyway, the
     // strategy only keeps the router from holding the old run
-    |> Navs.Route.cache CacheStrategy.NoCache
+    |> Route.cache CachePolicy.NoCache
     |> confirmLeave
     |> gate
     |> shown
 
-    Navs.Route.define<Control>(
+    Route.define<Control>(
       "review",
       "/athletes/:athleteId<guid>/review/:planId<guid>",
-      fun context _ -> asyncEx {
+      fun context nav -> asyncEx {
         match context with
         | GuidParam "planId" planId ->
-          return! reviewPage(env, lead, gates.Gate(context.path), planId)
+          return! reviewPage(env, leadOf nav, gates.Gate(context.Path), planId)
         | _ -> return notFound()
       }
     )
     // a fresh review on every visit: the stored Raw is the baseline and
     // a confirmed leave drops the draft, so no cached draft can come back
-    |> Navs.Route.cache CacheStrategy.NoCache
+    |> Route.cache CachePolicy.NoCache
     |> confirmLeave
     |> gate
     |> shown
 
-    Navs.Route.define<Control>(
+    Route.define<Control>(
       "settings",
       "/settings",
-      fun _ nav -> settingsPage(env, lead, nav)
+      fun _ nav -> settingsPage(env, leadOf nav, nav)
     )
     // the provider status and the preferences are read live; a fresh
     // page on every visit keeps them honest
-    |> Navs.Route.cache CacheStrategy.NoCache
+    |> Route.cache CachePolicy.NoCache
     |> shown
   ]
 

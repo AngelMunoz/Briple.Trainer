@@ -15,7 +15,6 @@ open Avalonia.VisualTree
 
 open Expecto
 open FSharp.Control.Reactive
-open FSharp.Data.Adaptive
 open Navs.Avalonia
 
 open Briple.Trainer.Components.AthleteList
@@ -33,6 +32,10 @@ let private es = Language.toCulture Es
 // migrations under test log through the app's pipeline (silent under the
 // default Serilog)
 let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
+
+// the route table only needs a back-control factory; the tests render a
+// plain placeholder in place of the shell's button
+let private stubLeadOf(_: Navs.INavigable) = fun () -> TextBlock() :> Control
 
 let private textBoxes(root: Control) : TextBox list =
   root.GetVisualDescendants()
@@ -757,111 +760,28 @@ let tests =
       }
     ]
 
-    testList "navigation history" [
-      test "settle ignores a repeat of the current top" {
-        let stack =
-          []
-          |> History.settle "/a"
-          |> History.settle "/b"
-          |> History.settle "/b"
-
-        Expect.equal stack [ "/b"; "/a" ] "dedup"
-      }
-
-      test "back only reads the previous entry" {
-        let stack = [] |> History.settle "/" |> History.settle "/athletes/new"
-
-        Expect.equal (History.back stack) (Some "/") "back target"
-
-        Expect.equal
-          stack
-          [ "/athletes/new"; "/" ]
-          "back does not change the stack"
-      }
-
-      test "a completed back collapses the top" {
-        let stack = [] |> History.settle "/" |> History.settle "/athletes/new"
-
-        Expect.equal
-          (History.settle "/" stack)
-          [ "/" ]
-          "the earlier entry replaces the top"
-      }
-
-      test "a cancelled back keeps every entry" {
-        let stack = [] |> History.settle "/" |> History.settle "/athletes/new"
-
-        let target = History.back stack
-
-        Expect.equal target (Some "/") "the target is the previous entry"
-
-        Expect.isTrue (History.canBack stack) "the stack still has the entry"
-      }
-
-      test "a single entry cannot go back" {
-        let stack = [] |> History.settle "/"
-
-        Expect.isFalse (History.canBack stack) "one entry"
-
-        Expect.equal (History.back stack) None "no target"
-      }
-
-      test "the stack caps at one hundred entries" {
-        let stack =
-          [ 1..300 ]
-          |> List.map string
-          |> List.fold (fun acc url -> History.settle url acc) []
-
-        Expect.equal (List.length stack) 100 "capped"
-      }
-
+    testList "pane sections" [
       test "urls map to pane sections" {
-        Expect.equal (History.sectionOf "/") (ValueSome "/") "home"
+        Expect.equal (Sections.sectionOf "/") (ValueSome "/") "home"
 
         Expect.equal
-          (History.sectionOf "/athletes/6f9619ff-8b86-d011-b42d-00c04fc964ff")
+          (Sections.sectionOf "/athletes/6f9619ff-8b86-d011-b42d-00c04fc964ff")
           (ValueSome "/")
           "detail"
 
         Expect.equal
-          (History.sectionOf "/settings")
+          (Sections.sectionOf "/settings")
           (ValueSome "/settings")
           "settings"
 
         Expect.equal
-          (History.sectionOf "/login")
+          (Sections.sectionOf "/login")
           ValueNone
           "login has no section"
       }
-
-      test "the live stack follows successful navigations" {
-        let stack = BackStack()
-
-        stack.Sync "/"
-        stack.Sync "/athletes/new"
-
-        Expect.equal stack.Current (Some "/athletes/new") "current"
-
-        Expect.equal (stack.Back()) (Some "/") "back target"
-
-        Expect.equal
-          stack.Current
-          (Some "/athletes/new")
-          "reading the target does not consume it"
-
-        // the cancelled navigation leaves the stack alone
-        Expect.equal (stack.Back()) (Some "/") "the same target again"
-
-        // the completed navigation collapses the entry
-        stack.Sync "/"
-
-        Expect.equal stack.Current (Some "/") "the back completed"
-
-        Expect.equal (stack.Back()) None "nothing below"
-      }
     ]
 
-    test "a back navigation through the router updates the live stack" {
+    test "a back navigation through the router returns to the previous page" {
       let db =
         Path.Combine(Path.GetTempPath(), $"briple-back-{Guid.NewGuid():N}.db")
 
@@ -881,27 +801,16 @@ let tests =
           ))
 
       let shell =
-        probeUi(fun () ->
-          Briple.Trainer.Views.Routes.build(
-            env,
-            (fun () -> TextBlock() :> Control)
-          ))
+        probeUi(fun () -> Briple.Trainer.Views.Routes.build(env, stubLeadOf))
 
       let router = shell.Router
-      let history = BackStack()
-
-      router.Route
-      |> AVal.toObservable
-      |> Observable.choose(fun route ->
-        route |> ValueOption.toOption |> Option.map _.path)
-      |> Observable.subscribe history.Sync
-      |> ignore
 
       let path() =
-        router.RouteSnapshot |> ValueOption.map _.path |> ValueOption.toOption
+        router.Snapshot.Route |> ValueOption.map _.Path |> ValueOption.toOption
 
       let booted = waitFor(5000, path, fun current -> current = Some "/")
       Expect.isTrue booted "the boot landed on the athletes list"
+      Expect.isFalse router.History.CanGoBack "the list is the first entry"
 
       onUi(fun () -> Briple.Trainer.Views.Routes.go(router, "/athletes/new"))
 
@@ -909,24 +818,25 @@ let tests =
         waitFor(5000, path, fun current -> current = Some "/athletes/new")
 
       Expect.isTrue atForm "the form opened"
+      Expect.isTrue router.History.CanGoBack "the form has a previous entry"
 
-      Expect.equal (history.Back()) (Some "/") "the previous entry is the list"
+      Expect.equal
+        (router.History.Current |> Option.map _.Url)
+        (Some "/athletes/new")
+        "the form is the current history entry"
 
       // no input: the form is Ready and the back proceeds
-      onUi(fun () ->
-        history.Back()
-        |> Option.iter(fun url -> Briple.Trainer.Views.Routes.go(router, url)))
+      onUi(fun () -> Briple.Trainer.Views.Routes.back router)
 
       let returned = waitFor(5000, path, fun current -> current = Some "/")
 
       Expect.isTrue returned "the back navigation landed on the list"
+      Expect.isFalse router.History.CanGoBack "the list is the first entry"
 
       Expect.equal
-        history.Current
+        (router.History.Current |> Option.map _.Url)
         (Some "/")
-        "the completed back collapsed the form entry"
-
-      Expect.equal (history.Back()) None "nothing below the list"
+        "the list is the current history entry"
     }
 
     test "the export writes the raw text verbatim" {
@@ -1053,16 +963,14 @@ let tests =
           "the env carries no token"
 
         let shell =
-          probeUi(fun () ->
-            Briple.Trainer.Views.Routes.build(
-              env,
-              (fun () -> TextBlock() :> Control)
-            ))
+          probeUi(fun () -> Briple.Trainer.Views.Routes.build(env, stubLeadOf))
 
         let router = shell.Router
 
         let current() =
-          router.RouteSnapshot |> ValueOption.map _.path |> ValueOption.toOption
+          router.Snapshot.Route
+          |> ValueOption.map _.Path
+          |> ValueOption.toOption
 
         onUi(fun () ->
           Briple.Trainer.Views.Routes.go(
@@ -1102,14 +1010,10 @@ let tests =
         let windowOf(env: Briple.Trainer.Env.AppEnv) =
           probeUi(fun () ->
             let router =
-              (Briple.Trainer.Views.Routes.build(
-                env,
-                (fun () -> TextBlock() :> Control)
-              ))
-                .Router
+              (Briple.Trainer.Views.Routes.build(env, stubLeadOf)).Router
 
             let outlet = RouterOutlet()
-            outlet.Router <- router
+            outlet.Router <- Some router
 
             let window = Window(Content = outlet)
             window.Show() |> ignore

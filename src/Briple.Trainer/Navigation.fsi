@@ -1,45 +1,15 @@
 module Briple.Trainer.Navigation
 
-// The shell's back stack over Navs (which keeps no history): the URL of
-// every completed navigation lands in `Sync`, `Back` reads where a back
-// navigation goes. The stack changes only after a navigation succeeds,
-// so a cancelled leave never consumes an entry. URL-to-section mapping
-// for the nav pane lives here.
+// URL-to-section mapping for the nav pane. The router owns navigation
+// history and the shell reads it through `IRouter.History`.
 
 open System
 
-/// Pure back-stack operations over a most-recent-first URL list.
-module History =
-
-  /// Records a completed navigation. A URL that is the entry below the
-  /// current top is a completed back navigation: the top collapses.
-  val settle: url: string -> stack: string list -> string list
-
-  /// The URL a back navigation goes to, without changing the stack.
-  val back: stack: string list -> string option
-
-  /// Whether a back navigation is possible.
-  val canBack: stack: string list -> bool
+/// URL-to-section mapping for the nav pane.
+module Sections =
 
   /// The pane section a URL belongs to.
   val sectionOf: url: string -> string voption
-
-/// The live back stack: the stack rides one behavior subject, the same
-/// idiom the stores use.
-type BackStack =
-  new: unit -> BackStack
-
-  /// Records a completed navigation.
-  member Sync: url: string -> unit
-
-  /// Reads where a back navigation goes; the stack stays unchanged.
-  member Back: unit -> string option
-
-  /// The URL of the most recent navigation.
-  member Current: string option
-
-  /// Whether a back navigation is possible, as a stream.
-  member CanBack: IObservable<bool>
 
 /// The lifecycle state of a page the shell protects on exit.
 type PagePhase =

@@ -93,6 +93,10 @@
     <Compile Include="Views\Settings.fs" />
     <Compile Include="Views\Routes.fsi" />
     <Compile Include="Views\Routes.fs" />
+    <Compile Include="Startup.fsi" />
+    <Compile Include="Startup.fs" />
+    <Compile Include="Shell.fsi" />
+    <Compile Include="Shell.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
