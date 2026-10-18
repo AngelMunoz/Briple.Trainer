@@ -375,33 +375,40 @@ let tests =
 
       Expect.equal last.Emphasis [] "the emphasis stays"
 
-    test "the hub math clamps the wheel" {
-      let wheel = Briple.Trainer.Components.Hub.wheelOffset
-
-      Expect.equal (wheel(0.0, 100.0, 500.0)) 100.0 "pan forward"
-
-      Expect.equal (wheel(400.0, 200.0, 500.0)) 500.0 "clamped at the end"
-
-      Expect.equal (wheel(300.0, -1000.0, 500.0)) 0.0 "clamped at the start"
-    }
-
-    test "the hub leaves a plain vertical wheel to the page" {
+    test "the hub wheel pans and releases at the ends" {
       let step = Briple.Trainer.Components.Hub.wheelStep
+      let down = Vector(0.0, -120.0)
+      let up = Vector(0.0, 120.0)
 
       Expect.equal
-        (step(Avalonia.Vector(0.0, 120.0), false))
+        (step(100.0, 500.0, down))
+        (Briple.Trainer.Components.Hub.WheelStep.Pan 148.0)
+        "a forward turn pans one notch"
+
+      Expect.equal
+        (step(480.0, 500.0, down))
+        (Briple.Trainer.Components.Hub.WheelStep.Pan 500.0)
+        "the turn before the end stops at the end"
+
+      Expect.equal
+        (step(500.0, 500.0, down))
         Briple.Trainer.Components.Hub.WheelStep.Pass
-        "vertical without shift passes"
+        "a forward turn at the end goes to the page"
 
       Expect.equal
-        (step(Avalonia.Vector(0.0, -120.0), false))
+        (step(0.0, 500.0, up))
         Briple.Trainer.Components.Hub.WheelStep.Pass
-        "vertical up passes"
+        "a backward turn at the start goes to the page"
 
       Expect.equal
-        (step(Avalonia.Vector(0.0, -120.0), true))
-        (Briple.Trainer.Components.Hub.WheelStep.Pan 5760.0)
-        "shift maps the vertical wheel to a pan"
+        (step(0.0, 500.0, down))
+        (Briple.Trainer.Components.Hub.WheelStep.Pan 48.0)
+        "a hub at the start takes the forward turn"
+
+      Expect.equal
+        (step(0.0, 0.0, down))
+        Briple.Trainer.Components.Hub.WheelStep.Pass
+        "a hub that fits takes nothing"
     }
 
     test "the hub overflows when the columns exceed the viewport" {
@@ -447,7 +454,49 @@ let tests =
 
       Expect.isTrue headers "the slot headers rendered"
     }
-    test "a plain vertical wheel over the hub scrolls the page" {
+    test "the hub shares the viewport when its columns fit" {
+      let hubControl =
+        probeUi(fun () ->
+          Briple.Trainer.Components.Hub.hub {
+            Title = ""
+            Slots = [
+              for index in 1..2 ->
+                Briple.Trainer.Components.Hub.slot(
+                  $"Día {index}",
+                  TextBlock(Text = $"contenido {index}")
+                )
+            ]
+            Active = ValueNone
+            OnSelect = ValueNone
+          })
+
+      probeUi(fun () ->
+        let window =
+          Window(Content = hubControl, Width = 900.0, Height = 400.0)
+
+        window.Show() |> ignore)
+
+      let fitted =
+        waitFor(
+          2000,
+          (fun () -> hubControl :?> ScrollViewer),
+          fun scroller -> scroller.Extent.Width <= scroller.Viewport.Width + 1.0
+        )
+
+      Expect.isTrue
+        fitted
+        "the two columns share the viewport instead of overflowing"
+
+      let headers =
+        waitFor(
+          2000,
+          (fun () -> hubControl),
+          fun root -> hasText(root, "Día 1") && hasText(root, "Día 2")
+        )
+
+      Expect.isTrue headers "both columns stay whole in a wide window"
+    }
+    test "the hub pans on a vertical wheel and releases at its ends" {
       let hubControl =
         probeUi(fun () ->
           Briple.Trainer.Components.Hub.hub {
@@ -484,44 +533,56 @@ let tests =
           | point when point.HasValue -> point.Value
           | _ -> Point(20.0, 20.0))
 
-      onUi(fun () ->
-        HeadlessWindowExtensions.MouseWheel(
-          window,
-          point,
-          Vector(0.0, -120.0),
-          RawInputModifiers.None
-        ))
+      let wheel(delta: Vector) =
+        onUi(fun () ->
+          HeadlessWindowExtensions.MouseWheel(
+            window,
+            point,
+            delta,
+            RawInputModifiers.None
+          ))
 
-      settle()
-
-      let pageScrolled = probeUi(fun () -> outer.Offset.Y)
-
-      Expect.isGreaterThan
-        pageScrolled
-        0.0
-        "the page scrolled instead of the hub swallowing the wheel"
-
-      // Shift maps the vertical wheel to a horizontal pan; the page stays
-      onUi(fun () -> outer.Offset <- Vector(0.0, 0.0))
-
-      onUi(fun () ->
-        HeadlessWindowExtensions.MouseWheel(
-          window,
-          point,
-          Vector(0.0, -120.0),
-          RawInputModifiers.Shift
-        ))
-
-      settle()
+        settle()
 
       let hubScroller = hubControl :?> ScrollViewer
 
-      let hubPanned, pageStayed =
-        probeUi(fun () -> hubScroller.Offset.X, outer.Offset.Y)
+      // a forward turn over the hub pans it; the page holds
+      wheel(Vector(0.0, -120.0))
 
-      Expect.isGreaterThan hubPanned 0.0 "shift pans the hub horizontally"
+      Expect.isGreaterThan
+        (probeUi(fun () -> hubScroller.Offset.X))
+        0.0
+        "the vertical wheel pans the hub"
 
-      Expect.equal pageStayed 0.0 "shift does not scroll the page"
+      Expect.equal
+        (probeUi(fun () -> outer.Offset.Y))
+        0.0
+        "the page holds while the hub can still pan"
+
+      // at the end the same turn belongs to the page
+      onUi(fun () ->
+        hubScroller.Offset <-
+          Vector(hubScroller.Extent.Width - hubScroller.Viewport.Width, 0.0))
+
+      settle()
+      wheel(Vector(0.0, -120.0))
+
+      let scrolledDown = probeUi(fun () -> outer.Offset.Y)
+
+      Expect.isGreaterThan
+        scrolledDown
+        0.0
+        "the page scrolls once the hub reaches its end"
+
+      // at the start a backward turn belongs to the page
+      onUi(fun () -> hubScroller.Offset <- Vector(0.0, 0.0))
+      settle()
+      wheel(Vector(0.0, 120.0))
+
+      Expect.isLessThan
+        (probeUi(fun () -> outer.Offset.Y))
+        scrolledDown
+        "the page scrolls back once the hub reaches its start"
     }
   ]
 
@@ -542,6 +603,26 @@ type private FakeAgent(reading: NoteInterpretation) =
     member _.ConsolidateMarks(_, _) = failwith "not used in this flow"
 
     member _.InterpretNote(_, _) = Task.FromResult(Ok reading)
+
+/// Holds one generation open until the test releases it.
+type private PendingAgent() =
+  let completion =
+    TaskCompletionSource<Result<Run, exn>>(
+      TaskCreationOptions.RunContinuationsAsynchronously
+    )
+
+  member _.Finish(result: Result<Run, exn>) = completion.SetResult result
+
+  interface Briple.Trainer.Env.IProvideAgent with
+    member _.AgentAvailable = true
+
+    member _.GenerateNew(_, _) = completion.Task
+
+    member _.GenerateAdjustment(_, _) = completion.Task
+
+    member _.ConsolidateMarks(_, _) = failwith "not used in this flow"
+
+    member _.InterpretNote(_, _) = failwith "not used in this flow"
 
 let noteTests =
   testList "note section" [
@@ -823,6 +904,79 @@ let reviewTests =
 
 let wizardTests =
   testList "wizard hub" [
+    testCase "the wizard shows both sections whole at the default window"
+    <| fun () ->
+      let db =
+        Path.Combine(
+          Path.GetTempPath(),
+          $"briple-wizard-fit-{Guid.NewGuid():N}.db"
+        )
+
+      migrate(testLogger, db) |> ignore
+
+      let stores = createStores(sqliteStore db, ignore)
+
+      let athlete =
+        match wait(stores.Athletes.Add sampleAthlete) with
+        | Ok entity -> entity
+        | Error e -> failtest $"add failed: {e}"
+
+      let _, culture = liveCulture es
+
+      let gate =
+        Briple.Trainer.Navigation.PageGate(
+          "/athletes/test/generate",
+          fun _ _ -> async { return true }
+        )
+
+      let page =
+        probeUi(fun () ->
+          let page =
+            Briple.Trainer.Views.Generate.WizardPage(
+              {
+                Culture = culture
+                Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
+                Store = stores.Raw
+                Memories = stores.Memories
+                Plans = stores.Plans
+                Agent = FakeAgent(noReading)
+                Athlete = athlete
+                Confirmed = []
+                Proposals = []
+                Previous = ValueNone
+                Gate = gate
+              },
+              ignore
+            )
+
+          let window = Window(Content = page, Width = 1100.0, Height = 800.0)
+
+          window.Show() |> ignore
+          page)
+
+      let fitted =
+        waitFor(
+          2000,
+          (fun () ->
+            page.GetVisualDescendants()
+            |> Seq.choose(fun visual ->
+              match visual with
+              | :? ScrollViewer as scroller when
+                scroller.HorizontalScrollBarVisibility =
+                  ScrollBarVisibility.Auto
+                ->
+                Some scroller
+              | _ -> None)
+            |> Seq.tryHead
+            |> Option.map(fun scroller ->
+              scroller.Extent.Width, scroller.Viewport.Width)),
+          function
+          | Some(extent, viewport) -> extent <= viewport + 1.0
+          | None -> false
+        )
+
+      Expect.isTrue fitted "the two sections share the page, with no clipping"
+
     testCase "the hub moves between sections and resets on activation"
     <| fun () ->
       let db =
@@ -864,7 +1018,13 @@ let wizardTests =
             ignore
           ))
 
-      mount page
+      // narrow enough that the two 400px columns cannot share it: the
+      // headers then pan the hub from one section to the other
+      probeUi(fun () ->
+        let window = Window(Content = page, Width = 620.0, Height = 700.0)
+
+        window.Show() |> ignore)
+
       settle()
 
       let hub =
@@ -908,4 +1068,104 @@ let wizardTests =
           probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardBack)))
 
         Expect.isNone noStepBack "the wizard has no step-back button"
+
+        let noNext =
+          probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardNext)))
+
+        Expect.isNone noNext "the old wizard step button is gone"
+
+    testCase "the page leaves the form when a run starts"
+    <| fun () ->
+      let db =
+        Path.Combine(
+          Path.GetTempPath(),
+          $"briple-wizard-run-{Guid.NewGuid():N}.db"
+        )
+
+      migrate(testLogger, db) |> ignore
+
+      let stores = createStores(sqliteStore db, ignore)
+
+      let athlete =
+        match wait(stores.Athletes.Add sampleAthlete) with
+        | Ok entity -> entity
+        | Error e -> failtest $"add failed: {e}"
+
+      let _, culture = liveCulture es
+      let agent = PendingAgent()
+
+      let gate =
+        Briple.Trainer.Navigation.PageGate(
+          "/athletes/test/generate",
+          fun _ _ -> async { return true }
+        )
+
+      let page =
+        probeUi(fun () ->
+          let page =
+            Briple.Trainer.Views.Generate.WizardPage(
+              {
+                Culture = culture
+                Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
+                Store = stores.Raw
+                Memories = stores.Memories
+                Plans = stores.Plans
+                Agent = agent
+                Athlete = athlete
+                Confirmed = []
+                Proposals = []
+                Previous = ValueNone
+                Gate = gate
+              },
+              ignore
+            )
+
+          let window = Window(Content = page, Width = 900.0, Height = 700.0)
+
+          window.Show() |> ignore
+          page)
+
+      settle()
+
+      let generate =
+        match
+          probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardGenerate)))
+        with
+        | Some button -> button
+        | None -> failtest "the generate button did not render"
+
+      onUi(fun () -> click generate)
+      settle()
+
+      let generating =
+        waitFor(
+          2000,
+          (fun () -> page),
+          fun root -> hasText(root, get(es, Keys.wizardCancelGeneration))
+        )
+
+      Expect.isTrue generating "the page switched to the generating state"
+
+      let plan =
+        match Parse.parse sampleRaw with
+        | Ok parsed -> parsed.Plan
+        | Error error ->
+          failtest $"the sample plan broke: {Parse.describe error}"
+
+      agent.Finish(
+        Ok {
+          Response = ""
+          Output = sampleRaw
+          Verdict = Briple.Trainer.Core.Validator.Valid(plan, [])
+        }
+      )
+
+      let finished =
+        waitFor(
+          2000,
+          (fun () -> page),
+          fun root -> hasText(root, get(es, Keys.wizardConfirm))
+        )
+
+      Expect.isTrue finished "the page shows the plan when the run ends"
   ]

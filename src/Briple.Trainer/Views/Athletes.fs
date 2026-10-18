@@ -24,7 +24,7 @@ open Briple.Trainer.Theme
 [<Struct>]
 type DetailPageProps = {
   Culture: PageCulture
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Plans: PlanStore
   Athlete: AthleteEntity
 }
@@ -129,7 +129,6 @@ let view (props: DetailPageProps) (onEvent: Event -> unit) : Control =
           sectionTitleKey Keys.plansTitle,
           planSection(culture, plans, onReview)
         )
-    Measure = 760.0
   }
 
 type AthleteDetailPage

@@ -25,13 +25,13 @@ let noFooter: FooterBar = { Secondary = []; Primary = [] }
 
 [<Struct>]
 type PageChrome = {
-  /// The shell's back control, placed first in the header row.
-  Lead: Control voption
+  /// The shell's back control, placed first in the header row. A page
+  /// that rebuilds its chrome asks for a fresh one.
+  Lead: (unit -> Control) voption
   Title: Control
   Commands: Control list
   Footer: FooterBar
   Body: Control
-  Measure: float
 }
 
 /// The page title level: the `title` ramp class.
@@ -424,8 +424,8 @@ let inline fluentPage(chrome: PageChrome) : Control =
 
     let lead: Control array =
       match chrome.Lead with
-      | ValueSome control -> [|
-          control
+      | ValueSome build -> [|
+          build()
             .VerticalAlignment(VerticalAlignment.Center)
             .Margin(0.0, 0.0, 8.0, 0.0)
             .Column(0)
@@ -440,17 +440,11 @@ let inline fluentPage(chrome: PageChrome) : Control =
   let body =
     ScrollViewer()
       .HorizontalScrollBarVisibility(ScrollBarVisibility.Disabled)
-      // the content fills the viewport and starts at the page margin, so
-      // rows of different lengths share one left edge and one right edge
+      // the body fills the window at every width: the layout decides the
+      // shape, not a page constant. Rows of different lengths share one
+      // left edge and one right edge because the panel stretches.
       .HorizontalContentAlignment(HorizontalAlignment.Stretch)
-      .Content(
-        StackPanel()
-          .Margin(24.0)
-          .Spacing(12.0)
-          .MaxWidth(chrome.Measure)
-          .HorizontalAlignment(HorizontalAlignment.Left)
-          .Children(chrome.Body)
-      )
+      .Content(StackPanel().Margin(24.0).Spacing(12.0).Children(chrome.Body))
 
   match chrome.Footer.Secondary, chrome.Footer.Primary with
   | [], [] -> DockPanel().LastChildFill(true).Children(header.DockTop(), body)
@@ -484,5 +478,4 @@ let inline page(titleText: string, content: Control) : Control =
     Commands = []
     Footer = noFooter
     Body = content
-    Measure = 760.0
   }

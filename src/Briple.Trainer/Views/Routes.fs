@@ -71,7 +71,7 @@ let athletesPage
   AthleteList(
     {
       Culture = cultureOf env
-      Lead = ValueSome(lead())
+      Lead = ValueSome lead
       Athletes = env.Stores.Athletes.Observe()
     },
     fun event ->
@@ -90,7 +90,7 @@ let newAthletePage
   NewAthleteForm(
     {
       Culture = cultureOf env
-      Lead = ValueSome(lead())
+      Lead = ValueSome lead
       Gate = gate
     },
     fun event ->
@@ -133,7 +133,7 @@ let detailPage
       Athletes.AthleteDetailPage(
         {
           Culture = cultureOf env
-          Lead = ValueSome(lead())
+          Lead = ValueSome lead
           Plans = env.Stores.Plans
           Athlete = athlete
         },
@@ -177,7 +177,7 @@ let wizardPage
       Generate.WizardPage(
         {
           Culture = cultureOf env
-          Lead = ValueSome(lead())
+          Lead = ValueSome lead
           Store = env.Store
           Memories = env.Stores.Memories
           Plans = env.Stores.Plans
@@ -211,7 +211,7 @@ let reviewPage
     return
       Review.ReviewPage {
         Culture = cultureOf env
-        Lead = ValueSome(lead())
+        Lead = ValueSome lead
         Plans = env.Stores.Plans
         Memories = env.Stores.Memories
         Agent = env
@@ -230,7 +230,7 @@ let loginPage
   ) : Control =
   Login.LoginPage {
     Culture = cultureOf env
-    Lead = ValueSome(lead())
+    Lead = ValueSome lead
     Save = env.SaveCredentials
     OnDone = fun () -> go(nav, "/")
   }
@@ -243,7 +243,7 @@ let settingsPage
   ) : Control =
   Settings.SettingsPage {
     Culture = cultureOf env
-    Lead = ValueSome(lead())
+    Lead = ValueSome lead
     Language = fun () -> env.Language
     Theme = fun () -> env.Theme
     AgentAvailable = fun () -> env.AgentAvailable

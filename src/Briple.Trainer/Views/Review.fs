@@ -31,7 +31,7 @@ open Briple.Trainer.Theme
 [<Struct>]
 type ReviewPageProps = {
   Culture: PageCulture
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Plans: PlanStore
   Memories: MemoryStore
   Agent: IProvideAgent
@@ -327,7 +327,6 @@ let invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
             )
             .Classes("body", "danger")
         )
-    Measure = 760.0
   }
 
 /// The page at one culture, over the current model.
@@ -411,7 +410,6 @@ let view
       Commands = [ export; save ]
       Footer = noFooter
       Body = StackPanel().Spacing(8.0).Children(status, pending, review, notes)
-      Measure = 760.0
     }
 
 type ReviewPage(props: ReviewPageProps) as this =

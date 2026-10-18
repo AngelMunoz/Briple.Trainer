@@ -18,7 +18,7 @@ open Briple.Trainer.Stores
 type DetailPageProps = {
   Culture: PageCulture
   /// The shell's back control, placed in the page header.
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Plans: PlanStore
   Athlete: AthleteEntity
 }

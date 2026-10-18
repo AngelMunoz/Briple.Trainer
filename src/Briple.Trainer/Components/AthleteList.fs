@@ -24,7 +24,7 @@ open Briple.Trainer.Theme
 [<Struct>]
 type AthleteListProps = {
   Culture: PageCulture
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Athletes: IObservable<AthleteEntity list>
 }
 
@@ -115,7 +115,6 @@ let view (props: AthleteListProps) (onEvent: Event -> unit) : Control =
     Commands = [ newCommand ]
     Footer = noFooter
     Body = StackPanel().Spacing(8.0).Children(emptyState, rows)
-    Measure = 760.0
   }
 
 type AthleteList

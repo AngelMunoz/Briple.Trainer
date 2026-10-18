@@ -22,19 +22,20 @@ type FooterBar = {
 val noFooter: FooterBar
 
 /// The page contract: the shell's back control as the header lead, the
-/// title, the page commands, the flow actions and the body, read inside
-/// a measure so prose and forms keep a readable width.
+/// title, the page commands, the flow actions and the body. The body
+/// fills the window at every width; the page composes its own layout.
 [<Struct>]
 type PageChrome = {
-  /// The shell's back control, placed first in the header row.
-  Lead: Control voption
+  /// The shell's back control, placed first in the header row. It is a
+  /// factory because a control belongs to one parent: a page that
+  /// rebuilds its chrome asks for a fresh instance.
+  Lead: (unit -> Control) voption
   /// The title control: a resource-bound title for a fixed page, or a
   /// plain title for data (an athlete name).
   Title: Control
   Commands: Control list
   Footer: FooterBar
   Body: Control
-  Measure: float
 }
 
 /// The page title level: 28 SemiBold.
@@ -233,7 +234,8 @@ val inline checkRowObs:
 /// The full page: ONE header row (the shell's back lead, the title
 /// beside it, the page commands to the right with the primary last),
 /// the flow actions (when any) pinned to the bottom, and the body
-/// scrolling in between, centered inside the measure.
+/// scrolling in between at the full width of the window. The template
+/// has no width of its own: the layout of the body decides the shape.
 val inline fluentPage: chrome: PageChrome -> Control
 
 /// A body-only page: the page contract without commands.

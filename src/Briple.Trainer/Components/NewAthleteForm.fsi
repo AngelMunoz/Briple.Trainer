@@ -32,7 +32,7 @@ type FormPhase =
 type Props = {
   Culture: PageCulture
   /// The shell's back control, placed in the page header.
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   /// The exit gate: the form tracks its derived phase.
   Gate: PageGate
 }

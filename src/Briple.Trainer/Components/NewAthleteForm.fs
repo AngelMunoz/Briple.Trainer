@@ -28,7 +28,7 @@ type FormPhase =
 [<Struct>]
 type Props = {
   Culture: PageCulture
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Gate: PageGate
 }
 
@@ -186,7 +186,6 @@ let view
           fieldKey(Keys.athleteGoals, (fun () -> goalChecks)),
           hyperlinkButtonKey(Keys.athleteCancel, (fun () -> dispatch Cancel))
         )
-    Measure = 560.0
   }
 
 type NewAthleteForm(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this

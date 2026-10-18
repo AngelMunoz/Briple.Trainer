@@ -16,7 +16,7 @@ open Briple.Trainer.Persistence
 type AthleteListProps = {
   Culture: PageCulture
   /// The shell's back control, placed in the page header.
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   /// The live athletes list, straight from the store.
   Athletes: IObservable<AthleteEntity list>
 }

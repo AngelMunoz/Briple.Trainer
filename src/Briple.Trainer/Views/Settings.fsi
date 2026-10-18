@@ -16,7 +16,7 @@ open Briple.Trainer.Strings
 type SettingsPageProps = {
   Culture: PageCulture
   /// The shell's back control, placed in the page header.
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Language: unit -> Language
   Theme: unit -> ThemeChoice
   AgentAvailable: unit -> bool

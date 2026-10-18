@@ -23,7 +23,7 @@ open Briple.Trainer.Theme
 [<Struct>]
 type LoginPageProps = {
   Culture: PageCulture
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Save: string -> Result<CredentialSave, string>
   OnDone: unit -> unit
 }
@@ -171,7 +171,6 @@ let view
           fieldKey(Keys.loginToken, (fun () -> tokenEntry)),
           outcomeHost
         )
-    Measure = 560.0
   }
 
 type LoginPage(props: LoginPageProps) as this =

@@ -22,7 +22,7 @@ open Briple.Trainer.Stores
 type WizardPageProps = {
   Culture: PageCulture
   /// The shell's back control, placed in the page header.
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   /// The raw storage: the audit line only.
   Store: IStore
   Memories: MemoryStore

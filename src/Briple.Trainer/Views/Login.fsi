@@ -15,7 +15,7 @@ open Briple.Trainer.Env
 type LoginPageProps = {
   Culture: PageCulture
   /// The shell's back control, placed in the page header.
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Save: string -> Result<CredentialSave, string>
   OnDone: unit -> unit
 }

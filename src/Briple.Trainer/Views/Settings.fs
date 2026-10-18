@@ -14,7 +14,7 @@ open Briple.Trainer.Theme
 [<Struct>]
 type SettingsPageProps = {
   Culture: PageCulture
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Language: unit -> Language
   Theme: unit -> ThemeChoice
   AgentAvailable: unit -> bool
@@ -85,7 +85,6 @@ let view(props: SettingsPageProps) : Control =
           cardRowKey(Keys.settingsTheme, themeRow),
           cardRowKey(Keys.settingsProvider, providerBody)
         )
-    Measure = 560.0
   }
 
 type SettingsPage(props: SettingsPageProps) as this =

@@ -20,7 +20,7 @@ open Briple.Trainer.Stores
 type ReviewPageProps = {
   Culture: PageCulture
   /// The shell's back control, placed in the page header.
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Plans: PlanStore
   Memories: MemoryStore
   Agent: IProvideAgent

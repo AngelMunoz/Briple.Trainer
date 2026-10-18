@@ -341,6 +341,65 @@ let tests =
           "the longer row centers its chevron too"
       }
 
+      test "the page fills a wide window to its edge" {
+        let entity name = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = name
+            Gender = Female
+            Goals = [ Strength ]
+          }
+        }
+
+        let ana = entity "Ana"
+        let _, culture = liveCulture es
+
+        let control =
+          probeUi(fun () ->
+            AthleteList(
+              {
+                Culture = culture
+                Lead = ValueNone
+                Athletes = new BehaviorSubject<AthleteEntity list>([ ana ])
+              },
+              ignore
+            ))
+
+        let window =
+          probeUi(fun () ->
+            let window =
+              Window(Content = control, Width = 1600.0, Height = 800.0)
+
+            window.Show() |> ignore
+            window)
+
+        let rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            fun root -> buttonWithText(root, "Ana") |> Option.isSome
+          )
+
+        Expect.isTrue rendered "the row did not render"
+
+        settle()
+
+        let right =
+          probeUi(fun () ->
+            let row =
+              buttonWithText(control, "Ana")
+              |> Option.defaultWith(fun () -> failtest "the row vanished")
+
+            let left = row.TranslatePoint(Point(0.0, 0.0), window)
+
+            left.Value.X + row.Bounds.Width)
+
+        Expect.isGreaterThan
+          right
+          1500.0
+          "the page has no width cap: the row reaches the window edge"
+      }
+
       test "the page lead sits before the title" {
         let _, culture = liveCulture es
 
@@ -349,7 +408,7 @@ let tests =
             AthleteList(
               {
                 Culture = culture
-                Lead = ValueSome(TextBlock(Text = "back") :> Control)
+                Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
                 Athletes = new BehaviorSubject<AthleteEntity list>([])
               },
               ignore

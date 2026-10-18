@@ -37,7 +37,7 @@ open Briple.Trainer.Theme
 [<Struct>]
 type WizardPageProps = {
   Culture: PageCulture
-  Lead: Control voption
+  Lead: (unit -> Control) voption
   Store: IStore
   Memories: MemoryStore
   Plans: PlanStore
@@ -586,9 +586,9 @@ let inline stepCaption(culture: PageCulture, number: int) : Control =
     )
     .Classes("caption", "secondary")
 
-let memoriesColumn
-  (props: WizardPageProps, model: IObservable<Model>, dispatch: Dispatch<Msg>)
-  : Control =
+/// The memories section: what the athlete remembers. It reads only;
+/// the decision is the brief's.
+let memoriesColumn(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
   let cards: Control array = [|
     for entity in props.Proposals ->
       MemoryReview.MemoryReview(
@@ -610,16 +610,6 @@ let memoriesColumn
     |> Array.ofList
     |> linesPanel
 
-  let next =
-    let button =
-      iconPrimaryButtonKey(
-        Keys.wizardNext,
-        Icons.chevronRight,
-        (fun () -> dispatch(GoSection BriefSection))
-      )
-
-    button.IsEnabled(model |> Observable.map(fun m -> resolved(props, m)))
-
   StackPanel()
     .Spacing(8.0)
     .Children(
@@ -632,8 +622,7 @@ let memoriesColumn
          StackPanel() :> Control
        else
          sectionTitleKey Keys.wizardApplies),
-      confirmedRows,
-      next.HorizontalAlignment(HorizontalAlignment.Left)
+      confirmedRows
     )
 
 let briefColumn
@@ -691,7 +680,7 @@ let editingView
       Slots = [
         Hub.slotView(
           Localization.textBlock Keys.wizardStepMemories,
-          memoriesColumn(props, model, dispatch)
+          memoriesColumn(props, dispatch)
         )
         Hub.slotView(
           Localization.textBlock Keys.wizardStepBrief,
@@ -710,7 +699,6 @@ let editingView
     Commands = []
     Footer = noFooter
     Body = hub
-    Measure = 760.0
   }
 
 let generatingView(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
@@ -741,7 +729,6 @@ let generatingView(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
             .HorizontalAlignment(HorizontalAlignment.Center),
           actionRow [ cancel ]
         )
-    Measure = 560.0
   }
 
 let failedView
@@ -792,7 +779,6 @@ let failedView
       StackPanel()
         .Spacing(12.0)
         .Children(reasonsPanel, actionRow [ exit; retry ])
-    Measure = 760.0
   }
 
 let doneView
@@ -849,7 +835,6 @@ let doneView
       StackPanel()
         .Spacing(8.0)
         .Children(preview, advisoryPanel, actionRow [ discard; confirm ])
-    Measure = 760.0
   }
 
 let phaseKey(model: Model) =
