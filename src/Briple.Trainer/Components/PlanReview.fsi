@@ -29,7 +29,9 @@ type RowPath = {
   Variant: int
   Week: int
   Day: int
-  Order: int
+  /// The position in the day's exercise list. The file's Order restarts in
+  /// each circuit, so it cannot identify the row.
+  Index: int
 }
 
 /// What the component reports to its parent: the edited tree and the

@@ -150,6 +150,18 @@ module Keys =
   [<Literal>]
   val labelNoEquipment: string = "label.noequipment"
 
+  /// Minutes in a memory's duration delta.
+  [<Literal>]
+  val deltaDuration: string = "delta.duration"
+
+  /// Effort zone in a memory's zone delta.
+  [<Literal>]
+  val deltaZone: string = "delta.zone"
+
+  /// Cardio modality in a memory's modality delta.
+  [<Literal>]
+  val deltaModality: string = "delta.modality"
+
   [<Literal>]
   val plansTitle: string = "plans.title"
 
@@ -463,6 +475,26 @@ module Keys =
 
   [<Literal>]
   val violationFormatWarning: string = "violation.formatWarning"
+
+  /// A day with more exercises than the goal profile allows.
+  [<Literal>]
+  val violationRows: string = "violation.rows"
+
+  /// A timed block prescribed on an exercise that is not cardio.
+  [<Literal>]
+  val violationTimedStrength: string = "violation.timedStrength"
+
+  /// A timed row whose effort is a RIR target.
+  [<Literal>]
+  val violationTimedRir: string = "violation.timedRir"
+
+  /// A circuit whose rows do not share the same laps.
+  [<Literal>]
+  val violationCircuitLaps: string = "violation.circuitLaps"
+
+  /// A session with fewer cardio minutes than the goal profile asks.
+  [<Literal>]
+  val violationCardio: string = "violation.cardio"
 
   [<Literal>]
   val dataUnreadableJson: string = "data.unreadableJson"

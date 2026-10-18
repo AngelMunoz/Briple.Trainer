@@ -32,7 +32,7 @@ type Origin =
 type Parameter =
   | PlanWeeks of weeks: int * origin: Origin
   | AthleteVariants of variants: string list * origin: Origin
-  | VariantCount of variant: string * total: int * origin: Origin
+  | VariantCount of variant: string * perDay: int * origin: Origin
   | WeekRir of week: int * target: string * origin: Origin
   | Adjustment of target: Target * deltas: Delta list * origin: Origin
 

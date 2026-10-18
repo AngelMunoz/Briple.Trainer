@@ -36,7 +36,7 @@ type RowPath = {
   Variant: int
   Week: int
   Day: int
-  Order: int
+  Index: int
 }
 
 type Event =
@@ -109,16 +109,14 @@ let exerciseAt (plan: Plan) (path: RowPath) (fallback: Exercise) : Exercise =
   |> Option.bind(_.Variants >> List.tryItem path.Variant)
   |> Option.bind(_.Weeks >> List.tryItem path.Week)
   |> Option.bind(_.Days >> List.tryItem path.Day)
-  |> Option.bind(_.Exercises >> List.tryFind(fun e -> e.Order = path.Order))
+  |> Option.bind(_.Exercises >> List.tryItem path.Index)
   |> Option.defaultValue fallback
 
 /// Replaces the exercise a path points to, one named level at a time.
 let editExercise (path: RowPath) (edit: Exercise -> Exercise) (plan: Plan) =
   let day(current: Day) : Day = {
     current with
-        Exercises =
-          current.Exercises
-          |> List.map(fun e -> if e.Order = path.Order then edit e else e)
+        Exercises = current.Exercises |> mapAt path.Index edit
   }
 
   let week(current: Week) : Week = {
@@ -212,7 +210,7 @@ type SectionContext = {
 /// One exercise: prose when the page reads, its fields when the page
 /// edits. The typed text lives in the boxes; the tree updates live.
 let exerciseRow(ctx: SectionContext, path: RowPath, exercise: Exercise) =
-  let rowPath = { path with Order = exercise.Order }
+  let rowPath = path
 
   let readBody(current: Exercise) : Control =
     StackPanel()
@@ -270,16 +268,20 @@ let exerciseRow(ctx: SectionContext, path: RowPath, exercise: Exercise) =
   ContentControl().Content(body.ToBinding())
 
 /// The exercises of a day grouped by circuit and laps.
-let circuitGroupsOf(day: Day) : ((string * string) * Exercise list) list =
+let circuitGroupsOf
+  (day: Day)
+  : ((string * string) * (int * Exercise) list) list =
   day.Exercises
+  |> List.indexed
   |> List.fold
-    (fun groups exercise ->
+    (fun groups (index, exercise) ->
       match groups with
       | ((circuit, laps), items) :: rest when
         circuit = exercise.Circuit && laps = exercise.Laps
         ->
-        ((circuit, laps), items @ [ exercise ]) :: rest
-      | _ -> ((exercise.Circuit, exercise.Laps), [ exercise ]) :: groups)
+        ((circuit, laps), items @ [ (index, exercise) ]) :: rest
+      | _ ->
+        ((exercise.Circuit, exercise.Laps), [ (index, exercise) ]) :: groups)
     []
   |> List.rev
 
@@ -302,8 +304,8 @@ let dayBody(ctx: SectionContext, path: RowPath, day: Day) : Control =
         )
         .Classes("caption-strong", "secondary")
 
-      for exercise in exercises do
-        exerciseRow(ctx, path, exercise)
+      for index, exercise in exercises do
+        exerciseRow(ctx, { path with Index = index }, exercise)
   |]
 
   StackPanel().Spacing(8.0).Children(children)
@@ -391,7 +393,7 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) =
                     Variant = variantIndex
                     Week = weekIndex
                     Day = 0
-                    Order = 0
+                    Index = 0
                   },
                   variant
                 )

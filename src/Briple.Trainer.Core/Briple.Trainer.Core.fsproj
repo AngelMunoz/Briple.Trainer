@@ -21,6 +21,8 @@
     <Compile Include="Athletes.fs" />
     <Compile Include="Memories.fsi" />
     <Compile Include="Memories.fs" />
+    <Compile Include="Goals.fsi" />
+    <Compile Include="Goals.fs" />
     <Compile Include="Parameters.fsi" />
     <Compile Include="Parameters.fs" />
     <Compile Include="Requests.fsi" />

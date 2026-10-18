@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -119,6 +119,15 @@
   </data>
   <data name="label.noequipment" xml:space="preserve">
     <value>sin equipo</value>
+  </data>
+  <data name="delta.duration" xml:space="preserve">
+    <value>min</value>
+  </data>
+  <data name="delta.zone" xml:space="preserve">
+    <value>zona</value>
+  </data>
+  <data name="delta.modality" xml:space="preserve">
+    <value>modalidad</value>
   </data>
   <data name="plans.title" xml:space="preserve">
     <value>Planes</value>
@@ -431,6 +440,21 @@
   </data>
   <data name="violation.formatWarning" xml:space="preserve">
     <value>línea {0}: {1}</value>
+  </data>
+  <data name="violation.rows" xml:space="preserve">
+    <value>el día {2} de la opción {0} (semana {1}) tiene {3} ejercicios; el perfil permite {4}</value>
+  </data>
+  <data name="violation.timedStrength" xml:space="preserve">
+    <value>{0}: {1} está prescrito por {2} min y no es una modalidad de cardio</value>
+  </data>
+  <data name="violation.timedRir" xml:space="preserve">
+    <value>{0}: {1} va por tiempo y su esfuerzo es '{2}'</value>
+  </data>
+  <data name="violation.circuitLaps" xml:space="preserve">
+    <value>{0}: el circuito {1} mezcla vueltas</value>
+  </data>
+  <data name="violation.cardio" xml:space="preserve">
+    <value>{0}: {1} min de cardio; el perfil pide {2}</value>
   </data>
   <data name="data.unreadableJson" xml:space="preserve">
     <value>json ilegible: {0}</value>

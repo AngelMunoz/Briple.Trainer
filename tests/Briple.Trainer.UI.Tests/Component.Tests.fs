@@ -319,7 +319,102 @@ let tests =
           (probeUi(fun () -> textBoxes review))
           "the row closes after the revert"
 
+    testCase "the row key follows the position, not the file order"
+    <| fun () ->
+      let plan: Plan = {
+        Version = 1
+        Title = "dos circuitos"
+        Weeks = 1
+        Generated = ""
+        Origin = "test"
+        Blocks = [
+          {
+            Gender = Male
+            Variants = [
+              {
+                Id = "3dias"
+                Title = None
+                Weeks = [
+                  {
+                    Number = 1
+                    Days = [
+                      {
+                        Id = "Lunes"
+                        Title = None
+                        Notes = []
+                        Exercises = [
+                          {
+                            Circuit = "A"
+                            Laps = "2"
+                            Order = 1
+                            Name = "Press de banca"
+                            Reps = "8-10"
+                            Rir = "2"
+                            Rest = "2 min"
+                            Notes = "-"
+                          }
+                          {
+                            Circuit = "A"
+                            Laps = "2"
+                            Order = 2
+                            Name = "Remo con barra"
+                            Reps = "8-10"
+                            Rir = "2"
+                            Rest = "2 min"
+                            Notes = "-"
+                          }
+                          {
+                            Circuit = "B"
+                            Laps = "2"
+                            Order = 1
+                            Name = "Plancha frontal"
+                            Reps = "30-45 s"
+                            Rir = "rpe 6-7"
+                            Rest = "1 min"
+                            Notes = "-"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+        Extras = []
+      }
+
+      let _, culture = liveCulture es
+
+      let review =
+        probeUi(fun () ->
+          Briple.Trainer.Components.PlanReview.PlanReview(
+            {
+              Culture = culture
+              Parsed = { Plan = plan; Warnings = [] }
+              Week = ValueNone
+              Editing = false
+            },
+            ignore
+          ))
+
+      mount review
+      settle()
+
+      let readable =
+        waitFor(
+          2000,
+          (fun () -> review),
+          fun root -> hasText(root, "1. Plancha frontal")
+        )
+
+      Expect.isTrue
+        readable
+        "circuit B must show its own first row, not circuit A's order 1"
+
     testCase "wizard brief reports every draft change"
+
     <| fun () ->
       let updates =
         ResizeArray<Briple.Trainer.Components.WizardBrief.BriefDraft>()

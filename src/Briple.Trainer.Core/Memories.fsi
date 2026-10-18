@@ -7,6 +7,8 @@ module Briple.Trainer.Core.Memories
 
 open System
 
+open Briple.Trainer.Core.Athletes
+
 /// Quick marks available on an exercise or a day.
 type Label =
   | Light
@@ -45,6 +47,12 @@ type Delta =
   | Sets of change: int
   | Load of percentage: int
   | PatternVariant of name: string
+  /// Minutes added to or removed from a timed block.
+  | Duration of minutes: int
+  /// Steps up or down an effort zone.
+  | Zone of change: int
+  /// A cardio modality the trainer wants instead.
+  | Modality of name: string
 
 /// Life cycle of a memory.
 type MemoryStatus =
@@ -72,12 +80,19 @@ type Memory = {
   Scope: MemoryScope
 }
 
-/// The automatic adjustment of each label: light raises load, heavy
-/// lowers it; pain and no equipment have no automatic adjustment.
+/// The automatic adjustment of each label for the plan's goal: a light
+/// mark raises load on strength goals and duration on cardio goals; heavy
+/// lowers them. Pain and no equipment have no automatic adjustment. The
+/// goal is a proxy: the trainer confirms or replaces the delta.
+val automaticAdjustmentsFor: goal: PlanGoal -> label: Label -> Delta list
+
+/// The default adjustment: the hypertrophy profile.
 val automaticAdjustments: label: Label -> Delta list
 
-/// Consolidates a mark into the proposed memory with its automatic
-/// adjustment.
+/// Consolidates a mark into the proposed memory for the plan's goal.
+val consolidateFor: goal: PlanGoal -> mark: FeedbackMark -> Memory
+
+/// Consolidates a mark with the default (hypertrophy) adjustment.
 val consolidate: mark: FeedbackMark -> Memory
 
 /// Confirms the memory with the adjustments the trainer accepted or

@@ -229,6 +229,16 @@ type Violation =
   | FormatWarning of warning: ParseWarning
   | Data of failures: DataFailure list
   | Prescription of advisory: PrescriptionAdvisory
+  | TooManyRows of
+    variant: string *
+    week: int *
+    day: string *
+    found: int *
+    max: int
+  | TimedStrengthBlock of day: string * name: string * minutes: int
+  | TimedEffortIsRir of day: string * name: string * effort: string
+  | CircuitLapsDiffer of day: string * circuit: string
+  | MissingCardio of day: string * found: int * expected: int
 
   interface IPlanFormatError<Violation> with
     static member Unterminated(lastLine, block) =

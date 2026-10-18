@@ -10,6 +10,7 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Goals
 open Briple.Trainer.Core.Parameters
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Tests.TestSupport
@@ -43,18 +44,26 @@ let private manBrief = {
 
 let tests =
   testList "Requests" [
-    testCase "the RIR progression derives from the period" (fun () ->
+    testCase "the RIR progression follows the goal profile" (fun () ->
       Expect.equal
-        (derivedRirPerWeek 4)
+        (rirFor (profileOf Hypertrophy) 4)
         [ (1, "3"); (2, "2"); (3, "1"); (4, "0") ]
-        "four weeks: 3-2-1-0"
+        "hypertrophy: 3-2-1-0"
 
       Expect.equal
-        (derivedRirPerWeek 5)
+        (rirFor (profileOf Hypertrophy) 5)
         [ (1, "3"); (2, "2"); (3, "1"); (4, "0"); (5, "0") ]
-        "it floors at 0"
+        "it floors at the last value"
 
-      Expect.equal (derivedRirPerWeek 1) [ (1, "3") ] "one week: 3")
+      Expect.equal
+        (rirFor (profileOf CardioVascularHealth) 4)
+        [ (1, "3"); (2, "3"); (3, "2"); (4, "2") ]
+        "cardio: 3-3-2-2"
+
+      Expect.equal
+        (rirFor (profileOf BasicBodyActivation) 2)
+        [ (1, "4"); (2, "4") ]
+        "activation starts at 4")
 
     testCase "the brief's tokens are its one frequency" (fun () ->
       Expect.equal (variantTokens manBrief) [ "3dias" ] "tres dias"
@@ -104,11 +113,11 @@ let tests =
 
       Expect.contains
         parameters
-        (VariantCount("3dias", 72, PreviousPlan))
-        "3dias keeps its previous 72"
+        (VariantCount("3dias", 6, PreviousPlan))
+        "3dias keeps its previous 6 per training day"
 
       Expect.isFalse
-        (parameters |> List.contains(VariantCount("5dias", 120, PreviousPlan)))
+        (parameters |> List.contains(VariantCount("5dias", 6, PreviousPlan)))
         "the frequency it drops does not travel"
 
       Expect.contains

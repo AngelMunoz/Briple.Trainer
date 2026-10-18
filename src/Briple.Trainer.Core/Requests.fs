@@ -5,6 +5,7 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Parameters
+open Briple.Trainer.Core.Goals
 
 type VariantFrequency =
   | DosDias
@@ -124,6 +125,19 @@ module Emphasis =
     | Stability -> "stability"
     | MovementPatterns -> "movement patterns"
 
+  let structureHint(emphasis: Emphasis) : string option =
+    match emphasis with
+    | FullBodyCircuit -> Some "circuit: 4-6 exercises, 3 rounds, short rest"
+    | Hiit
+    | IntervalHiit ->
+      Some
+        "intervals: laps equal the repeats; each round is a work duration and the rest is the recovery"
+    | ContinuousZone2 -> Some "one continuous cardio block of at least 20 min"
+    | StrengthCardio -> Some "one strength circuit plus one cardio block"
+    | Mobility
+    | Stability -> Some "timed holds at rpe 3-5"
+    | _ -> None
+
 type Brief = {
   Goal: PlanGoal
   Frequency: VariantFrequency
@@ -146,10 +160,6 @@ type AdjustmentRequest = {
   PreviousPlan: Plan
 }
 
-let derivedRirPerWeek(weeks: int) : (int * string) list = [
-  for week in 1..weeks -> week, string(max 0 (4 - week))
-]
-
 let variantTokens(brief: Brief) : string list = [
   VariantFrequency.toFileToken brief.Frequency
 ]
@@ -165,6 +175,28 @@ let planCounts (athlete: Athlete) (plan: Plan) : (string * int) list =
       |> List.sumBy(fun week ->
         week.Days |> List.sumBy(fun day -> day.Exercises.Length))))
   |> Option.defaultValue []
+
+let dayCount (athlete: Athlete) (variant: string) (plan: Plan) : int =
+  plan.Blocks
+  |> List.tryFind(fun block -> block.Gender = athlete.Gender)
+  |> Option.bind(fun block ->
+    block.Variants |> List.tryFind(fun candidate -> candidate.Id = variant))
+  |> Option.map(fun variant ->
+    variant.Weeks |> List.sumBy(fun week -> week.Days.Length))
+  |> Option.defaultValue 0
+
+let perDayCount (athlete: Athlete) (variant: string) (plan: Plan) : int =
+  match
+    planCounts athlete plan |> List.tryFind(fun (id, _) -> id = variant)
+  with
+  | Some(_, total) ->
+    let days = dayCount athlete variant plan
+
+    if days > 0 then
+      int(Math.Round(float total / float days))
+    else
+      total
+  | None -> 0
 
 /// The confirmed memories a request carries: the athlete-scoped ones
 /// (they outlive plans) plus the plan-scoped ones observed on the plan
@@ -182,7 +214,7 @@ let ofBrief (weeks: int) (brief: Brief) : Parameter list = [
   PlanWeeks(weeks, TrainerBrief)
   AthleteVariants(variantTokens brief, TrainerBrief)
   yield!
-    derivedRirPerWeek weeks
+    rirFor (profileOf brief.Goal) weeks
     |> List.map(fun (week, target) -> WeekRir(week, target, Derived))
   yield!
     brief.Adjustments
@@ -199,8 +231,12 @@ let parametersForAdjustment(request: AdjustmentRequest) : Parameter list =
   let previousCounts =
     planCounts request.Athlete request.PreviousPlan
     |> List.filter(fun (variant, _) -> List.contains variant frequency)
-    |> List.map(fun (variant, total) ->
-      VariantCount(variant, total, PreviousPlan))
+    |> List.map(fun (variant, _) ->
+      VariantCount(
+        variant,
+        perDayCount request.Athlete variant request.PreviousPlan,
+        PreviousPlan
+      ))
 
   ofConfirmedMemories request.Memories
   @ ofBrief request.Weeks request.Brief

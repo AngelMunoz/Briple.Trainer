@@ -18,6 +18,7 @@ open JDeck
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Logging
 open OpenAI
+open Briple.Trainer.Core.Goals
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Data
 open Briple.Trainer.Core.Plan.Writer
@@ -148,11 +149,14 @@ let appendMesocycle (rirPerWeek: (int * string) list) (plan: Plan) =
         Extras = plan.Extras @ lines
   }
 
-let run
-  (rirPerWeek: (int * string) list)
-  (check: Plan -> Violation list)
-  (response: string)
-  : Run =
+[<Struct>]
+type RunContext = {
+  Profile: GoalProfile
+  RirPerWeek: (int * string) list
+  Check: Plan -> Violation list
+}
+
+let run (context: RunContext) (response: string) : Run =
   match fromJson response: Result<_, Violation> with
   | Error failure -> {
       Response = response
@@ -160,12 +164,16 @@ let run
       Verdict = Rejected [ failure ]
     }
   | Ok rawPlan ->
-    let plan = appendMesocycle rirPerWeek rawPlan
-    let violations = check plan
+    let plan = appendMesocycle context.RirPerWeek rawPlan
+    let violations = context.Check plan
 
     let verdict =
       match violations with
-      | [] -> Valid(plan, checkPrescription plan)
+      | [] ->
+        Valid(
+          plan,
+          checkPrescription plan @ checkStructure context.Profile plan
+        )
       | _ -> Rejected violations
 
     {
@@ -187,10 +195,15 @@ let generateNew
 
   let! response = ask(env, system request.Brief.Goal, newPlanPrompt request)
 
+  let profile = profileOf request.Brief.Goal
+
   let result =
     run
-      (derivedRirPerWeek request.Weeks)
-      (checkParameters request.Athlete request.Weeks request.Brief)
+      {
+        Profile = profile
+        RirPerWeek = rirFor profile request.Weeks
+        Check = checkParameters request.Athlete request.Weeks request.Brief
+      }
       response
 
   match result.Verdict with
@@ -216,10 +229,15 @@ let generateAdjustment
 
   let! response = ask(env, system request.Brief.Goal, adjustmentPrompt request)
 
+  let profile = profileOf request.Brief.Goal
+
   let result =
     run
-      (derivedRirPerWeek request.Weeks)
-      (checkParameters request.Athlete request.Weeks request.Brief)
+      {
+        Profile = profile
+        RirPerWeek = rirFor profile request.Weeks
+        Check = checkParameters request.Athlete request.Weeks request.Brief
+      }
       response
 
   match result.Verdict with
@@ -244,6 +262,7 @@ let deltaOf(text: string) : Delta option =
 
   match parts.[0].ToLowerInvariant(), parts |> Array.tryItem 1 with
   | "variant", Some name -> Some(PatternVariant(name.Trim()))
+  | "modality", Some name -> Some(Modality(name.Trim()))
   | kind, Some numberText ->
     match numberText |> cleanNumber |> Int32.TryParse with
     | true, number ->
@@ -252,6 +271,8 @@ let deltaOf(text: string) : Delta option =
       | "reps" -> Some(Reps number)
       | "sets" -> Some(Sets number)
       | "load" -> Some(Load number)
+      | "duration" -> Some(Duration number)
+      | "zone" -> Some(Zone number)
       | _ -> None
     | _ -> None
   | _ -> None

@@ -12,6 +12,7 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Plan.Parser
 open Briple.Trainer.Core.Plan.Writer
 open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Goals
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Validator
 open Briple.Trainer.Core.Tests.TestSupport
@@ -79,7 +80,7 @@ let private planOf perWeek perDay : Plan = {
     }
   ]
   Extras = [
-    for week, target in derivedRirPerWeek 4 ->
+    for week, target in rirFor (profileOf Hypertrophy) 4 ->
       $"mesociclo | Semana {week}: objetivo | RIR {target}"
   ]
 }
@@ -166,6 +167,16 @@ let tests =
                               Rest = "90 s"
                               Notes = "-"
                             }
+                            {
+                              Circuit = "A"
+                              Laps = "2"
+                              Order = 3
+                              Name = "Movilidad de cadera 90/90"
+                              Reps = "30-45 s"
+                              Rir = "rpe 3-4"
+                              Rest = "30 s"
+                              Notes = "-"
+                            }
                           ]
                         }
                       ]
@@ -190,7 +201,15 @@ let tests =
            |> List.forall(function
              | Prescription _ -> true
              | _ -> false))
-          "every advisory is a prescription finding")
+          "every advisory is a prescription finding"
+
+        Expect.isFalse
+          (advisories
+           |> List.exists(function
+             | Prescription(MultipleExercises "Movilidad de cadera 90/90") ->
+               true
+             | _ -> false))
+          "a slash inside a real name is not an alternative")
 
     testCase "an output with two blocks is rejected by gender" (fun () ->
       let request = {
@@ -361,4 +380,274 @@ let tests =
       match validateAdjustment request (outputOf(5, 2)) with
       | Valid _ -> ()
       | Rejected violations -> failtest $"expected Valid: %A{violations}")
+
+    testCase "a timed strength block and a timed RIR are flagged" (fun () ->
+      let plan: Plan = {
+        Version = 1
+        Title = "t"
+        Weeks = 1
+        Generated = ""
+        Origin = ""
+        Blocks = [
+          {
+            Gender = Male
+            Variants = [
+              {
+                Id = "1dia"
+                Title = None
+                Weeks = [
+                  {
+                    Number = 1
+                    Days = [
+                      {
+                        Id = "Lunes"
+                        Title = None
+                        Notes = []
+                        Exercises = [
+                          {
+                            Circuit = "A"
+                            Laps = "1"
+                            Order = 1
+                            Name = "Sentadilla con barra"
+                            Reps = "12 min"
+                            Rir = "1"
+                            Rest = "2 min"
+                            Notes = "-"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+        Extras = []
+      }
+
+      let findings = checkStructure (profileOf Hypertrophy) plan
+
+      Expect.exists
+        findings
+        (function
+        | TimedStrengthBlock _ -> true
+        | _ -> false)
+        "the timed strength block is flagged"
+
+      Expect.exists
+        findings
+        (function
+        | TimedEffortIsRir _ -> true
+        | _ -> false)
+        "the timed RIR is flagged")
+
+    testCase "the cardio minutes count the interval laps" (fun () ->
+      let plan: Plan = {
+        Version = 1
+        Title = "t"
+        Weeks = 1
+        Generated = ""
+        Origin = ""
+        Blocks = [
+          {
+            Gender = Male
+            Variants = [
+              {
+                Id = "1dia"
+                Title = None
+                Weeks = [
+                  {
+                    Number = 1
+                    Days = [
+                      {
+                        Id = "Lunes"
+                        Title = None
+                        Notes = []
+                        Exercises = [
+                          {
+                            Circuit = "A"
+                            Laps = "7"
+                            Order = 1
+                            Name = "Bicicleta estática"
+                            Reps = "3 min"
+                            Rir = "rpe 6-7"
+                            Rest = "1 min"
+                            Notes = "-"
+                          }
+                          {
+                            Circuit = "B"
+                            Laps = "3"
+                            Order = 1
+                            Name = "Sentadilla goblet"
+                            Reps = "8-12"
+                            Rir = "3"
+                            Rest = "75 s"
+                            Notes = "-"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+        Extras = []
+      }
+
+      let findings = checkStructure (profileOf CardioVascularHealth) plan
+
+      Expect.isFalse
+        (findings
+         |> List.exists(function
+           | MissingCardio _ -> true
+           | _ -> false))
+        "7 x 3 min reaches the 20 min profile")
+
+    testCase "a day over the profile's row cap is flagged" (fun () ->
+      let exercises = [
+        for order in 1..9 ->
+          {
+            Circuit = "A"
+            Laps = "3"
+            Order = order
+            Name = $"Ejercicio {order}"
+            Reps = "8-10"
+            Rir = "2"
+            Rest = "2 min"
+            Notes = "-"
+          }
+      ]
+
+      let plan: Plan = {
+        Version = 1
+        Title = "t"
+        Weeks = 1
+        Generated = ""
+        Origin = ""
+        Blocks = [
+          {
+            Gender = Male
+            Variants = [
+              {
+                Id = "1dia"
+                Title = None
+                Weeks = [
+                  {
+                    Number = 1
+                    Days = [
+                      {
+                        Id = "Lunes"
+                        Title = None
+                        Notes = []
+                        Exercises = exercises
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+        Extras = []
+      }
+
+      let findings = checkStructure (profileOf Hypertrophy) plan
+
+      Expect.exists
+        findings
+        (function
+        | TooManyRows(_, _, _, 9, 8) -> true
+        | _ -> false)
+        "the day carries 9 rows and the profile allows 8")
+
+    testCase "the cardio goal accepts its own mesocycle" (fun () ->
+      let planFor(targets: (int * string) list) : Plan = {
+        Version = 1
+        Title = "cardio"
+        Weeks = 2
+        Generated = "2026-10-17"
+        Origin = "test"
+        Blocks = [
+          {
+            Gender = Male
+            Variants = [
+              {
+                Id = "3dias"
+                Title = None
+                Weeks = [
+                  for number in 1..2 ->
+                    {
+                      Number = number
+                      Days = [
+                        for dayIndex in 0..2 ->
+                          {
+                            Id = dayIds[dayIndex]
+                            Title = None
+                            Notes = []
+                            Exercises = [
+                              {
+                                Circuit = "A"
+                                Laps = "1"
+                                Order = 1
+                                Name = "Caminata en cinta"
+                                Reps = "25 min"
+                                Rir = "zona 2"
+                                Rest = "-"
+                                Notes = "-"
+                              }
+                              {
+                                Circuit = "B"
+                                Laps = "3"
+                                Order = 1
+                                Name = "Sentadilla goblet"
+                                Reps = "8-12"
+                                Rir = "3"
+                                Rest = "75 s"
+                                Notes = "-"
+                              }
+                            ]
+                          }
+                      ]
+                    }
+                ]
+              }
+            ]
+          }
+        ]
+        Extras = [
+          for week, target in targets ->
+            $"mesociclo | Semana {week}: objetivo | RIR {target}"
+        ]
+      }
+
+      let cardioBrief = {
+        Goal = CardioVascularHealth
+        Frequency = TresDias
+        Emphasis = []
+        Adjustments = []
+      }
+
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 2
+        Brief = cardioBrief
+      }
+
+      match validateNew request (write(planFor [ (1, "3"); (2, "3") ])) with
+      | Valid _ -> ()
+      | Rejected violations -> failtest $"expected Valid: %A{violations}"
+
+      match validateNew request (write(planFor [ (1, "3"); (2, "2") ])) with
+      | Rejected violations ->
+        Expect.exists
+          violations
+          (function
+          | WrongRir _ -> true
+          | _ -> false)
+          "the hypertrophy progression is rejected for cardio"
+      | Valid _ -> failtest "the hypertrophy progression must be rejected")
   ]

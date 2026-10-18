@@ -72,6 +72,10 @@ module Emphasis =
   /// The English prompt token.
   val toToken: Emphasis -> string
 
+  /// A structural instruction for the prompt, when the emphasis implies
+  /// one: a circuit, intervals, a continuous block, timed holds.
+  val structureHint: emphasis: Emphasis -> string option
+
 /// The trainer's brief: the goal, the weekly frequency and the emphasis
 /// of this plan; the confirmed memories arrive as adjustments.
 type Brief = {
@@ -99,15 +103,16 @@ type AdjustmentRequest = {
   PreviousPlan: Plan
 }
 
-/// The mesocycle RIR progression derived from the period: it starts at
-/// RIR 3 and drops one per week, floor 0.
-val derivedRirPerWeek: weeks: int -> (int * string) list
-
 /// The variant tokens of a brief: the one frequency it carries.
 val variantTokens: brief: Brief -> string list
 
 /// The #ej count of each variant in a plan, for the athlete's block.
 val planCounts: athlete: Athlete -> plan: Plan -> (string * int) list
+
+/// The exercises per training day of one variant, rounded. The adjustment
+/// keeps this density, not the total, so a shorter period does not double
+/// the exercises of each day.
+val perDayCount: athlete: Athlete -> variant: string -> plan: Plan -> int
 
 /// The confirmed memories a request carries: the athlete-scoped ones
 /// (they outlive plans) plus the plan-scoped ones observed on the plan

@@ -167,6 +167,15 @@ module Keys =
   let labelNoEquipment = "label.noequipment"
 
   [<Literal>]
+  let deltaDuration = "delta.duration"
+
+  [<Literal>]
+  let deltaZone = "delta.zone"
+
+  [<Literal>]
+  let deltaModality = "delta.modality"
+
+  [<Literal>]
   let plansTitle = "plans.title"
 
   [<Literal>]
@@ -479,6 +488,21 @@ module Keys =
 
   [<Literal>]
   let violationFormatWarning = "violation.formatWarning"
+
+  [<Literal>]
+  let violationRows = "violation.rows"
+
+  [<Literal>]
+  let violationTimedStrength = "violation.timedStrength"
+
+  [<Literal>]
+  let violationTimedRir = "violation.timedRir"
+
+  [<Literal>]
+  let violationCircuitLaps = "violation.circuitLaps"
+
+  [<Literal>]
+  let violationCardio = "violation.cardio"
 
   [<Literal>]
   let dataUnreadableJson = "data.unreadableJson"

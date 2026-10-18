@@ -240,6 +240,32 @@ let describeViolation(culture: CultureInfo, violation: Violation) : string =
     )
   | Data failures ->
     failures |> List.map(describeDataFailure culture) |> String.concat "; "
+  | TooManyRows(variant, week, day, found, max) ->
+    getf(
+      culture,
+      Keys.violationRows,
+      [ variant :> obj; week :> obj; day :> obj; found :> obj; max :> obj ]
+    )
+  | TimedStrengthBlock(day, name, minutes) ->
+    getf(
+      culture,
+      Keys.violationTimedStrength,
+      [ day :> obj; name :> obj; minutes :> obj ]
+    )
+  | TimedEffortIsRir(day, name, effort) ->
+    getf(
+      culture,
+      Keys.violationTimedRir,
+      [ day :> obj; name :> obj; effort :> obj ]
+    )
+  | CircuitLapsDiffer(day, circuit) ->
+    getf(culture, Keys.violationCircuitLaps, [ day :> obj; circuit :> obj ])
+  | MissingCardio(day, found, expected) ->
+    getf(
+      culture,
+      Keys.violationCardio,
+      [ day :> obj; found :> obj; expected :> obj ]
+    )
   | Prescription advisory -> describeAdvisory culture advisory
 
 let inline callOf(agent: IProvideAgent, ct: CancellationToken) =

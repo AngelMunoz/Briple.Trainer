@@ -6,6 +6,7 @@ module Briple.Trainer.Core.Tests.Memories.Tests
 
 open System
 open Expecto
+open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 
 let private mark label target = {
@@ -99,4 +100,24 @@ let tests =
              "Sentadilla con salto"
              "keeps the technique"
          | Mark _ -> failtest "it was born from an exemption"))
+
+    testCase "the goal picks the automatic adjustment" (fun () ->
+      let light = mark Light (Exercise "Caminata")
+
+      Expect.equal
+        (consolidateFor CardioVascularHealth light).Deltas
+        [ Duration 5 ]
+        "cardio raises the duration"
+
+      Expect.equal
+        (consolidateFor Hypertrophy light).Deltas
+        [ Load 5 ]
+        "hypertrophy raises the load"
+
+      let heavy = mark Heavy (Exercise "Caminata")
+
+      Expect.equal
+        (consolidateFor WeightLoss heavy).Deltas
+        [ Duration -5 ]
+        "weight loss lowers the duration")
   ]

@@ -6,6 +6,7 @@ module Briple.Trainer.Core.Validator
 
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Goals
 open Briple.Trainer.Core.Requests
 
 /// The verdict on an agent output. Prescription advisories travel with
@@ -16,9 +17,14 @@ type Verdict =
 
 /// Checks a plan of the domain against the parameters of the request:
 /// gender, the brief's frequency (one variant, its days per week), the
-/// weeks and the derived RIR.
+/// weeks and the goal's mesocycle RIR.
 val checkParameters:
   athlete: Athlete -> weeks: int -> brief: Brief -> plan: Plan -> Violation list
+
+/// The goal's structure rules: rows per day, a timed strength block, RIR
+/// on a timed row, a circuit with different laps and the cardio minutes
+/// of the session. Advisory until the first-pass rate is measured.
+val checkStructure: profile: GoalProfile -> plan: Plan -> Violation list
 
 /// Reviews the prescription of every exercise row: one exercise per
 /// name, a pure dose, and an effort target consistent with the dose.

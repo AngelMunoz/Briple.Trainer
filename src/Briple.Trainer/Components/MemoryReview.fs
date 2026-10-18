@@ -84,6 +84,9 @@ let deltaText (culture: CultureInfo) (delta: Delta) =
   | Sets change -> $"sets {withSign change}"
   | Load percentage -> "load " + withSign percentage + "%"
   | PatternVariant name -> name
+  | Duration minutes -> $"{withSign minutes} {get(culture, Keys.deltaDuration)}"
+  | Zone change -> $"{get(culture, Keys.deltaZone)} {withSign change}"
+  | Modality name -> $"{get(culture, Keys.deltaModality)} {name}"
 
 let init(props: Props) =
   {

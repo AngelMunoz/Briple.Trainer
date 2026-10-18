@@ -10,18 +10,20 @@ open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 
 /// System message of the generation flows: role, JSON response schema,
-/// prescription rules, evidence rules for the plan's goal and variant
-/// rotation.
+/// prescription rules, evidence rules and the goal profile (volume,
+/// effort, structure and progression).
 val system: goal: PlanGoal -> string
 
 /// System message of the mark consolidation.
 val consolidationSystem: string
 
-/// User message of the new-plan flow.
+/// User message of the new-plan flow: the athlete, the plan's goal, the
+/// structure of the goal profile and the mandatory values. The mesociclo
+/// lines are not printed; the app adds them.
 val newPlanPrompt: request: NewPlanRequest -> string
 
 /// User message of the adjustment flow: the common part plus the
-/// previous plan in the same schema.
+/// previous plan in the same schema and the per-day counts it keeps.
 val adjustmentPrompt: request: AdjustmentRequest -> string
 
 /// User message of the consolidation: the recorded marks.

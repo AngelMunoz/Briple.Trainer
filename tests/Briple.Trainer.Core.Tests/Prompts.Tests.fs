@@ -96,8 +96,18 @@ let tests =
 
         Expect.stringContains
           prompt
-          "- week 1 targets RIR 3 (added automatically, do not write it)"
-          "the derived RIR gets fixed"
+          "do not copy a weekly RIR target into the rows"
+          "the mesociclo is the app's, not the model's"
+
+        Expect.stringContains
+          prompt
+          "PLAN GOAL: hypertrophy."
+          "the goal travels"
+
+        Expect.stringContains
+          prompt
+          "STRUCTURE THIS PLAN MUST HAVE:"
+          "the structure travels"
 
         Expect.isFalse
           (prompt.Contains "exercises in total")
@@ -172,32 +182,97 @@ let tests =
 
       Expect.isFalse (bare.Contains "EMPHASIS") "nothing when empty")
 
-    testCase "the goal selects the evidence block" (fun () ->
+    testCase "the emphasis brings a structural hint" (fun () ->
+      let withHiit = { brief with Emphasis = [ Hiit ] }
+
+      let hiitPrompt =
+        newPlanPrompt(
+          {
+            Athlete = man
+            Memories = []
+            Weeks = 4
+            Brief = withHiit
+          }
+        )
+
+      Expect.stringContains
+        hiitPrompt
+        "EMPHASIS STRUCTURE:"
+        "the hint block travels"
+
+      Expect.stringContains
+        hiitPrompt
+        "intervals: laps equal the repeats"
+        "hiit becomes intervals"
+
+      let withCircuit = {
+        brief with
+            Emphasis = [ FullBodyCircuit ]
+      }
+
+      let circuitPrompt =
+        newPlanPrompt(
+          {
+            Athlete = man
+            Memories = []
+            Weeks = 4
+            Brief = withCircuit
+          }
+        )
+
+      Expect.stringContains
+        circuitPrompt
+        "circuit: 4-6 exercises, 3 rounds, short rest"
+        "a full-body circuit becomes a circuit")
+
+    testCase "the goal selects the profile block" (fun () ->
       Expect.stringContains
         (system Hypertrophy)
-        "GOAL: HYPERTROPHY"
+        "GOAL PROFILE: HYPERTROPHY"
         "hypertrophy block"
 
       Expect.stringContains
         (system WeightLoss)
-        "GOAL: WEIGHT LOSS"
+        "GOAL PROFILE: WEIGHT LOSS"
         "weight loss block"
 
       Expect.stringContains
         (system CardioVascularHealth)
-        "GOAL: CARDIOVASCULAR HEALTH"
+        "GOAL PROFILE: CARDIOVASCULAR HEALTH"
         "cardio block"
 
       Expect.stringContains
         (system BasicBodyActivation)
-        "GOAL: BASIC BODY ACTIVATION"
+        "GOAL PROFILE: BASIC BODY ACTIVATION"
         "activation block"
 
-      Expect.stringContains (system Strength) "GOAL: STRENGTH" "strength block"
+      Expect.stringContains
+        (system Strength)
+        "GOAL PROFILE: STRENGTH"
+        "strength block"
 
       Expect.isFalse
-        ((system WeightLoss).Contains "GOAL: HYPERTROPHY")
-        "goals do not mix")
+        ((system WeightLoss).Contains "GOAL PROFILE: HYPERTROPHY")
+        "goals do not mix"
+
+      Expect.stringContains
+        (system CardioVascularHealth)
+        "20 minutes or more"
+        "cardio asks for time"
+
+      Expect.isFalse
+        ((system CardioVascularHealth).Contains "RIR 0")
+        "cardio never asks for RIR 0"
+
+      Expect.stringContains
+        (system BasicBodyActivation)
+        "no failure work"
+        "activation never asks for failure"
+
+      Expect.stringContains
+        (system Strength)
+        "3-6 reps on the main lifts"
+        "strength asks for low reps")
 
     testCase
       "the adjustment prompt carries the kept counts and the previous plan"
@@ -214,8 +289,8 @@ let tests =
 
         Expect.stringContains
           prompt
-          "- option 3dias has exactly 1 exercises in total"
-          "the kept count"
+          "- option 3dias has exactly 1 exercises per training day"
+          "the kept density"
 
         Expect.stringContains
           prompt

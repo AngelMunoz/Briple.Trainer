@@ -2,6 +2,8 @@ module Briple.Trainer.Core.Memories
 
 open System
 
+open Briple.Trainer.Core.Athletes
+
 /// Quick marks available on an exercise or a day.
 type Label =
   | Light
@@ -39,6 +41,9 @@ type Delta =
   | Sets of change: int
   | Load of percentage: int
   | PatternVariant of name: string
+  | Duration of minutes: int
+  | Zone of change: int
+  | Modality of name: string
 
 /// Life cycle of a memory.
 type MemoryStatus =
@@ -65,26 +70,41 @@ type Memory = {
   Scope: MemoryScope
 }
 
-/// The automatic adjustment of each label: light raises load, heavy
-/// lowers it; pain and no equipment have no automatic adjustment.
-let automaticAdjustments(label: Label) : Delta list =
+let automaticAdjustmentsFor (goal: PlanGoal) (label: Label) : Delta list =
   match label with
-  | Light -> [ Load 5 ]
-  | Heavy -> [ Load -5 ]
-  | Pain -> []
+  | Light ->
+    match goal with
+    | Hypertrophy
+    | Strength -> [ Load 5 ]
+    | WeightLoss
+    | CardioVascularHealth
+    | BasicBodyActivation -> [ Duration 5 ]
+  | Heavy ->
+    match goal with
+    | Hypertrophy
+    | Strength -> [ Load -5 ]
+    | WeightLoss
+    | CardioVascularHealth
+    | BasicBodyActivation -> [ Duration -5 ]
+  | Pain
   | NoEquipment -> []
 
-/// Consolidates a mark into the proposed memory with its automatic
+let automaticAdjustments(label: Label) : Delta list =
+  automaticAdjustmentsFor Hypertrophy label
+
+/// Consolidates a mark into the proposed memory with the goal's automatic
 /// adjustment. Marks are situational: the scope starts at the plan. No
 /// summary prose here: the summary is the UI's or the model's job, never
 /// the domain's.
-let consolidate(mark: FeedbackMark) : Memory = {
+let consolidateFor (goal: PlanGoal) (mark: FeedbackMark) : Memory = {
   Summary = ""
-  Deltas = automaticAdjustments mark.Label
+  Deltas = automaticAdjustmentsFor goal mark.Label
   Origin = Mark mark
   Status = Proposed
   Scope = Plan
 }
+
+let consolidate(mark: FeedbackMark) : Memory = consolidateFor Hypertrophy mark
 
 /// Confirms the memory with the adjustments the trainer accepted or
 /// picked from the predefined ones.

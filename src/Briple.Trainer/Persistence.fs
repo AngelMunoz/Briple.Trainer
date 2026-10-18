@@ -164,6 +164,9 @@ module Codec =
     | Sets change -> $"sets:{change}"
     | Load percentage -> $"load:{percentage}"
     | PatternVariant name -> $"variant:{name}"
+    | Duration minutes -> $"duration:{minutes}"
+    | Zone change -> $"zone:{change}"
+    | Modality name -> $"modality:{name}"
 
   let (|DeltaToken|_|)(token: string) =
     let parts = token.Split(':', 2)
@@ -181,6 +184,9 @@ module Codec =
       | "sets" -> number value |> Option.map Sets
       | "load" -> number value |> Option.map Load
       | "variant" -> Some(PatternVariant value)
+      | "duration" -> number value |> Option.map Duration
+      | "zone" -> number value |> Option.map Zone
+      | "modality" -> Some(Modality value)
       | _ -> None
     | _ -> None
 
