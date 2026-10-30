@@ -496,3 +496,4 @@ docs/notas-*.md
 
 # estado local de la herramienta de agente
 .zcode/
+spike/
