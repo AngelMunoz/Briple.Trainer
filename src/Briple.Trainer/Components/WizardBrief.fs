@@ -131,8 +131,7 @@ let update (props: Props) (msg: Msg) (model: Model) =
 
     | SetMode mode -> { model with Mode = mode }
 
-  props.OnChanged next
-  next, Cmd.none
+  next, Cmd.ofAction(fun () -> props.OnChanged next)
 
 let goalKey(goal: PlanGoal) =
   goalOptions
@@ -245,4 +244,6 @@ type WizardBrief(props: Props) as this =
   do
     let program = Program.mkProgram init (update props) (view props)
 
-    this.Content <- Program.runWith props program
+    let root, _ = Program.runWithLifetime this props program
+
+    this.Content <- root

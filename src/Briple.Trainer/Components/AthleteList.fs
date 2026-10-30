@@ -9,6 +9,8 @@ open Avalonia.Layout
 open Avalonia.Media
 open NXUI.Extensions
 
+open FSharp.Control.Reactive
+open MVUish.Avalonia
 open MVUish.Avalonia.Collections
 
 open Briple.Trainer
@@ -22,16 +24,69 @@ open Briple.Trainer.Strings
 open Briple.Trainer.Theme
 
 [<Struct>]
+type AthleteListEnv = {
+  Observe: unit -> IObservable<AthleteEntity list>
+  Snapshot: unit -> AthleteEntity list
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+[<Struct>]
 type AthleteListProps = {
-  Culture: PageCulture
   Lead: (unit -> Control) voption
-  Athletes: IObservable<AthleteEntity list>
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 [<Struct>]
 type Event =
   | NewRequested
   | OpenRequested of Guid
+
+type Model = {
+  Athletes: AthleteEntity list
+  Culture: CultureInfo
+}
+
+type Msg =
+  | AthletesChanged of AthleteEntity list
+  | CultureChanged of CultureInfo
+  | NewRequested
+  | OpenRequested of Guid
+
+[<Struct>]
+type Context = {
+  Env: AthleteListEnv
+  Props: AthleteListProps
+  OnEvent: Event -> unit
+}
+
+let init(ctx: Context) =
+  let model = {
+    Athletes = ctx.Env.Snapshot()
+    Culture = ctx.Env.Culture
+  }
+
+  model, Cmd.none
+
+let update (ctx: Context) (msg: Msg) (model: Model) =
+  match msg with
+  | AthletesChanged athletes -> { model with Athletes = athletes }, Cmd.none
+  | CultureChanged culture -> { model with Culture = culture }, Cmd.none
+  | NewRequested ->
+    model, Cmd.ofAction(fun () -> ctx.OnEvent Event.NewRequested)
+  | OpenRequested id ->
+    model, Cmd.ofAction(fun () -> ctx.OnEvent(Event.OpenRequested id))
+
+let subscribe (ctx: Context) (_: Model) : Sub<Msg> =
+  Sub.batch [
+    Sub.fromObservable
+      "athletes"
+      (ctx.Env.Observe() |> Observable.map AthletesChanged)
+    Sub.fromObservable
+      "culture"
+      (ctx.Env.CultureChanged |> Observable.map CultureChanged)
+  ]
 
 let goalName(culture: CultureInfo, goal: PlanGoal) : string =
   match goal with
@@ -61,13 +116,16 @@ let inline chevron() : Control =
     .Foreground(muted)
 
 /// One row: the name and the profile summary; the whole row opens. The
-/// summary is composed text, so it follows the live culture; the name is
-/// data and never changes.
+/// summary is composed text, so it follows the model's culture; the name
+/// is data and never changes.
 let athleteRow
-  (culture: PageCulture, onOpen: Guid -> unit, athlete: AthleteEntity)
-  : Control =
+  (
+    culture: IObservable<CultureInfo>,
+    onOpen: Guid -> unit,
+    athlete: AthleteEntity
+  ) : Control =
   let detail =
-    culture.Changed |> Observable.map(fun current -> summary(current, athlete))
+    culture |> Observable.map(fun current -> summary(current, athlete))
 
   Button()
     .Content(contentRowObs(athlete.Profile.Name, detail, chevron))
@@ -75,11 +133,15 @@ let athleteRow
     .Margin(0.0, 0.0, 0.0, 4.0)
     .Classes("row")
 
-/// The page: static text comes from the resource dictionary; the row
-/// summaries follow the culture stream.
-let view (props: AthleteListProps) (onEvent: Event -> unit) : Control =
-  let culture = props.Culture
-  let onOpen id = onEvent(Event.OpenRequested id)
+/// The page: static text comes from the resource dictionary; the rows
+/// follow the model's athlete list and culture.
+let view
+  (props: AthleteListProps)
+  (model: IObservable<Model>)
+  (dispatch: Dispatch<Msg>)
+  : Control =
+  let culture = model |> Observable.map _.Culture
+  let onOpen id = dispatch(OpenRequested id)
 
   let rows =
     let template =
@@ -91,7 +153,10 @@ let view (props: AthleteListProps) (onEvent: Event -> unit) : Control =
     ItemsControl().ItemTemplate(template)
     |> stretchItems
     |> fun list ->
-        list.BindItemsSource(props.Athletes, fun athlete -> athlete.Id)
+        list.BindItemsSource(
+          model |> Observable.map _.Athletes,
+          fun athlete -> athlete.Id
+        )
 
   let emptyState =
     StackPanel()
@@ -100,13 +165,15 @@ let view (props: AthleteListProps) (onEvent: Event -> unit) : Control =
         glyph(Icons.accountSearchOutline, 32.0, muted),
         labelKey Keys.athletesEmpty
       )
-      .IsVisible(props.Athletes |> Observable.map List.isEmpty)
+      .IsVisible(
+        model |> Observable.map(fun current -> List.isEmpty current.Athletes)
+      )
 
   let newCommand =
     iconPrimaryButtonKey(
       Keys.athletesNew,
       Icons.plus,
-      (fun () -> onEvent Event.NewRequested)
+      (fun () -> dispatch NewRequested)
     )
 
   fluentPage {
@@ -118,7 +185,28 @@ let view (props: AthleteListProps) (onEvent: Event -> unit) : Control =
   }
 
 type AthleteList
-  (props: AthleteListProps, [<InlineIfLambda>] onEvent: Event -> unit) as this =
+  (
+    env: AthleteListEnv,
+    props: AthleteListProps,
+    [<InlineIfLambda>] onEvent: Event -> unit
+  ) as this =
   inherit UserControl()
 
-  do this.Content <- view props onEvent
+  do
+    let ctx = {
+      Env = env
+      Props = props
+      OnEvent = onEvent
+    }
+
+    let program =
+      Program.mkProgram
+        (fun (_: AthleteListProps) -> init ctx)
+        (update ctx)
+        (view props)
+      |> Program.withSubscription(subscribe ctx)
+
+    let root, lifetime = Program.runWithLifecycle props program
+
+    this.Content <- root
+    props.Lifetime.AddDisposable lifetime

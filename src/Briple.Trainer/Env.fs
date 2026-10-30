@@ -146,6 +146,29 @@ type IProvideHost =
 type IProvideLogging =
   abstract LoggerFactory: ILoggerFactory
 
+/// The confirmation dialog worker: one question at a time.
+type IDialogs =
+  abstract ConfirmAsync: request: Dialogs.ConfirmRequest -> Async<bool>
+
+type IProvideDialogs =
+  abstract Dialogs: IDialogs
+
+/// The toast worker: a short notification in the shell overlay.
+type IToasts =
+  abstract Show: title: string * body: string * isError: bool -> unit
+
+type IProvideToasts =
+  abstract Toasts: IToasts
+
+/// The UI resource worker: static text follows the live dictionary.
+type ILocalization =
+  abstract Text: key: string -> IObservable<string>
+
+  abstract TextBlock: key: string -> TextBlock
+
+type IProvideLocalization =
+  abstract Localization: ILocalization
+
 /// The Core agent capabilities: one provider client plus the app's
 /// logger. One value per call; Core never sees the concrete app env.
 /// (The log type is qualified: `open Serilog` shadows `ILogger` here.)
@@ -277,6 +300,23 @@ type AppEnv
     | ValueNone -> invalidOp "the agent was requested without a token"
 
   // the Core agent capabilities over one provider client and the app's
+  let dialogs = {
+    new IDialogs with
+      member _.ConfirmAsync(request) = Dialogs.confirmAsync request
+  }
+
+  let toasts = {
+    new IToasts with
+      member _.Show(title, body, isError) = Toasts.show(title, body, isError)
+  }
+
+  let localization = {
+    new ILocalization with
+      member _.Text key = Localization.text key
+
+      member _.TextBlock key = Localization.textBlock key
+  }
+
   // Serilog-bridged logger
   let agentEnv() =
     AgentEnv(
@@ -335,6 +375,15 @@ type AppEnv
 
   interface IProvideLogging with
     member _.LoggerFactory = loggerFactory
+
+  interface IProvideDialogs with
+    member _.Dialogs = dialogs
+
+  interface IProvideToasts with
+    member _.Toasts = toasts
+
+  interface IProvideLocalization with
+    member _.Localization = localization
 
   interface IProvideAgent with
     member _.AgentAvailable = workingSettings.IsSome

@@ -22,49 +22,87 @@ open Briple.Trainer.Theme
 
 [<Struct>]
 type LoginPageProps = {
-  Culture: PageCulture
   Lead: (unit -> Control) voption
-  Save: string -> Result<CredentialSave, string>
   OnDone: unit -> unit
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 type SaveState =
   | Idle
+  | Saving
   | VaultSaved
   | VaultFailed of reason: string
   | SaveFailed of reason: string
 
-type Model = { Token: string; State: SaveState }
+type Model = {
+  Token: string
+  State: SaveState
+  Culture: CultureInfo
+}
 
 type Msg =
   | SetToken of string
   | SaveRequested
+  | SaveFinished of Result<CredentialSave, string>
   | ContinueInsecure
+  | CultureChanged of CultureInfo
 
-let init(_: LoginPageProps) = { Token = ""; State = Idle }, Cmd.none
+/// The page-local capabilities plus the done callback.
+[<Struct>]
+type Context = {
+  CurrentCulture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+  Save: string -> Result<CredentialSave, string>
+  OnDone: unit -> unit
+}
 
-let update (props: LoginPageProps) (msg: Msg) (model: Model) =
+let contextOf
+  (env: #IProvideCredentials & #IProvideCulture)
+  (props: LoginPageProps)
+  : Context = {
+  CurrentCulture = env.Culture
+  CultureChanged = env.CultureChanged
+  Save = env.SaveCredentials
+  OnDone = props.OnDone
+}
+
+let init(ctx: Context) =
+  {
+    Token = ""
+    State = Idle
+    Culture = ctx.CurrentCulture
+  },
+  Cmd.none
+
+let update (ctx: Context) (msg: Msg) (model: Model) =
   match msg with
   | SetToken value -> { model with Token = value }, Cmd.none
+  | CultureChanged culture -> { model with Culture = culture }, Cmd.none
 
   // one save attempt per terminal state: a double click or a revisit
   // must not write the credential twice
   | SaveRequested when model.State = Idle ->
+    { model with State = Saving },
+    Cmd.OfFunc.perform ctx.Save model.Token SaveFinished
+
+  | SaveFinished result ->
     let state =
-      match props.Save model.Token with
-      | Ok CredentialSave.Secured ->
-        props.OnDone()
-        VaultSaved
+      match result with
+      | Ok CredentialSave.Secured -> VaultSaved
       | Ok(CredentialSave.Insecure reason) -> VaultFailed reason
       | Error reason -> SaveFailed reason
 
-    { model with State = state }, Cmd.none
+    let afterSave =
+      match result with
+      | Ok CredentialSave.Secured -> Cmd.ofAction(fun () -> ctx.OnDone())
+      | _ -> Cmd.none
+
+    { model with State = state }, afterSave
 
   | SaveRequested -> model, Cmd.none
 
-  | ContinueInsecure ->
-    props.OnDone()
-    model, Cmd.none
+  | ContinueInsecure -> model, Cmd.ofAction(fun () -> ctx.OnDone())
 
 /// The insecure fallback as a severity band: what failed, what plain
 /// text means, and the explicit way out. The static labels are resources;
@@ -105,7 +143,8 @@ let outcomeView
   (culture: CultureInfo, state: SaveState, dispatch: Dispatch<Msg>)
   : Control =
   match state with
-  | Idle -> TextBlock()
+  | Idle
+  | Saving -> TextBlock()
   | VaultSaved -> labelKey Keys.loginSaved
   | VaultFailed reason -> insecureWarning(culture, reason, dispatch)
   | SaveFailed reason ->
@@ -154,9 +193,9 @@ let view
   let outcomeHost =
     ContentControl()
       .Content(
-        (Observable.combineLatest model props.Culture.Changed
-         |> Observable.map(fun (current, culture) ->
-           outcomeView(culture, current.State, dispatch)))
+        (model
+         |> Observable.map(fun current ->
+           outcomeView(current.Culture, current.State, dispatch)))
           .ToBinding()
       )
 
@@ -174,10 +213,26 @@ let view
         )
   }
 
-type LoginPage(props: LoginPageProps) as this =
+type LoginPage<'T when 'T :> IProvideCredentials and 'T :> IProvideCulture>
+  (env: 'T, props: LoginPageProps) as this =
   inherit UserControl()
 
   do
-    let program = Program.mkProgram init (update props) (view props)
+    let ctx = contextOf env props
 
-    this.Content <- Program.runWith props program
+    let subscribe(_: Model) : Sub<Msg> =
+      Sub.fromObservable
+        "culture"
+        (ctx.CultureChanged |> Observable.map CultureChanged)
+
+    let program =
+      Program.mkProgram
+        (fun (_: LoginPageProps) -> init ctx)
+        (update ctx)
+        (view props)
+      |> Program.withSubscription subscribe
+
+    let root, lifetime = Program.runWithLifecycle props program
+
+    this.Content <- root
+    props.Lifetime.AddDisposable lifetime

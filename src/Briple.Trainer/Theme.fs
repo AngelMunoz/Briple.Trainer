@@ -62,6 +62,9 @@ let cardFillBrush = SolidColorBrush(Color.Parse "#B3FFFFFF")
 /// The card surface fill over Mica.
 let cardFill = cardFillBrush :> IBrush
 
+/// The height of the app-drawn title bar band.
+let bandHeight = 32.0
+
 /// The OS UI font, like CSS `system-ui`: the platform FontManager
 /// resolves it (Segoe UI on Windows, the system default on macOS/Linux).
 let font = FontFamily.Default
@@ -105,6 +108,7 @@ let appStyles: Styles =
       [|
         TextBlock.FontSizeProperty, box 28.0
         TextBlock.FontWeightProperty, box FontWeight.SemiBold
+        TextBlock.ForegroundProperty, text
       |]
     )
   )
@@ -115,6 +119,7 @@ let appStyles: Styles =
       [|
         TextBlock.FontSizeProperty, box 20.0
         TextBlock.FontWeightProperty, box FontWeight.SemiBold
+        TextBlock.ForegroundProperty, text
       |]
     )
   )
@@ -125,6 +130,7 @@ let appStyles: Styles =
       [|
         TextBlock.FontSizeProperty, box 14.0
         TextBlock.FontWeightProperty, box FontWeight.SemiBold
+        TextBlock.ForegroundProperty, text
       |]
     )
   )
@@ -132,14 +138,20 @@ let appStyles: Styles =
   styles.Add(
     styleOf(
       (fun selector -> selector.OfType<TextBlock>().Class("body")),
-      [| TextBlock.FontSizeProperty, box 14.0 |]
+      [|
+        TextBlock.FontSizeProperty, box 14.0
+        TextBlock.ForegroundProperty, text
+      |]
     )
   )
 
   styles.Add(
     styleOf(
       (fun selector -> selector.OfType<TextBlock>().Class("caption")),
-      [| TextBlock.FontSizeProperty, box 12.0 |]
+      [|
+        TextBlock.FontSizeProperty, box 12.0
+        TextBlock.ForegroundProperty, text
+      |]
     )
   )
 
@@ -149,17 +161,44 @@ let appStyles: Styles =
       [|
         TextBlock.FontSizeProperty, box 12.0
         TextBlock.FontWeightProperty, box FontWeight.SemiBold
+        TextBlock.ForegroundProperty, text
       |]
+    )
+  )
+
+  // controls that render text outside the type ramp
+  styles.Add(
+    styleOf(
+      (fun selector -> selector.OfType<ComboBox>()),
+      [| ComboBox.ForegroundProperty, text |]
     )
   )
 
   styles.Add(
     styleOf(
-      (fun selector -> selector.OfType<TextBlock>().Class("pane-title")),
-      [|
-        TextBlock.FontSizeProperty, box 18.0
-        TextBlock.FontWeightProperty, box FontWeight.SemiBold
-      |]
+      (fun selector -> selector.OfType<ComboBoxItem>()),
+      [| ComboBoxItem.ForegroundProperty, text |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector -> selector.OfType<TextBox>()),
+      [| TextBox.ForegroundProperty, text |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector -> selector.OfType<CheckBox>()),
+      [| CheckBox.ForegroundProperty, text |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector -> selector.OfType<RadioButton>()),
+      [| RadioButton.ForegroundProperty, text |]
     )
   )
 
@@ -266,6 +305,63 @@ let appStyles: Styles =
         Button.HeightProperty, 40.0
         Button.PaddingProperty, Thickness(0.0)
         Button.HorizontalContentAlignmentProperty, HorizontalAlignment.Center
+      |]
+    )
+  )
+
+  // app-drawn caption buttons in the title band: 44x30, flat at rest,
+  // a wash on hover; the close button turns red
+  styles.Add(
+    styleOf(
+      (fun selector -> selector.OfType<Button>().Class("caption")),
+      [|
+        Button.BackgroundProperty, Brushes.Transparent
+        Button.BorderThicknessProperty, Thickness(0.0)
+        Button.ForegroundProperty, muted
+        Button.WidthProperty, 44.0
+        Button.HeightProperty, 30.0
+        Button.PaddingProperty, Thickness(0.0)
+        Button.CornerRadiusProperty, CornerRadius(6.0)
+        Button.HorizontalContentAlignmentProperty, HorizontalAlignment.Center
+        Button.VerticalContentAlignmentProperty, VerticalAlignment.Center
+      |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector ->
+        selector.OfType<Button>().Class("caption").Class(":pointerover")),
+      [| Button.BackgroundProperty, hoverFill |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector ->
+        selector.OfType<Button>().Class("caption").Class(":pressed")),
+      [| Button.BackgroundProperty, hoverFill |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector ->
+        selector.OfType<Button>().Class("caption-close").Class(":pointerover")),
+      [|
+        Button.BackgroundProperty, errorBrush
+        Button.ForegroundProperty, Brushes.White
+      |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector ->
+        selector.OfType<Button>().Class("caption-close").Class(":pressed")),
+      [|
+        Button.BackgroundProperty, errorBrush
+        Button.ForegroundProperty, Brushes.White
       |]
     )
   )

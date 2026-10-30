@@ -39,14 +39,22 @@ type Model = {
   Busy: bool
   Proposals: (Guid * Memory) list
   Status: Status
+  Culture: CultureInfo
+}
+
+/// The services the note section needs, built once at the page.
+[<Struct>]
+type NoteEnv = {
+  Agent: IProvideAgent
+  Memories: MemoryStore
+  Logger: Microsoft.Extensions.Logging.ILogger
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
 }
 
 /// The section inputs.
 [<Struct>]
 type Props = {
-  Culture: PageCulture
-  Agent: IProvideAgent
-  Memories: MemoryStore
   AthleteId: Guid
   /// The plan the note is observed on: its vocabulary closes the
   /// surface and its id stamps plan-scoped memories.
@@ -74,9 +82,12 @@ type Msg =
   | Interpreted of Reading
   | Decided of MemoryReview.Event
   | Saved of localId: Guid * Result<MemoryEntity, exn>
+  | CultureChanged of CultureInfo
 
 /// The note section.
 type NoteSection =
   inherit UserControl
 
-  new: props: Props * [<InlineIfLambda>] onEvent: (Event -> unit) -> NoteSection
+  new:
+    env: NoteEnv * props: Props * [<InlineIfLambda>] onEvent: (Event -> unit) ->
+      NoteSection

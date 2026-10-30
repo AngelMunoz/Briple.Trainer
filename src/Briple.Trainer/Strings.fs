@@ -71,6 +71,15 @@ module Keys =
   let commonBack = "common.back"
 
   [<Literal>]
+  let windowMinimize = "window.minimize"
+
+  [<Literal>]
+  let windowMaximizeRestore = "window.maximizeRestore"
+
+  [<Literal>]
+  let windowClose = "window.close"
+
+  [<Literal>]
   let commonCancel = "common.cancel"
 
   [<Literal>]

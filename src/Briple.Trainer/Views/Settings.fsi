@@ -6,27 +6,31 @@ module Briple.Trainer.Views.Settings
 
 open Avalonia.Controls
 
-open Briple.Trainer.Components.Page
 open Briple.Trainer.Env
 open Briple.Trainer.Strings
 
-/// What the page needs, as one value. The values are getters so a
-/// culture rebuild reads the live preference, not a snapshot.
+/// The services and the starting values the settings page needs.
+[<Struct>]
+type SettingsEnv = {
+  Language: Language
+  Theme: ThemeChoice
+  AgentAvailable: bool
+}
+
+/// The page data.
 [<Struct>]
 type SettingsPageProps = {
-  Culture: PageCulture
   /// The shell's back control, placed in the page header.
   Lead: (unit -> Control) voption
-  Language: unit -> Language
-  Theme: unit -> ThemeChoice
-  AgentAvailable: unit -> bool
   OnLanguage: Language -> unit
   OnTheme: ThemeChoice -> unit
   OpenLogin: unit -> unit
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 /// The settings page.
 type SettingsPage =
   inherit UserControl
 
-  new: props: SettingsPageProps -> SettingsPage
+  new: env: SettingsEnv * props: SettingsPageProps -> SettingsPage

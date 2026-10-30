@@ -18,5 +18,6 @@ type ConfirmRequest = {
 val inline confirmAsync: request: ConfirmRequest -> Async<bool>
 
 /// The overlay layer the shell mounts last; it shows only while a
-/// request is pending.
-val host: Control
+/// request is pending. Each host is a new control, so a test window can
+/// release it cleanly.
+val host: unit -> Control

@@ -24,6 +24,15 @@
   <data name="common.back" xml:space="preserve">
     <value>Back</value>
   </data>
+  <data name="window.minimize" xml:space="preserve">
+    <value>Minimize</value>
+  </data>
+  <data name="window.maximizeRestore" xml:space="preserve">
+    <value>Maximize or restore</value>
+  </data>
+  <data name="window.close" xml:space="preserve">
+    <value>Close</value>
+  </data>
   <data name="common.cancel" xml:space="preserve">
     <value>Cancel</value>
   </data>

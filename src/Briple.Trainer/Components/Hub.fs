@@ -10,6 +10,8 @@ open Avalonia.Media
 open NXUI
 open NXUI.Extensions
 
+open MVUish.Avalonia
+
 open Briple.Trainer.Components.Fields
 open Briple.Trainer.Theme
 
@@ -24,6 +26,7 @@ type HubSlot = {
 type HubProps = {
   Title: string
   Slots: HubSlot list
+  InitialActive: int voption
   Active: IObservable<int> voption
   OnSelect: (int -> unit) voption
 }
@@ -76,7 +79,40 @@ let fitColumns
     for index in 0 .. columns.Length - 1 do
       columns[index].Width <- Math.Max(slots[index].Width, share)
 
-let hub(props: HubProps) : Control =
+type Model = { Active: int }
+
+type Msg =
+  | Selected of int
+  | Activated of int
+
+let init(props: HubProps) =
+  {
+    Active = props.InitialActive |> ValueOption.defaultValue -1
+  },
+  Cmd.none
+
+let update (props: HubProps) (msg: Msg) (model: Model) =
+  match msg with
+  | Selected index ->
+    let select =
+      props.OnSelect
+      |> ValueOption.map(fun select -> Cmd.ofAction(fun () -> select index))
+      |> ValueOption.defaultValue Cmd.none
+
+    { model with Active = index }, select
+  | Activated index -> { model with Active = index }, Cmd.none
+
+let subscribe (props: HubProps) (_: Model) : Sub<Msg> =
+  props.Active
+  |> ValueOption.map(fun active ->
+    Sub.fromObservable "active" (active |> Observable.map Activated))
+  |> ValueOption.defaultValue Sub.none
+
+let view
+  (props: HubProps)
+  (model: IObservable<Model>)
+  (dispatch: Dispatch<Msg>)
+  : Control =
   let scroller =
     ScrollViewer()
       .HorizontalScrollBarVisibility(ScrollBarVisibility.Auto)
@@ -86,39 +122,25 @@ let hub(props: HubProps) : Control =
   // resize keeps the selection pointing at the same column
   let offsets: float array = Array.zeroCreate props.Slots.Length
 
-  let scrollTo(index: int) : unit =
-    if index >= 0 && index < offsets.Length then
-      scroller.Offset <- Vector(offsets[index], 0.0)
-
-  let activeHeader(index: int) : IObservable<bool> voption =
-    props.Active
-    |> ValueOption.map(fun active ->
-      active |> Observable.map(fun current -> current = index))
-
   let columns: StackPanel array = [|
     for index, item in props.Slots |> List.indexed ->
-      let header =
-        let button =
-          Button(Content = item.Header)
-            .FontWeight(FontWeight.SemiBold)
-            .HorizontalAlignment(HorizontalAlignment.Left)
-            .OnClickHandler(fun _ _ ->
-              scrollTo index
-              props.OnSelect |> ValueOption.iter(fun select -> select index))
-            .Classes("chrome")
+      let active =
+        model |> Observable.map(fun current -> current.Active = index)
 
-        match activeHeader index with
-        | ValueSome active ->
-          button
-            .Foreground(
-              active |> Observable.map(fun on -> if on then accent else muted)
-            )
-            .FontWeight(
-              active
-              |> Observable.map(fun on ->
-                if on then FontWeight.SemiBold else FontWeight.Normal)
-            )
-        | ValueNone -> button
+      let header =
+        Button(Content = item.Header)
+          .FontWeight(FontWeight.SemiBold)
+          .HorizontalAlignment(HorizontalAlignment.Left)
+          .OnClickHandler(fun _ _ -> dispatch(Selected index))
+          .Classes("chrome")
+          .Foreground(
+            active |> Observable.map(fun on -> if on then accent else muted)
+          )
+          .FontWeight(
+            active
+            |> Observable.map(fun on ->
+              if on then FontWeight.SemiBold else FontWeight.Normal)
+          )
 
       StackPanel()
         .Width(item.Width)
@@ -160,21 +182,39 @@ let hub(props: HubProps) : Control =
       args.Handled <- true
     | Pass -> ())
 
-  // the page owns the selection: the hub follows it and pans to it.
-  // The binding lives on the scroller; it is released when the hub
-  // leaves the tree, so a dropped page leaves no live subscription.
-  props.Active
-  |> ValueOption.iter(fun active ->
-    let binding =
-      scroller.Bind(
-        ScrollViewer.OffsetProperty,
-        active
-        |> Observable.filter(fun index -> index >= 0 && index < offsets.Length)
-        |> Observable.map(fun index -> Vector(offsets[index], 0.0))
-      )
+  // the model owns the selection: the scroller follows it and pans to it.
+  // The binding lives on the scroller; it is released when the hub leaves
+  // the tree, so a dropped page leaves no live subscription.
+  let binding =
+    scroller.Bind(
+      ScrollViewer.OffsetProperty,
+      model
+      |> Observable.map(fun current ->
+        if current.Active >= 0 && current.Active < offsets.Length then
+          Vector(offsets[current.Active], 0.0)
+        else
+          scroller.Offset)
+    )
 
-    scroller.DetachedFromVisualTree.Add(fun _ -> binding.Dispose()))
+  scroller.DetachedFromVisualTree.Add(fun _ -> binding.Dispose())
 
   match props.Title with
   | "" -> scroller
   | _ -> StackPanel().Spacing(8.0).Children(sectionTitle props.Title, scroller)
+
+type Hub(props: HubProps) as this =
+  inherit UserControl()
+
+  do
+    let render (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
+      view props model dispatch
+
+    let program =
+      Program.mkProgram init (update props) render
+      |> Program.withSubscription(subscribe props)
+
+    let root, _ = Program.runWithLifetime this props program
+
+    this.Content <- root
+
+let hub(props: HubProps) : Control = Hub(props) :> Control

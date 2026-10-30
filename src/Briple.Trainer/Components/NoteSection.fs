@@ -14,6 +14,7 @@ open IcedTasks.Polyfill.Task.Tasks
 open NXUI.Extensions
 
 open FSharp.Control.Reactive
+open Microsoft.Extensions.Logging
 
 open MVUish.Avalonia
 open MVUish.Avalonia.Collections
@@ -50,13 +51,20 @@ type Model = {
   Busy: bool
   Proposals: (Guid * Memory) list
   Status: Status
+  Culture: CultureInfo
+}
+
+[<Struct>]
+type NoteEnv = {
+  Agent: IProvideAgent
+  Memories: MemoryStore
+  Logger: Microsoft.Extensions.Logging.ILogger
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
 }
 
 [<Struct>]
 type Props = {
-  Culture: PageCulture
-  Agent: IProvideAgent
-  Memories: MemoryStore
   AthleteId: Guid
   /// The plan the note is observed on: its vocabulary closes the
   /// surface and its id stamps plan-scoped memories.
@@ -82,18 +90,33 @@ type Msg =
   | Interpreted of Reading
   | Decided of MemoryReview.Event
   | Saved of localId: Guid * Result<MemoryEntity, exn>
+  | CultureChanged of CultureInfo
 
 /// Ten live memories is the surface cap of one plan context.
 let memoryCap = 10
 
 /// Replays the page's kept state: a culture rebuild never loses a note,
 /// a reading or a pending proposal.
-let init(props: Props) = props.Initial, Cmd.none
+[<Struct>]
+type Context = {
+  Env: NoteEnv
+  Props: Props
+  OnEvent: Event -> unit
+}
+
+let init(ctx: Context) =
+  {
+    ctx.Props.Initial with
+        Culture = ctx.Env.Culture
+  },
+  Cmd.none
 
 /// The live count decides before the agent is called.
-let read(props: Props, note: string) : Task<Reading> = task {
+let read (ctx: Context) (note: string) : Task<Reading> = task {
+  let props = ctx.Props
+
   let live =
-    props.Memories.Snapshot props.AthleteId
+    ctx.Env.Memories.Snapshot props.AthleteId
     |> List.filter(fun entity -> entity.Memory.Status <> Discarded)
 
   if List.length live >= memoryCap then
@@ -105,7 +128,7 @@ let read(props: Props, note: string) : Task<Reading> = task {
       Date = DateOnly.FromDateTime DateTime.Today
     }
 
-    match! props.Agent.InterpretNote(ask, props.Cancel) with
+    match! ctx.Env.Agent.InterpretNote(ask, props.Cancel) with
     | Ok interpretation -> return Read interpretation
     | Error e -> return Unreadable e
 }
@@ -113,23 +136,29 @@ let read(props: Props, note: string) : Task<Reading> = task {
 /// Persists the confirmed memory; the local id travels so the update can
 /// drop the proposal card when the write lands.
 let saveMemory
-  (props: Props)
+  (ctx: Context)
   ((localId, memory): Guid * Memory)
   : Task<Guid * Result<MemoryEntity, exn>> = task {
+  let props = ctx.Props
+
   let! saved =
-    props.Memories.Add(props.AthleteId, memory, ValueSome props.PlanId)
+    ctx.Env.Memories.Add(props.AthleteId, memory, ValueSome props.PlanId)
 
   return localId, saved
 }
 
 /// The update closes over `onEvent`: the confirmed memory is a one-shot
 /// output, not a model transition.
-let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
+let update (ctx: Context) (msg: Msg) (model: Model) =
+  let props = ctx.Props
+  let onEvent = ctx.OnEvent
+
   let inline settled(next: Model, cmd: Cmd<Msg>) =
-    props.OnState next
-    next, cmd
+    next, Cmd.batch [ Cmd.ofAction(fun () -> props.OnState next); cmd ]
 
   match msg with
+  | CultureChanged culture ->
+    settled({ model with Culture = culture }, Cmd.none)
   | SetNote note -> settled({ model with Note = note }, Cmd.none)
 
   | InterpretRequested when
@@ -141,7 +170,7 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
             Busy = true
             Status = Reading
       },
-      Cmd.OfTask.perform read (props, model.Note.Trim()) Interpreted
+      Cmd.OfTask.perform (read ctx) (model.Note.Trim()) Interpreted
     )
 
   | InterpretRequested -> model, Cmd.none
@@ -159,15 +188,21 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
   | Interpreted(Read interpretation) ->
     // the rejections are the feedback loop: logged structured so the
     // uncovered surfaces count themselves over time
-    for rejection in interpretation.Rejections do
-      let motive, text =
-        match rejection with
-        | UnknownLabel token -> "etiqueta-desconocida", token
-        | UnknownTarget text -> "objetivo-desconocido", text
-        | MissingField field -> "campo-faltante", field
-        | OutsideProtocol detail -> "fuera-de-protocolo", detail
+    let log =
+      Cmd.ofAction(fun () ->
+        for rejection in interpretation.Rejections do
+          let motive, text =
+            match rejection with
+            | UnknownLabel token -> "etiqueta-desconocida", token
+            | UnknownTarget text -> "objetivo-desconocido", text
+            | MissingField field -> "campo-faltante", field
+            | OutsideProtocol detail -> "fuera-de-protocolo", detail
 
-      Log.Information("nota rechazada: {Motivo} {Texto}", motive, text)
+          ctx.Env.Logger.LogInformation(
+            "nota rechazada: {Motivo} {Texto}",
+            motive,
+            text
+          ))
 
     settled(
       {
@@ -185,11 +220,13 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
               interpretation.Memories
               |> List.map(fun memory -> Guid.NewGuid(), memory)
       },
-      Cmd.none
+      log
     )
 
   | Interpreted(Unreadable e) ->
-    Log.Error(e, "note interpretation failed")
+    let log =
+      Cmd.ofAction(fun () ->
+        ctx.Env.Logger.LogError(e, "note interpretation failed"))
 
     settled(
       {
@@ -197,13 +234,13 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
             Busy = false
             Status = Failed e.Message
       },
-      Cmd.none
+      log
     )
 
   | Decided(MemoryReview.Confirmed(localId, memory)) ->
     let decided = confirm memory.Deltas memory
 
-    model, Cmd.OfTask.perform (saveMemory props) (localId, decided) Saved
+    model, Cmd.OfTask.perform (saveMemory ctx) (localId, decided) Saved
 
   | Decided(MemoryReview.Discarded localId) ->
     settled(
@@ -216,7 +253,7 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
     )
 
   | Saved(localId, Ok entity) ->
-    onEvent(Event.MemoryConfirmed entity)
+    let notify = Cmd.ofAction(fun () -> onEvent(Event.MemoryConfirmed entity))
 
     settled(
       {
@@ -224,12 +261,14 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
             Proposals =
               model.Proposals |> List.filter(fun (key, _) -> key <> localId)
       },
-      Cmd.none
+      notify
     )
 
   | Saved(_, Error e) ->
-    Log.Error(e, "memory save failed")
-    settled({ model with Status = Failed e.Message }, Cmd.none)
+    let log =
+      Cmd.ofAction(fun () -> ctx.Env.Logger.LogError(e, "memory save failed"))
+
+    settled({ model with Status = Failed e.Message }, log)
 
 /// One status line: the text and whether it carries the error tone.
 [<Struct>]
@@ -259,6 +298,7 @@ let statusText(culture: CultureInfo, status: Status) : StatusLine =
     }
 
 let view
+  (env: NoteEnv)
   (props: Props)
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
@@ -298,8 +338,7 @@ let view
   // one named stream, two bindings: the status reaches the text and the
   // tone (the lookup is a string format, computing it twice is free)
   let statusStream =
-    Observable.combineLatest model props.Culture.Changed
-    |> Observable.map(fun (m, culture) -> statusText(culture, m.Status))
+    model |> Observable.map(fun m -> statusText(m.Culture, m.Status))
 
   let status =
     TextBlock()
@@ -315,12 +354,14 @@ let view
   let proposalRow(item: Guid * Memory) : Control =
     let id, memory = item
 
+    let memoryEnv: MemoryReview.MemoryReviewEnv = {
+      Culture = env.Culture
+      CultureChanged = model |> Observable.map _.Culture
+    }
+
     MemoryReview.MemoryReview(
-      {
-        Culture = props.Culture
-        Id = id
-        Memory = memory
-      },
+      memoryEnv,
+      { Id = id; Memory = memory },
       Decided >> dispatch
     )
 
@@ -340,11 +381,30 @@ let view
         .Children(noteEntry, interpret, status, proposals)
   )
 
-type NoteSection(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
+type NoteSection
+  (env: NoteEnv, props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
   =
   inherit UserControl()
 
   do
-    let program = Program.mkProgram init (update props onEvent) (view props)
+    let ctx = {
+      Env = env
+      Props = props
+      OnEvent = onEvent
+    }
 
-    this.Content <- Program.runWith props program
+    let subscribe(_: Model) : Sub<Msg> =
+      Sub.fromObservable
+        "culture"
+        (env.CultureChanged |> Observable.map CultureChanged)
+
+    let program =
+      Program.mkProgram
+        (fun (_: Props) -> init ctx)
+        (update ctx)
+        (view env props)
+      |> Program.withSubscription subscribe
+
+    let root, _ = Program.runWithLifetime this props program
+
+    this.Content <- root

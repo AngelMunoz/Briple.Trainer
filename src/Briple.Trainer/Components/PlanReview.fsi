@@ -8,6 +8,9 @@ module Briple.Trainer.Components.PlanReview
 // verbatim fields are editable (reps, RIR, rest, notes); edits flow
 // back as the full Plan tree.
 
+open System
+open System.Globalization
+
 open Avalonia.Controls
 
 open Briple.Trainer.Components.Page
@@ -40,10 +43,16 @@ type Event =
   | PlanChanged of Plan
   | ViewChanged of week: int * editing: bool
 
+/// The culture the component reads.
+[<Struct>]
+type PlanReviewEnv = {
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
 /// The component inputs.
 [<Struct>]
 type Props = {
-  Culture: PageCulture
   Parsed: ParsedPlan
   /// The week the page had shown, when it comes back from a rebuild.
   Week: int voption
@@ -62,6 +71,7 @@ type Model = {
   /// The page-level edit mode: on, one row can be open; off, the tree
   /// reads as prose.
   Editing: bool
+  Culture: CultureInfo
 }
 
 type Msg =
@@ -74,9 +84,14 @@ type Msg =
   | SetEditing of on: bool
   | RevertEdit
   | Undo
+  | CultureChanged of CultureInfo
 
 /// The review of one parsed plan.
 type PlanReview =
   inherit UserControl
 
-  new: props: Props * [<InlineIfLambda>] onEvent: (Event -> unit) -> PlanReview
+  new:
+    env: PlanReviewEnv *
+    props: Props *
+    [<InlineIfLambda>] onEvent: (Event -> unit) ->
+      PlanReview

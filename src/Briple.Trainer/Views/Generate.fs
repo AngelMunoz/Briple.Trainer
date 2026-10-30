@@ -14,6 +14,7 @@ open NXUI.Extensions
 open FSharp.Control.Reactive
 open IcedTasks
 open JDeck
+open Microsoft.Extensions.Logging
 open MVUish.Avalonia
 
 open Serilog
@@ -37,18 +38,28 @@ open Briple.Trainer.Strings
 open Briple.Trainer.Theme
 
 [<Struct>]
-type WizardPageProps = {
-  Culture: PageCulture
-  Lead: (unit -> Control) voption
+type GenerateEnv = {
   Store: IStore
   Memories: MemoryStore
   Plans: PlanStore
   Agent: IProvideAgent
+  Logger: Microsoft.Extensions.Logging.ILogger
+  Dialogs: IDialogs
+  Toasts: IToasts
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+[<Struct>]
+type WizardPageProps = {
+  Lead: (unit -> Control) voption
   Athlete: AthleteEntity
   Confirmed: Memory list
   Proposals: MemoryEntity list
   Previous: PlanEntity voption
   Gate: PageGate
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 type Outcome =
@@ -81,6 +92,7 @@ type Model = {
   Brief: Draft
   Last: Draft voption
   Token: CancellationTokenSource voption
+  Culture: CultureInfo
 }
 
 type Msg =
@@ -88,6 +100,11 @@ type Msg =
   | GoSection of Section
   | BriefChanged of Draft
   | GenerateRequested
+  | RunStarted of
+    CancellationTokenSource *
+    Generation *
+    kind: string *
+    audit: string
   | GenerationDone of Result<Run, string> * kind: string
   | PlanSaved of Result<PlanEntity, exn>
   | ConfirmPlan
@@ -101,6 +118,7 @@ type Msg =
   | RunAbandoned
   | Shown
   | Recorded
+  | CultureChanged of CultureInfo
 
 // --- pure request assembly ---
 
@@ -111,6 +129,13 @@ let (|AdjustmentBase|_|)(previous: PlanEntity voption) =
     match Briple.Trainer.Core.Plan.Parser.Parse.parse entity.Raw with
     | Ok parsed -> ValueSome parsed.Plan
     | _ -> ValueNone)
+
+[<Struct>]
+type Context = {
+  Env: GenerateEnv
+  Props: WizardPageProps
+  OnOutcome: Outcome -> unit
+}
 
 [<Struct>]
 type RequestParts = {
@@ -146,8 +171,8 @@ let inline kindOf kind =
   | Generation.NewPlan _ -> "new"
   | Generation.PlanAdjustment _ -> "adjust"
 
-let contentLanguage(culture: PageCulture) : ContentLanguage =
-  match culture.Current().TwoLetterISOLanguageName with
+let contentLanguage(culture: CultureInfo) : ContentLanguage =
+  match culture.TwoLetterISOLanguageName with
   | "en" -> ContentLanguage.English
   | _ -> ContentLanguage.Spanish
 
@@ -348,7 +373,9 @@ let auditPayload(draft: Draft, request: Generation) =
 
 // --- the page state machine ---
 
-let init(props: WizardPageProps) =
+let init(ctx: Context) =
+  let props = ctx.Props
+
   {
     Section = MemoriesSection
     Phase = Editing
@@ -358,10 +385,11 @@ let init(props: WizardPageProps) =
       WizardBrief.defaultDraft(
         props.Athlete.Profile,
         props.Previous.IsSome,
-        contentLanguage props.Culture
+        contentLanguage ctx.Env.Culture
       )
     Last = ValueNone
     Token = ValueNone
+    Culture = ctx.Env.Culture
   },
   Cmd.none
 
@@ -404,7 +432,7 @@ let requestFor(props: WizardPageProps, model: Model, draft: Draft) =
     Weeks = draft.Weeks
     Brief = {
       briefOf draft with
-          Language = contentLanguage props.Culture
+          Language = contentLanguage model.Culture
     }
     Previous =
       match props.Previous, draft.Mode with
@@ -412,42 +440,36 @@ let requestFor(props: WizardPageProps, model: Model, draft: Draft) =
       | _ -> ValueNone
   }
 
-/// One run, one CTS: leaving the wizard or a new run cancels it.
-let startRun
-  (props: WizardPageProps, model: Model, draft: Draft)
-  : Model * Cmd<Msg> =
-  cancel model.Token
-
-  let request = requestFor(props, model, draft)
+/// One run, one CTS: leaving the wizard or a new run cancels it. The
+/// resource work runs in the command, not in the model update.
+let beginRun(ctx: Context, model: Model, draft: Draft) : Model * Cmd<Msg> =
+  let request = requestFor(ctx.Props, model, draft)
   let kind = kindOf request
-  let cts = new CancellationTokenSource()
+  let audit = auditPayload(draft, request)
+  let previous = model.Token
 
-  let record =
-    Cmd.OfTask.perform
-      (addRequest props.Store)
-      (props.Athlete.Id, kind, auditPayload(draft, request))
-      (fun _ -> Recorded)
-
-  let run =
-    Cmd.OfTask.perform (callOf(props.Agent, cts.Token)) request (fun result ->
-      GenerationDone(Result.mapError (fun (e: exn) -> e.Message) result, kind))
+  let start =
+    Cmd.ofEffect(fun dispatch ->
+      cancel previous
+      let cts = new CancellationTokenSource()
+      dispatch(RunStarted(cts, request, kind, audit)))
 
   {
     model with
         Phase = Generating
         Brief = draft
         Last = ValueSome draft
-        Token = ValueSome cts
+        Token = ValueNone
   },
-  Cmd.batch [ record; run ]
+  start
 
-let update
-  (props: WizardPageProps)
-  (onOutcome: Outcome -> unit)
-  (msg: Msg)
-  (model: Model)
-  =
+let update (ctx: Context) (msg: Msg) (model: Model) =
+  let props = ctx.Props
+  let env = ctx.Env
+  let onOutcome = ctx.OnOutcome
+
   match msg with
+  | CultureChanged culture -> { model with Culture = culture }, Cmd.none
   | MemoryDecided(MemoryReview.Event.Confirmed(id, memory)) ->
     let decided = {
       model with
@@ -466,7 +488,7 @@ let update
       |> List.tryFind(fun entity -> entity.Id = id)
       |> Option.map(fun entity ->
         Cmd.OfTask.perform
-          (updateMemory props.Memories)
+          (updateMemory env.Memories)
           {
             entity with
                 Memory =
@@ -496,7 +518,7 @@ let update
       |> List.tryFind(fun entity -> entity.Id = id)
       |> Option.map(fun entity ->
         Cmd.OfTask.perform
-          (updateMemory props.Memories)
+          (updateMemory env.Memories)
           {
             entity with
                 Memory = discard entity.Memory
@@ -514,17 +536,38 @@ let update
   | BriefChanged draft -> { model with Brief = draft }, Cmd.none
 
   | GenerateRequested when model.Phase = Editing && resolved(props, model) ->
-    startRun(props, model, model.Brief)
+    beginRun(ctx, model, model.Brief)
 
   | GenerateRequested -> model, Cmd.none
 
   | Retry ->
     match model.Phase, model.Last with
-    | Failed _, ValueSome draft -> startRun(props, model, draft)
+    | Failed _, ValueSome draft -> beginRun(ctx, model, draft)
     | _ -> model, Cmd.none
 
+  | RunStarted(cts, request, kind, audit) ->
+    let record =
+      Cmd.OfTask.perform
+        (addRequest ctx.Env.Store)
+        (props.Athlete.Id, kind, audit)
+        (fun _ -> Recorded)
+
+    let run =
+      Cmd.OfTask.perform
+        (callOf(ctx.Env.Agent, cts.Token))
+        request
+        (fun result ->
+          GenerationDone(
+            Result.mapError (fun (e: exn) -> e.Message) result,
+            kind
+          ))
+
+    { model with Token = ValueSome cts }, Cmd.batch [ record; run ]
+
   | GenerationDone(Ok run, kind) ->
-    model.Token |> ValueOption.iter(fun source -> source.Dispose())
+    let cleanup =
+      Cmd.ofAction(fun () ->
+        model.Token |> ValueOption.iter(fun source -> source.Dispose()))
 
     match run.Verdict with
     | Rejected violations ->
@@ -533,7 +576,7 @@ let update
             Phase = Failed(RejectedPlan violations, ValueSome model.Brief)
             Token = ValueNone
       },
-      Cmd.none
+      cleanup
     | Valid(plan, advisories) ->
       let plan = withGenerationDate (DateOnly.FromDateTime DateTime.Now) plan
 
@@ -542,17 +585,19 @@ let update
             Phase = Done(plan, advisories, kind)
             Token = ValueNone
       },
-      Cmd.none
+      cleanup
 
   | GenerationDone(Error reason, _) ->
-    model.Token |> ValueOption.iter(fun source -> source.Dispose())
+    let cleanup =
+      Cmd.ofAction(fun () ->
+        model.Token |> ValueOption.iter(fun source -> source.Dispose()))
 
     {
       model with
           Phase = Failed(Unavailable reason, ValueSome model.Brief)
           Token = ValueNone
     },
-    Cmd.none
+    cleanup
 
   | ConfirmPlan ->
     match model.Phase with
@@ -563,46 +608,43 @@ let update
         Counts = planCounts props.Athlete.Profile plan
       }
 
-      model, Cmd.OfTask.perform props.Plans.Add (insert, plan) PlanSaved
+      model, Cmd.OfTask.perform env.Plans.Add (insert, plan) PlanSaved
     | _ -> model, Cmd.none
 
   // the phase must reach Ready before the navigation asks the guard:
   // the message runs after the state update
   | PlanSaved(Ok entity) ->
-    cancel model.Token
-
     {
       model with
           Phase = Editing
           Token = ValueNone
     },
-    Cmd.ofMsg(Finished entity.Id)
+    Cmd.batch [
+      Cmd.ofAction(fun () -> cancel model.Token)
+      Cmd.ofMsg(Finished entity.Id)
+    ]
 
   | Finished entityId ->
-    onOutcome(PlanFinished entityId)
-    model, Cmd.none
+    model, Cmd.ofAction(fun () -> onOutcome(PlanFinished entityId))
 
   | PlanSaved(Error e) ->
-    let culture = props.Culture.Current()
-    Log.Error(e, "plan save failed")
-
+    let culture = model.Culture
     let action = get(culture, Keys.reviewSave)
 
-    Briple.Trainer.Toasts.show(
-      action,
-      friendly(culture, action, e.Message),
-      true
-    )
-
-    model, Cmd.none
+    model,
+    Cmd.batch [
+      Cmd.ofAction(fun () -> env.Logger.LogError(e, "plan save failed"))
+      Cmd.ofAction(fun () ->
+        env.Toasts.Show(action, friendly(culture, action, e.Message), true))
+    ]
 
   | DiscardRequested ->
     match model.Phase with
     | Done _ ->
-      let culture = props.Culture.Current()
+      let culture = model.Culture
 
       let ask =
-        Briple.Trainer.Dialogs.confirmAsync {
+        env.Dialogs.ConfirmAsync {
           Title = get(culture, Keys.wizardDiscardTitle)
           Body = get(culture, Keys.wizardDiscardBody)
           Accept = get(culture, Keys.wizardDiscard)
@@ -615,45 +657,35 @@ let update
     | _ -> model, Cmd.none
 
   | Discarded ->
-    cancel model.Token
-
     {
       model with
           Phase = Editing
           Token = ValueNone
     },
-    Cmd.ofMsg Left
+    Cmd.batch [ Cmd.ofAction(fun () -> cancel model.Token); Cmd.ofMsg Left ]
 
   | Ignored -> model, Cmd.none
 
   | Exit ->
-    cancel model.Token
-
     {
       model with
           Phase = Editing
           Token = ValueNone
     },
-    Cmd.ofMsg Left
+    Cmd.batch [ Cmd.ofAction(fun () -> cancel model.Token); Cmd.ofMsg Left ]
 
-  | Left ->
-    onOutcome WizardCancelled
-    model, Cmd.none
+  | Left -> model, Cmd.ofAction(fun () -> onOutcome WizardCancelled)
 
   | RunAbandoned ->
-    cancel model.Token
-
     {
       model with
           Phase = Editing
           Token = ValueNone
     },
-    Cmd.none
+    Cmd.ofAction(fun () -> cancel model.Token)
 
   | Shown ->
     // a fresh visit, even when the router served a cached page
-    cancel model.Token
-
     {
       Section = MemoriesSection
       Phase = Editing
@@ -663,12 +695,13 @@ let update
         WizardBrief.defaultDraft(
           props.Athlete.Profile,
           props.Previous.IsSome,
-          contentLanguage props.Culture
+          contentLanguage model.Culture
         )
       Last = ValueNone
       Token = ValueNone
+      Culture = model.Culture
     },
-    Cmd.none
+    Cmd.ofAction(fun () -> cancel model.Token)
 
   | Recorded -> model, Cmd.none
 
@@ -690,10 +723,18 @@ let inline statusLineKey(key: string, isError: bool) : Control =
 let inline linesPanel(lines: Control array) : Control =
   StackPanel().Spacing(4.0).Children(lines)
 
-let inline stepCaption(culture: PageCulture, number: int) : Control =
+[<Struct>]
+type ViewCulture = {
+  Current: CultureInfo
+  Changed: IObservable<CultureInfo>
+}
+
+let inline stepCaption
+  (culture: IObservable<CultureInfo>, number: int)
+  : Control =
   TextBlock()
     .Text(
-      culture.Changed
+      culture
       |> Observable.map(fun current ->
         getf(current, Keys.wizardStepOf, [ number :> obj; 2 :> obj ]))
     )
@@ -701,12 +742,19 @@ let inline stepCaption(culture: PageCulture, number: int) : Control =
 
 /// The memories section: what the athlete remembers. It reads only;
 /// the decision is the brief's.
-let memoriesColumn(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
+let memoriesColumn
+  (props: WizardPageProps, culture: ViewCulture, dispatch: Dispatch<Msg>)
+  : Control =
+  let memoryEnv: MemoryReview.MemoryReviewEnv = {
+    Culture = culture.Current
+    CultureChanged = culture.Changed
+  }
+
   let cards: Control array = [|
     for entity in props.Proposals ->
       MemoryReview.MemoryReview(
+        memoryEnv,
         {
-          Culture = props.Culture
           Id = entity.Id
           Memory = entity.Memory
         },
@@ -732,7 +780,7 @@ let memoriesColumn(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
   StackPanel()
     .Spacing(8.0)
     .Children(
-      stepCaption(props.Culture, 1),
+      stepCaption(culture.Changed, 1),
       (if Array.isEmpty cards then
          labelKey Keys.memoriesEmpty
        else
@@ -771,7 +819,7 @@ let briefColumn
   StackPanel()
     .Spacing(8.0)
     .Children(
-      stepCaption(props.Culture, 2),
+      stepCaption(model |> Observable.map _.Culture, 2),
       brief,
       generate.HorizontalAlignment(HorizontalAlignment.Left)
     )
@@ -790,19 +838,25 @@ let editingView
     model: IObservable<Model>,
     dispatch: Dispatch<Msg>
   ) : Control =
+  let culture = {
+    Current = current.Culture
+    Changed = model |> Observable.map _.Culture
+  }
+
   let hub =
     Hub.hub {
       Title = ""
       Slots = [
         Hub.slotView(
           Localization.textBlock Keys.wizardStepMemories,
-          memoriesColumn(props, dispatch)
+          memoriesColumn(props, culture, dispatch)
         )
         Hub.slotView(
           Localization.textBlock Keys.wizardStepBrief,
           briefColumn(props, current.Brief, model, dispatch)
         )
       ]
+      InitialActive = ValueSome(sectionIndex current.Section)
       Active =
         ValueSome(model |> Observable.map(fun m -> sectionIndex m.Section))
       OnSelect =
@@ -850,6 +904,7 @@ let generatingView(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
 let failedView
   (
     props: WizardPageProps,
+    culture: ViewCulture,
     failure: Failure,
     last: Draft voption,
     dispatch: Dispatch<Msg>
@@ -878,7 +933,7 @@ let failedView
   let reasonsPanel =
     ContentControl()
       .Content(
-        (props.Culture.Changed
+        (culture.Changed
          |> Observable.map(fun culture ->
            linesPanel [|
              for reason in reasonsFor culture -> statusLine(reason, true)
@@ -900,6 +955,7 @@ let failedView
 let doneView
   (
     props: WizardPageProps,
+    culture: ViewCulture,
     plan: Plan,
     advisories: Violation list,
     dispatch: Dispatch<Msg>
@@ -907,7 +963,7 @@ let doneView
   let advisoryPanel =
     ContentControl()
       .Content(
-        (props.Culture.Changed
+        (culture.Changed
          |> Observable.map(fun culture ->
            advisories
            |> List.map(fun advisory ->
@@ -917,10 +973,15 @@ let doneView
           .ToBinding()
       )
 
+  let planEnv: PlanReview.PlanReviewEnv = {
+    Culture = culture.Current
+    CultureChanged = culture.Changed
+  }
+
   let preview =
     PlanReview.PlanReview(
+      planEnv,
       {
-        Culture = props.Culture
         Parsed = { Plan = plan; Warnings = [] }
         Week = ValueNone
         Editing = false
@@ -966,11 +1027,17 @@ let phaseView
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
+  let culture = {
+    Current = current.Culture
+    Changed = model |> Observable.map _.Culture
+  }
+
   match current.Phase with
   | Editing -> editingView(props, current, model, dispatch)
   | Generating -> generatingView(props, dispatch)
-  | Failed(failure, last) -> failedView(props, failure, last, dispatch)
-  | Done(plan, advisories, _) -> doneView(props, plan, advisories, dispatch)
+  | Failed(failure, last) -> failedView(props, culture, failure, last, dispatch)
+  | Done(plan, advisories, _) ->
+    doneView(props, culture, plan, advisories, dispatch)
 
 /// The phase switches when the model enters another phase; the edits
 /// inside a phase stay in the components, so the brief and the hub keep
@@ -991,19 +1058,33 @@ let view
     )
 
 type WizardPage
-  (props: WizardPageProps, [<InlineIfLambda>] onOutcome: Outcome -> unit) as this
-  =
+  (
+    env: GenerateEnv,
+    props: WizardPageProps,
+    [<InlineIfLambda>] onOutcome: Outcome -> unit
+  ) as this =
   inherit UserControl()
 
   do
+    let ctx = {
+      Env = env
+      Props = props
+      OnOutcome = onOutcome
+    }
+
     let subscribe(_: Model) : Sub<Msg> =
-      fun dispatch ->
-        Page.listenGate {
-          Control = this
-          Gate = props.Gate
-          OnShown = fun () -> dispatch Shown
-          OnCancel = fun () -> dispatch RunAbandoned
-        }
+      Sub.batch [
+        Sub.ofId "gate" (fun dispatch ->
+          Page.listenGate {
+            Control = this
+            Gate = props.Gate
+            OnShown = fun () -> dispatch Shown
+            OnCancel = fun () -> dispatch RunAbandoned
+          })
+        Sub.fromObservable
+          "culture"
+          (env.CultureChanged |> Observable.map CultureChanged)
+      ]
 
     let render (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
       Page.trackPhase(this, props.Gate, model |> Observable.map phaseOf)
@@ -1011,7 +1092,13 @@ type WizardPage
       view props model dispatch
 
     let program =
-      Program.mkProgram init (update props onOutcome) render
+      Program.mkProgram
+        (fun (_: WizardPageProps) -> init ctx)
+        (update ctx)
+        render
       |> Program.withSubscription subscribe
 
-    this.Content <- Program.runWith props program
+    let root, lifetime = Program.runWithLifecycle props program
+
+    this.Content <- root
+    props.Lifetime.AddDisposable lifetime

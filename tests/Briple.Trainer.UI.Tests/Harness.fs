@@ -149,3 +149,19 @@ let buttonWithText(root: Control, text: string) : Button option =
 /// Clicks through the routed event, the way MigrondiUI's tests do.
 let click(button: Button) : unit =
   button.RaiseEvent(Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent))
+
+/// A disposable bag for route pages that need a page lifetime in tests.
+type TestLifetime() =
+  let items = ResizeArray<IDisposable>()
+
+  interface Navs.IDisposableBag with
+    member _.AddDisposable disposable = items.Add disposable
+
+  interface IDisposable with
+    member _.Dispose() =
+      for item in items do
+        item.Dispose()
+
+      items.Clear()
+
+let testLifetime() : Navs.IDisposableBag = new TestLifetime() :> _

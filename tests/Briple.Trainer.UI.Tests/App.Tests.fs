@@ -11,6 +11,8 @@ open System.Reactive.Subjects
 open Avalonia
 open Avalonia.Controls
 open Avalonia.Controls.Presenters
+open Avalonia.Media
+open Avalonia.Styling
 open Avalonia.VisualTree
 
 open Expecto
@@ -28,6 +30,16 @@ open Briple.Trainer.Strings
 open Briple.Trainer.UI.Tests.Harness
 
 let private es = Language.toCulture Es
+
+let private athleteListEnv
+  (athletes: BehaviorSubject<AthleteEntity list>)
+  (culture: Briple.Trainer.Components.Page.PageCulture)
+  : AthleteListEnv = {
+  Observe = fun () -> athletes :> IObservable<_>
+  Snapshot = fun () -> athletes.Value
+  Culture = culture.Current()
+  CultureChanged = culture.Changed
+}
 
 // migrations under test log through the app's pipeline (silent under the
 // default Serilog)
@@ -53,10 +65,24 @@ let private buttons(root: Control) : Button list =
     | _ -> None)
   |> List.ofSeq
 
+let private controlByName(root: Control, name: string) : Control option =
+  root.GetVisualDescendants()
+  |> Seq.tryPick(fun visual ->
+    match visual with
+    | :? Control as control when control.Name = name -> Some control
+    | _ -> None)
+
+let private textBlockWith(root: Control, text: string) : TextBlock option =
+  root.GetVisualDescendants()
+  |> Seq.tryPick(fun visual ->
+    match visual with
+    | :? TextBlock as block when block.Text = text -> Some block
+    | _ -> None)
+
 /// Mounts the dialog overlay, asks one confirmation and answers through
 /// the buttons; the tuple is the reply cell, the overlay and its window.
 let private askDialog() =
-  let overlay = probeUi(fun () -> Briple.Trainer.Dialogs.host)
+  let overlay = probeUi(fun () -> Briple.Trainer.Dialogs.host())
 
   let window = mountWindow overlay
 
@@ -129,6 +155,41 @@ let tests =
       }
     ]
 
+    testList "theme" [
+      test "theme text follows the applied variant" {
+        let block: TextBlock =
+          probeUi(fun () ->
+            let block = TextBlock(Text = "Tema")
+            block.Classes.Add("body")
+            block)
+
+        let window =
+          probeUi(fun () ->
+            let window = Window(Content = block)
+            window.Show() |> ignore
+            window)
+
+        let color() =
+          probeUi(fun () ->
+            match block.Foreground with
+            | :? SolidColorBrush as brush -> brush.Color
+            | _ -> failwith "the text has no solid foreground")
+
+        try
+          onUi(fun () -> Briple.Trainer.Theme.applyVariant ThemeVariant.Light)
+
+          Expect.equal (color()) (Color.Parse "#1A1A1A") "light text"
+
+          onUi(fun () -> Briple.Trainer.Theme.applyVariant ThemeVariant.Dark)
+
+          Expect.equal (color()) (Color.Parse "#FFFFFF") "dark text"
+        finally
+          onUi(fun () ->
+            Briple.Trainer.Theme.applyVariant ThemeVariant.Light
+            window.Close())
+      }
+    ]
+
     testList "athlete list" [
       test "the empty page renders the empty-state text" {
         let _, culture = liveCulture es
@@ -136,10 +197,12 @@ let tests =
         let control =
           probeUi(fun () ->
             AthleteList(
+              athleteListEnv
+                (new BehaviorSubject<AthleteEntity list>([]))
+                culture,
               {
-                Culture = culture
                 Lead = ValueNone
-                Athletes = new BehaviorSubject<AthleteEntity list>([])
+                Lifetime = testLifetime()
               },
               ignore
             ))
@@ -173,10 +236,12 @@ let tests =
         let control =
           probeUi(fun () ->
             AthleteList(
+              athleteListEnv
+                (new BehaviorSubject<AthleteEntity list>([ entity ]))
+                culture,
               {
-                Culture = culture
                 Lead = ValueNone
-                Athletes = new BehaviorSubject<AthleteEntity list>([ entity ])
+                Lifetime = testLifetime()
               },
               fun event ->
                 match event with
@@ -203,6 +268,8 @@ let tests =
           | None -> failtest "the row vanished"
 
         onUi(fun () -> click row)
+
+        settle()
 
         Expect.equal
           opened.Value
@@ -236,11 +303,12 @@ let tests =
         let control =
           probeUi(fun () ->
             AthleteList(
+              athleteListEnv
+                (new BehaviorSubject<AthleteEntity list>([ ana; beto ]))
+                culture,
               {
-                Culture = culture
                 Lead = ValueNone
-                Athletes =
-                  new BehaviorSubject<AthleteEntity list>([ ana; beto ])
+                Lifetime = testLifetime()
               },
               ignore
             ))
@@ -360,10 +428,12 @@ let tests =
         let control =
           probeUi(fun () ->
             AthleteList(
+              athleteListEnv
+                (new BehaviorSubject<AthleteEntity list>([ ana ]))
+                culture,
               {
-                Culture = culture
                 Lead = ValueNone
-                Athletes = new BehaviorSubject<AthleteEntity list>([ ana ])
+                Lifetime = testLifetime()
               },
               ignore
             ))
@@ -409,10 +479,12 @@ let tests =
         let control =
           probeUi(fun () ->
             AthleteList(
+              athleteListEnv
+                (new BehaviorSubject<AthleteEntity list>([]))
+                culture,
               {
-                Culture = culture
                 Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
-                Athletes = new BehaviorSubject<AthleteEntity list>([])
+                Lifetime = testLifetime()
               },
               ignore
             ))
@@ -460,7 +532,7 @@ let tests =
         | _ -> failtest "the lead or the title did not render"
       }
 
-      test "a store emission after detach still reaches the list" {
+      test "a store emission after detach does not reach the disposed list" {
         let entity name = {
           Id = Guid.NewGuid()
           Profile = {
@@ -473,14 +545,15 @@ let tests =
         let source = new BehaviorSubject<AthleteEntity list>([ entity "Ana" ])
 
         let _, culture = liveCulture es
+        let lifetime = new TestLifetime()
 
         let control =
           probeUi(fun () ->
             AthleteList(
+              athleteListEnv source culture,
               {
-                Culture = culture
                 Lead = ValueNone
-                Athletes = source
+                Lifetime = lifetime :> Navs.IDisposableBag
               },
               ignore
             ))
@@ -501,28 +574,33 @@ let tests =
 
         Expect.isTrue ana "the first row rendered"
 
-        // leaving the page detaches the control: a cached route does
-        // exactly this on every navigation away
-        onUi(fun () -> host.Content <- null)
+        // leaving the page detaches the control and disposes the route
+        // lifetime, the way the router does on every navigation away; the
+        // list route is NoCache, so the next visit builds a fresh page
+        onUi(fun () ->
+          host.Content <- null
+          (lifetime :> IDisposable).Dispose())
 
         settle()
+
+        Expect.isFalse
+          source.HasObservers
+          "the detached page stopped listening to the store"
 
         // the store emits while nobody is watching
         onUi(fun () -> source.OnNext([ entity "Ana"; entity "Beto" ]))
 
         settle()
 
-        // coming back re-attaches the same control instance
+        // the route builds a new page on the next visit; this instance
+        // must not restart its disposed program on reattach
         mount control
+        settle()
 
         let beto =
-          waitFor(
-            2000,
-            (fun () -> control),
-            (fun c -> buttonWithText(c, "Beto") |> Option.isSome)
-          )
+          probeUi(fun () -> buttonWithText(control, "Beto") |> Option.isSome)
 
-        Expect.isTrue beto "the late emission reached the reattached list"
+        Expect.isFalse beto "the disposed page did not resume on reattach"
       }
     ]
 
@@ -535,13 +613,13 @@ let tests =
           probeUi(fun () ->
             NewAthleteForm(
               {
-                Culture = culture
                 Lead = ValueNone
                 Gate =
                   Briple.Trainer.Navigation.PageGate(
                     "/athletes/new",
                     fun _ _ -> async { return true }
                   )
+                Lifetime = testLifetime()
               },
               events.Add
             ))
@@ -601,13 +679,13 @@ let tests =
           probeUi(fun () ->
             NewAthleteForm(
               {
-                Culture = culture
                 Lead = ValueNone
                 Gate =
                   Briple.Trainer.Navigation.PageGate(
                     "/athletes/new",
                     fun _ _ -> async { return true }
                   )
+                Lifetime = testLifetime()
               },
               events.Add
             ))
@@ -668,9 +746,9 @@ let tests =
           probeUi(fun () ->
             NewAthleteForm(
               {
-                Culture = culture
                 Lead = ValueNone
                 Gate = gate
+                Lifetime = testLifetime()
               },
               events.Add
             ))
@@ -728,9 +806,9 @@ let tests =
           probeUi(fun () ->
             NewAthleteForm(
               {
-                Culture = culture
                 Lead = ValueNone
                 Gate = gate
+                Lifetime = testLifetime()
               },
               ignore
             ))
@@ -1043,6 +1121,185 @@ let tests =
         Expect.isTrue
           onList
           "with token: the boot did not land on the athletes list"
+      }
+
+      test "the title bar band clears the page and hides the root back" {
+        let db =
+          Path.Combine(Path.GetTempPath(), $"briple-band-{Guid.NewGuid():N}.db")
+
+        match Briple.Trainer.Persistence.migrate(testLogger, db) with
+        | Error e -> failtest $"migrate failed: {e}"
+        | Ok() -> ()
+
+        let env =
+          probeUi(fun () ->
+            Briple.Trainer.Env.AppEnv(
+              Briple.Trainer.Stores.createStores(sqliteStore db, fun _ -> ()),
+              Briple.Trainer.Secrets.create(),
+              ValueSome {
+                Briple.Trainer.Env.defaultSettings with
+                    Key = "token"
+              }
+            ))
+
+        let window = probeUi(fun () -> Briple.Trainer.Shell.create env)
+
+        onUi(fun () -> window.Show() |> ignore)
+
+        let rendered =
+          waitFor(
+            5000,
+            (fun () -> window),
+            fun w -> hasText(w, get(es, Keys.athletesTitle))
+          )
+
+        Expect.isTrue rendered "the athletes page did not render"
+
+        settle()
+
+        let band =
+          probeUi(fun () -> controlByName(window, "TitleBarBand"))
+          |> Option.defaultWith(fun () ->
+            failtest "the title bar band is missing")
+
+        let title =
+          probeUi(fun () -> textBlockWith(window, get(es, Keys.athletesTitle)))
+          |> Option.defaultWith(fun () -> failtest "the page title is missing")
+
+        let command =
+          probeUi(fun () -> buttonWithText(window, get(es, Keys.athletesNew)))
+          |> Option.defaultWith(fun () -> failtest "the new command is missing")
+
+        let bandHeight, bandBottom, titleTop, commandTop =
+          probeUi(fun () ->
+            let bandHeight = band.Bounds.Height
+
+            let bandBottom =
+              band.TranslatePoint(Point(0.0, bandHeight), window).Value.Y
+
+            let titleTop =
+              title.TranslatePoint(Point(0.0, 0.0), window).Value.Y
+
+            let commandTop =
+              command.TranslatePoint(Point(0.0, 0.0), window).Value.Y
+
+            bandHeight, bandBottom, titleTop, commandTop)
+
+        Expect.equal bandHeight 32.0 "the band is 32px"
+
+        Expect.isGreaterThan
+          titleTop
+          bandBottom
+          "the page title starts below the band"
+
+        Expect.isGreaterThan
+          commandTop
+          bandBottom
+          "the page command starts below the band"
+
+        let rootBack =
+          probeUi(fun () ->
+            buttons(window)
+            |> List.tryFind(fun button -> button.Classes.Contains("back"))
+            |> Option.map(fun button -> button.IsVisible))
+
+        match rootBack with
+        | Some visible ->
+          Expect.isFalse visible "the root back control is hidden"
+        | None -> ()
+
+        let minimize =
+          probeUi(fun () -> controlByName(window, "MinimizeButton"))
+
+        let maximize =
+          probeUi(fun () -> controlByName(window, "MaximizeButton"))
+
+        let close = probeUi(fun () -> controlByName(window, "CloseButton"))
+
+        Expect.isSome minimize "the minimize button is missing"
+        Expect.isSome maximize "the maximize button is missing"
+        Expect.isSome close "the close button is missing"
+
+        let roleOf(control: Control) =
+          probeUi(fun () ->
+            Avalonia.Controls.Chrome.WindowDecorationProperties.GetElementRole(
+              control
+            ))
+
+        let dragRole =
+          probeUi(fun () ->
+            band.GetVisualDescendants()
+            |> Seq.tryFind(fun visual ->
+              let role =
+                Avalonia.Controls.Chrome.WindowDecorationProperties
+                  .GetElementRole(visual)
+
+              role = Avalonia.Input.WindowDecorationsElementRole.TitleBar))
+
+        Expect.isSome dragRole "the band has a title bar drag surface"
+
+        Expect.equal
+          (roleOf minimize.Value)
+          Avalonia.Input.WindowDecorationsElementRole.MinimizeButton
+          "the minimize button carries its system role"
+
+        Expect.equal
+          (roleOf maximize.Value)
+          Avalonia.Input.WindowDecorationsElementRole.MaximizeButton
+          "the maximize button carries its system role"
+
+        Expect.equal
+          (roleOf close.Value)
+          Avalonia.Input.WindowDecorationsElementRole.CloseButton
+          "the close button carries its system role"
+
+        let maximizeButton = maximize.Value :?> Button
+
+        onUi(fun () -> click maximizeButton)
+        settle()
+
+        Expect.equal
+          (probeUi(fun () -> window.WindowState))
+          WindowState.Maximized
+          "the caption button maximizes the window"
+
+        onUi(fun () -> click maximizeButton)
+        settle()
+
+        Expect.equal
+          (probeUi(fun () -> window.WindowState))
+          WindowState.Normal
+          "the caption button restores the window"
+
+        let newButton =
+          probeUi(fun () -> buttonWithText(window, get(es, Keys.athletesNew)))
+          |> Option.defaultWith(fun () -> failtest "the new command vanished")
+
+        onUi(fun () -> click newButton)
+
+        let form =
+          waitFor(
+            5000,
+            (fun () -> window),
+            fun w -> hasText(w, get(es, Keys.athleteName))
+          )
+
+        Expect.isTrue form "the form did not open"
+        settle()
+
+        let formBack =
+          probeUi(fun () ->
+            buttons(window)
+            |> List.tryFind(fun button -> button.Classes.Contains("back"))
+            |> Option.map(fun button -> button.IsVisible))
+
+        match formBack with
+        | Some visible ->
+          Expect.isTrue visible "the form back control is visible"
+        | None -> failtest "the form back control is missing"
+
+        onUi(fun () -> window.Close())
+        settle()
       }
     ]
   ]

@@ -27,6 +27,8 @@ type HubSlot = {
 type HubProps = {
   Title: string
   Slots: HubSlot list
+  /// The active column before the first stream emission; -1 means none.
+  InitialActive: int voption
   /// The active column; -1 means none. The hub pans to it and marks the
   /// header.
   Active: IObservable<int> voption

@@ -30,11 +30,12 @@ type FormPhase =
 /// The form inputs.
 [<Struct>]
 type Props = {
-  Culture: PageCulture
   /// The shell's back control, placed in the page header.
   Lead: (unit -> Control) voption
   /// The exit gate: the form tracks its derived phase.
   Gate: PageGate
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 type Model = {

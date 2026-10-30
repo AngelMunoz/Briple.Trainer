@@ -12,6 +12,7 @@ open NXUI.Extensions
 
 open FSharp.Control.Reactive
 open IcedTasks
+open Microsoft.Extensions.Logging
 open MVUish.Avalonia
 
 open Serilog
@@ -30,15 +31,24 @@ open Briple.Trainer.Stores
 open Briple.Trainer.Theme
 
 [<Struct>]
-type ReviewPageProps = {
-  Culture: PageCulture
-  Lead: (unit -> Control) voption
+type ReviewEnv = {
   Plans: PlanStore
   Memories: MemoryStore
   Agent: IProvideAgent
   Host: Window voption
+  Logger: Microsoft.Extensions.Logging.ILogger
+  Toasts: IToasts
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+[<Struct>]
+type ReviewPageProps = {
+  Lead: (unit -> Control) voption
   Entity: PlanEntity
   Gate: PageGate
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 /// The document the page shows: the stored tree and the pending edit,
@@ -64,6 +74,7 @@ type Model = {
   Editing: bool
   Status: PageStatus
   Note: NoteSection.Model
+  Culture: CultureInfo
 }
 
 type Msg =
@@ -75,6 +86,7 @@ type Msg =
   | Exported of Result<string option, exn>
   | NoteChanged of NoteSection.Model
   | NoteConfirmed of MemoryEntity
+  | CultureChanged of CultureInfo
   | ReconcileRequested
   | Reconciled of Result<PlanEntity voption, exn>
 
@@ -83,9 +95,18 @@ let noteInitial: NoteSection.Model = {
   Busy = false
   Proposals = []
   Status = NoteSection.Status.Idle
+  Culture = CultureInfo.InvariantCulture
 }
 
-let init(props: ReviewPageProps) =
+[<Struct>]
+type Context = {
+  Env: ReviewEnv
+  Props: ReviewPageProps
+}
+
+let init(ctx: Context) =
+  let props = ctx.Props
+
   let document =
     match Parse.parse props.Entity.Raw with
     | Ok parsed -> Loaded(parsed, None)
@@ -99,6 +120,7 @@ let init(props: ReviewPageProps) =
     Editing = false
     Status = PageStatus.NoStatus
     Note = noteInitial
+    Culture = ctx.Env.Culture
   },
   Cmd.none
 
@@ -137,24 +159,27 @@ let inline statusText(culture: CultureInfo, status: PageStatus) : string =
     friendly(culture, get(culture, actionKey), reason)
 
 let inline report
+  (ctx: Context)
   (culture: CultureInfo, actionKey: string, reason: string)
-  : unit =
+  : Cmd<Msg> =
   let action = get(culture, actionKey)
   let wording = friendly(culture, action, reason)
 
-  Briple.Trainer.Toasts.show(action, wording, true)
+  Cmd.ofAction(fun () -> ctx.Env.Toasts.Show(action, wording, true))
 
 /// The export picker and the write. The picker starts on the UI thread;
 /// the file write is small enough to finish there.
 let pickAndWrite
-  (props: ReviewPageProps)
+  (ctx: Context)
   (raw: string)
   : Async<Result<string option, exn>> = asyncEx {
-  match props.Host with
+  let props = ctx.Props
+
+  match ctx.Env.Host with
   | ValueNone -> return Error(exn "export without a host window")
   | ValueSome host ->
     try
-      let culture = props.Culture.Current()
+      let culture = ctx.Env.Culture
 
       let options =
         FilePickerSaveOptions(
@@ -175,8 +200,11 @@ let pickAndWrite
       return Error e
 }
 
-let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
+let update (ctx: Context) (msg: Msg) (model: Model) =
+  let props = ctx.Props
+
   match msg with
+  | CultureChanged culture -> { model with Culture = culture }, Cmd.none
   | PlanEdited edited ->
     match model.Document with
     | Broken _ -> model, Cmd.none
@@ -206,7 +234,7 @@ let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
 
       model,
       Cmd.OfTask.perform
-        (fun value -> props.Plans.UpdateRaw(props.Entity.Id, value))
+        (fun value -> ctx.Env.Plans.UpdateRaw(props.Entity.Id, value))
         raw
         (fun result -> SaveFinished(raw, result))
     | _ -> model, Cmd.none
@@ -226,22 +254,23 @@ let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
     Cmd.none
 
   | SaveFinished(_, Error e) ->
-    let culture = props.Culture.Current()
-    Log.Error(e, "plan update failed")
-    report(culture, Keys.reviewSave, e.Message)
+    let culture = model.Culture
+
+    let log =
+      Cmd.ofAction(fun () -> ctx.Env.Logger.LogError(e, "plan update failed"))
 
     {
       model with
           Status = PageStatus.Failed(Keys.reviewSave, e.Message)
     },
-    Cmd.none
+    Cmd.batch [ log; report ctx (culture, Keys.reviewSave, e.Message) ]
 
   | ExportRequested ->
     match model.Document with
     | Broken _ -> model, Cmd.none
     | Loaded _ ->
       model,
-      Cmd.OfAsync.perform (pickAndWrite props) (rawOf model.Document) Exported
+      Cmd.OfAsync.perform (pickAndWrite ctx) (rawOf model.Document) Exported
 
   | Exported(Ok(Some path)) ->
     {
@@ -253,15 +282,16 @@ let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
   | Exported(Ok None) -> model, Cmd.none
 
   | Exported(Error e) ->
-    let culture = props.Culture.Current()
-    Log.Error(e, "plan export failed")
-    report(culture, Keys.reviewExport, e.Message)
+    let culture = model.Culture
+
+    let log =
+      Cmd.ofAction(fun () -> ctx.Env.Logger.LogError(e, "plan export failed"))
 
     {
       model with
           Status = PageStatus.Failed(Keys.reviewExport, e.Message)
     },
-    Cmd.none
+    Cmd.batch [ log; report ctx (culture, Keys.reviewExport, e.Message) ]
 
   | NoteChanged state -> { model with Note = state }, Cmd.none
 
@@ -270,7 +300,7 @@ let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
   | ReconcileRequested ->
     model,
     Cmd.OfTask.perform
-      (fun id -> props.Plans.Find id)
+      (fun id -> ctx.Env.Plans.Find id)
       props.Entity.Id
       Reconciled
 
@@ -278,13 +308,17 @@ let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
     // a clean page adopts the stored tree; a pending draft keeps its
     // baseline and is never overwritten in silence
     if isDirty model.Document then
-      if entity.Raw <> model.Baseline then
-        Log.Warning(
-          "plan {PlanId} changed in the store while the review had a draft",
-          entity.Id
-        )
+      let warning =
+        if entity.Raw <> model.Baseline then
+          Cmd.ofAction(fun () ->
+            ctx.Env.Logger.LogWarning(
+              "plan {PlanId} changed in the store while the review had a draft",
+              entity.Id
+            ))
+        else
+          Cmd.none
 
-      { model with Entity = entity }, Cmd.none
+      { model with Entity = entity }, warning
     else
       let document =
         match Parse.parse entity.Raw with
@@ -302,10 +336,12 @@ let update (props: ReviewPageProps) (msg: Msg) (model: Model) =
   | Reconciled(Ok ValueNone) -> model, Cmd.none
 
   | Reconciled(Error e) ->
-    Log.Error(e, "plan reload failed")
-    model, Cmd.none
+    model,
+    Cmd.ofAction(fun () -> ctx.Env.Logger.LogError(e, "plan reload failed"))
 
-let invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
+let invalidBody
+  (props: ReviewPageProps, model: IObservable<Model>, failure: PlanFailure)
+  : Control =
   fluentPage {
     Lead = props.Lead
     Title = pageTitleKey Keys.reviewTitle
@@ -318,10 +354,10 @@ let invalidBody(props: ReviewPageProps, failure: PlanFailure) : Control =
           glyph(Icons.alertCircle, 24.0, errorBrush),
           TextBlock()
             .Text(
-              props.Culture.Changed
+              model
               |> Observable.map(fun current ->
                 getf(
-                  current,
+                  current.Culture,
                   Keys.reviewInvalid,
                   [ Parse.describe failure :> obj ]
                 ))
@@ -349,7 +385,7 @@ let guideGroups(plan: Plan) : (string option * string list) list =
     (if key = "" then None else Some key), rows |> List.map snd)
 
 /// The full plan guide, one heading per key and the body lines below.
-let guideSection(culture: PageCulture, plan: Plan) : Control =
+let guideSection(plan: Plan) : Control =
   let groups = guideGroups plan
 
   if List.isEmpty groups then
@@ -360,11 +396,7 @@ let guideSection(culture: PageCulture, plan: Plan) : Control =
 
       for key, lines in groups do
         match key with
-        | Some key ->
-          yield
-            TextBlock()
-              .Text(culture.Changed |> Observable.map(fun current -> key))
-              .Classes("body-strong")
+        | Some key -> yield TextBlock().Text(key).Classes("body-strong")
         | None -> ()
 
         for line in lines do
@@ -379,14 +411,16 @@ let guideSection(culture: PageCulture, plan: Plan) : Control =
 
 /// The page at one culture, over the current model.
 let view
-  (props: ReviewPageProps)
+  (ctx: Context)
   (notes: Threading.CancellationToken)
   (current: Model)
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
+  let props = ctx.Props
+
   match current.Document with
-  | Broken failure -> invalidBody(props, failure)
+  | Broken failure -> invalidBody(props, model, failure)
   | Loaded(parsed, draft) ->
     let plan = draft |> Option.defaultValue parsed.Plan
     let dirty = model |> Observable.map(fun m -> isDirty m.Document)
@@ -410,10 +444,7 @@ let view
 
     let status =
       TextBlock()
-        .Text(
-          Observable.combineLatest model props.Culture.Changed
-          |> Observable.map(fun (m, culture) -> statusText(culture, m.Status))
-        )
+        .Text(model |> Observable.map(fun m -> statusText(m.Culture, m.Status)))
         .Classes("caption", "secondary")
 
     let pending =
@@ -422,10 +453,17 @@ let view
         .Classes("caption", "secondary")
         .IsVisible(dirty)
 
+    let culture = model |> Observable.map _.Culture
+
+    let planEnv: PlanReview.PlanReviewEnv = {
+      Culture = current.Culture
+      CultureChanged = culture
+    }
+
     let review =
       PlanReview.PlanReview(
+        planEnv,
         {
-          Culture = props.Culture
           Parsed = { parsed with Plan = plan }
           Week = current.Week
           Editing = current.Editing
@@ -436,12 +474,18 @@ let view
           dispatch(ViewChanged(week, editing))
       )
 
+    let noteEnv: NoteSection.NoteEnv = {
+      Agent = ctx.Env.Agent
+      Memories = ctx.Env.Memories
+      Logger = ctx.Env.Logger
+      Culture = current.Culture
+      CultureChanged = model |> Observable.map _.Culture
+    }
+
     let notes =
       NoteSection.NoteSection(
+        noteEnv,
         {
-          Culture = props.Culture
-          Agent = props.Agent
-          Memories = props.Memories
           AthleteId = props.Entity.AthleteId
           Plan = plan
           PlanId = props.Entity.Id
@@ -460,31 +504,32 @@ let view
       Body =
         StackPanel()
           .Spacing(8.0)
-          .Children(
-            status,
-            pending,
-            review,
-            guideSection(props.Culture, plan),
-            notes
-          )
+          .Children(status, pending, review, guideSection plan, notes)
     }
 
-type ReviewPage(props: ReviewPageProps) as this =
+type ReviewPage(env: ReviewEnv, props: ReviewPageProps) as this =
   inherit UserControl()
 
   do
+    let ctx = { Env = env; Props = props }
+
     // the reading's token lives with the page; a confirmed leave asks
     // the page to stop the read through the gate's command channel
     let notesCts = new Threading.CancellationTokenSource()
 
     let subscribe(_: Model) : Sub<Msg> =
-      fun dispatch ->
-        Page.listenGate {
-          Control = this
-          Gate = props.Gate
-          OnShown = fun () -> dispatch ReconcileRequested
-          OnCancel = fun () -> notesCts.Cancel()
-        }
+      Sub.batch [
+        Sub.ofId "gate" (fun dispatch ->
+          Page.listenGate {
+            Control = this
+            Gate = props.Gate
+            OnShown = fun () -> dispatch ReconcileRequested
+            OnCancel = fun () -> notesCts.Cancel()
+          })
+        Sub.fromObservable
+          "culture"
+          (env.CultureChanged |> Observable.map CultureChanged)
+      ]
 
     let render (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
       Page.trackPhase(this, props.Gate, model |> Observable.map phaseOf)
@@ -494,12 +539,18 @@ type ReviewPage(props: ReviewPageProps) as this =
           (model
            |> Observable.take 1
            |> Observable.map(fun current ->
-             view props notesCts.Token current model dispatch))
+             view ctx notesCts.Token current model dispatch))
             .ToBinding()
         )
 
     let program =
-      Program.mkProgram init (update props) render
+      Program.mkProgram
+        (fun (_: ReviewPageProps) -> init ctx)
+        (update ctx)
+        render
       |> Program.withSubscription subscribe
 
-    this.Content <- Program.runWith props program
+    let root, lifetime = Program.runWithLifecycle props program
+
+    this.Content <- root
+    props.Lifetime.AddDisposable lifetime

@@ -37,11 +37,13 @@ type DeltaKind =
   | ModalityKind
 
 [<Struct>]
-type Props = {
-  Culture: PageCulture
-  Id: Guid
-  Memory: Memory
+type MemoryReviewEnv = {
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
 }
+
+[<Struct>]
+type Props = { Id: Guid; Memory: Memory }
 
 type Model = {
   Selected: Delta list
@@ -49,6 +51,7 @@ type Model = {
   Scope: MemoryScope
   Kind: DeltaKind
   Value: string
+  Culture: CultureInfo
 }
 
 type Msg =
@@ -60,6 +63,7 @@ type Msg =
   | RemoveAdded of Delta
   | Accept
   | Discard
+  | CultureChanged of CultureInfo
 
 let targetName target =
   match target with
@@ -137,13 +141,23 @@ let kindOptions = [
 /// Core, so the card and the delta decoder accept the same values.
 let modalityCatalog = modalities
 
-let init(props: Props) =
+[<Struct>]
+type Context = {
+  Env: MemoryReviewEnv
+  Props: Props
+  OnEvent: Event -> unit
+}
+
+let init(ctx: Context) =
+  let props = ctx.Props
+
   {
     Selected = props.Memory.Deltas
     Added = []
     Scope = props.Memory.Scope
     Kind = RirKind
     Value = ""
+    Culture = ctx.Env.Culture
   },
   Cmd.none
 
@@ -181,8 +195,12 @@ let addDelta(kind: DeltaKind, delta: Delta, deltas: Delta list) =
 
 /// The update closes over `onEvent`: the confirm and discard decisions are
 /// one-shot outputs, not model transitions.
-let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
+let update (ctx: Context) (msg: Msg) (model: Model) =
+  let props = ctx.Props
+  let onEvent = ctx.OnEvent
+
   match msg with
+  | CultureChanged culture -> { model with Culture = culture }, Cmd.none
   | Toggle delta ->
     let selected =
       if List.contains delta model.Selected then
@@ -223,31 +241,37 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
           Scope = model.Scope
     }
 
-    onEvent(Event.Confirmed(props.Id, memory))
-    model, Cmd.none
+    model, Cmd.ofAction(fun () -> onEvent(Event.Confirmed(props.Id, memory)))
 
-  | Discard ->
-    onEvent(Event.Discarded props.Id)
-    model, Cmd.none
+  | Discard -> model, Cmd.ofAction(fun () -> onEvent(Event.Discarded props.Id))
 
-type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
+type MemoryReview
+  (env: MemoryReviewEnv, props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
   =
   inherit UserControl()
 
-  let culture = props.Culture
-
   do
+    let ctx = {
+      Env = env
+      Props = props
+      OnEvent = onEvent
+    }
+
+    let subscribe(_: Model) : Sub<Msg> =
+      Sub.fromObservable
+        "culture"
+        (env.CultureChanged |> Observable.map CultureChanged)
 
     let view (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
-      let initial, _ = init props
+      let culture = model |> Observable.map _.Culture
+      let initial, _ = init ctx
 
       let optionRow(delta: Delta) : Control =
         let selected =
           model |> Observable.map(fun m -> List.contains delta m.Selected)
 
         let text =
-          culture.Changed
-          |> Observable.map(fun current -> deltaText current delta)
+          culture |> Observable.map(fun current -> deltaText current delta)
 
         checkRowObs(text, selected, fun () -> dispatch(Toggle delta))
 
@@ -255,8 +279,10 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
       let addedRows =
         ContentControl()
           .Content(
-            (Observable.combineLatest model props.Culture.Changed
-             |> Observable.map(fun (current, culture) ->
+            (model
+             |> Observable.map(fun current ->
+               let culture = current.Culture
+
                let children: Control array = [|
                  for delta in current.Added ->
                    DockPanel()
@@ -385,7 +411,7 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
             .Children(
               TextBlock()
                 .Text(
-                  culture.Changed
+                  culture
                   |> Observable.map(fun current ->
                     originText current props.Memory)
                 ),
@@ -417,6 +443,10 @@ type MemoryReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as th
         )
         .Classes("card")
 
-    let program = Program.mkProgram init (update props onEvent) view
+    let program =
+      Program.mkProgram (fun (_: Props) -> init ctx) (update ctx) view
+      |> Program.withSubscription subscribe
 
-    this.Content <- Program.runWith props program
+    let root, _ = Program.runWithLifetime this props program
+
+    this.Content <- root

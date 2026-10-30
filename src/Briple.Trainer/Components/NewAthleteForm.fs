@@ -27,9 +27,10 @@ type FormPhase =
 
 [<Struct>]
 type Props = {
-  Culture: PageCulture
   Lead: (unit -> Control) voption
   Gate: PageGate
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 type Model = {
@@ -111,13 +112,9 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
 
   | Save -> model, Cmd.none
 
-  | Submitting ->
-    onEvent(Saved(profileOf model))
-    model, Cmd.none
+  | Submitting -> model, Cmd.ofAction(fun () -> onEvent(Saved(profileOf model)))
 
-  | Cancel ->
-    onEvent Cancelled
-    model, Cmd.none
+  | Cancel -> model, Cmd.ofAction(fun () -> onEvent Cancelled)
 
 /// The page: static text comes from resources; the model owns the name,
 /// the gender and the goals.
@@ -201,4 +198,7 @@ type NewAthleteForm(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as 
 
     let program = Program.mkProgram init (update props onEvent) render
 
-    this.Content <- Program.runWith props program
+    let root, lifetime = Program.runWithLifecycle props program
+
+    this.Content <- root
+    props.Lifetime.AddDisposable lifetime

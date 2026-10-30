@@ -1,7 +1,12 @@
 module Briple.Trainer.Views.Settings
 
+open System
+
 open Avalonia.Controls
 open NXUI.Extensions
+
+open FSharp.Control.Reactive
+open MVUish.Avalonia
 
 open Briple.Trainer
 open Briple.Trainer.Components
@@ -12,16 +17,50 @@ open Briple.Trainer.Strings
 open Briple.Trainer.Theme
 
 [<Struct>]
+type SettingsEnv = {
+  Language: Language
+  Theme: ThemeChoice
+  AgentAvailable: bool
+}
+
+[<Struct>]
 type SettingsPageProps = {
-  Culture: PageCulture
   Lead: (unit -> Control) voption
-  Language: unit -> Language
-  Theme: unit -> ThemeChoice
-  AgentAvailable: unit -> bool
   OnLanguage: Language -> unit
   OnTheme: ThemeChoice -> unit
   OpenLogin: unit -> unit
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
+
+type Model = {
+  Language: Language
+  Theme: ThemeChoice
+  AgentAvailable: bool
+}
+
+type Msg =
+  | LanguageSelected of Language
+  | ThemeSelected of ThemeChoice
+  | ConnectRequested
+
+let init(env: SettingsEnv) =
+  let model = {
+    Language = env.Language
+    Theme = env.Theme
+    AgentAvailable = env.AgentAvailable
+  }
+
+  model, Cmd.none
+
+let update (props: SettingsPageProps) (msg: Msg) (model: Model) =
+  match msg with
+  | LanguageSelected language ->
+    { model with Language = language },
+    Cmd.ofAction(fun () -> props.OnLanguage language)
+  | ThemeSelected theme ->
+    { model with Theme = theme }, Cmd.ofAction(fun () -> props.OnTheme theme)
+  | ConnectRequested -> model, Cmd.ofAction(fun () -> props.OpenLogin())
 
 /// A closed dropdown over resource-key labels; the selection maps by
 /// index, so changing the language never rewrites the option values.
@@ -47,12 +86,17 @@ let picker
 
 /// The page: static text comes from resources; the dropdown labels
 /// follow the dictionary, no rebuild.
-let view(props: SettingsPageProps) : Control =
+let view
+  (env: SettingsEnv)
+  (props: SettingsPageProps)
+  (model: IObservable<Model>)
+  (dispatch: Dispatch<Msg>)
+  : Control =
   let languageRow =
     picker(
       [ Es, Keys.settingsLangEs; En, Keys.settingsLangEn ],
-      props.Language(),
-      props.OnLanguage
+      env.Language,
+      LanguageSelected >> dispatch
     )
 
   let themeRow =
@@ -62,15 +106,23 @@ let view(props: SettingsPageProps) : Control =
         Light, Keys.settingsThemeLight
         Dark, Keys.settingsThemeDark
       ],
-      props.Theme(),
-      props.OnTheme
+      env.Theme,
+      ThemeSelected >> dispatch
     )
 
-  let providerBody: Control =
-    if props.AgentAvailable() then
-      labelKey Keys.settingsConnected
-    else
-      iconPrimaryButtonKey(Keys.settingsConnect, Icons.key, props.OpenLogin)
+  let available = model |> Observable.map _.AgentAvailable
+
+  let connected = labelKey(Keys.settingsConnected).IsVisible(available)
+
+  let connect =
+    iconPrimaryButtonKey(
+      Keys.settingsConnect,
+      Icons.key,
+      (fun () -> dispatch ConnectRequested)
+    )
+      .IsVisible(available |> Observable.map not)
+
+  let providerBody = StackPanel().Spacing(8.0).Children(connected, connect)
 
   fluentPage {
     Lead = props.Lead
@@ -87,7 +139,17 @@ let view(props: SettingsPageProps) : Control =
         )
   }
 
-type SettingsPage(props: SettingsPageProps) as this =
+type SettingsPage(env: SettingsEnv, props: SettingsPageProps) as this =
   inherit UserControl()
 
-  do this.Content <- view props
+  do
+    let program =
+      Program.mkProgram
+        (fun (_: SettingsPageProps) -> init env)
+        (update props)
+        (view env props)
+
+    let root, lifetime = Program.runWithLifecycle props program
+
+    this.Content <- root
+    props.Lifetime.AddDisposable lifetime

@@ -17,6 +17,7 @@ open Avalonia.Controls.Primitives
 open Avalonia.Headless
 open Avalonia.Input
 open Avalonia.Interactivity
+open Avalonia.Media
 open Avalonia.VisualTree
 open NXUI.Extensions
 
@@ -38,7 +39,68 @@ open Briple.Trainer.UI.Tests.Harness
 // default Serilog)
 let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
 
+let private generateEnv
+  (stores: DataStores)
+  (agent: Briple.Trainer.Env.IProvideAgent)
+  (culture: Briple.Trainer.Components.Page.PageCulture)
+  : Briple.Trainer.Views.Generate.GenerateEnv = {
+  Store = stores.Raw
+  Memories = stores.Memories
+  Plans = stores.Plans
+  Agent = agent
+  Logger = testLogger
+  Dialogs = {
+    new Briple.Trainer.Env.IDialogs with
+      member _.ConfirmAsync(_) = async { return true }
+  }
+  Toasts = {
+    new Briple.Trainer.Env.IToasts with
+      member _.Show(_, _, _) = ()
+  }
+  Culture = culture.Current()
+  CultureChanged = culture.Changed
+}
+
+let private reviewEnv
+  (stores: DataStores)
+  (agent: Briple.Trainer.Env.IProvideAgent)
+  (culture: Briple.Trainer.Components.Page.PageCulture)
+  : Briple.Trainer.Views.Review.ReviewEnv = {
+  Plans = stores.Plans
+  Memories = stores.Memories
+  Agent = agent
+  Host = ValueNone
+  Logger = testLogger
+  Toasts = {
+    new Briple.Trainer.Env.IToasts with
+      member _.Show(_, _, _) = ()
+  }
+  Culture = culture.Current()
+  CultureChanged = culture.Changed
+}
+
 let private es = Language.toCulture Es
+
+let private memoryReviewEnv
+  (culture: Briple.Trainer.Components.Page.PageCulture)
+  : Briple.Trainer.Components.MemoryReview.MemoryReviewEnv = {
+  Culture = culture.Current()
+  CultureChanged = culture.Changed
+}
+
+let private planReviewEnv
+  (culture: Briple.Trainer.Components.Page.PageCulture)
+  : Briple.Trainer.Components.PlanReview.PlanReviewEnv = {
+  Culture = culture.Current()
+  CultureChanged = culture.Changed
+}
+
+let private scrollerIn(root: Control) : ScrollViewer =
+  root.GetVisualDescendants()
+  |> Seq.pick(fun visual ->
+    match visual with
+    | :? ScrollViewer as scroller -> Some scroller
+    | _ -> None)
 
 let private sampleAthlete: Athlete = {
   Name = "Pepe"
@@ -130,11 +192,8 @@ let tests =
       let card =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
-            {
-              Culture = culture
-              Id = Guid.NewGuid()
-              Memory = memory
-            },
+            memoryReviewEnv culture,
+            { Id = Guid.NewGuid(); Memory = memory },
             events.Add
           ))
 
@@ -178,11 +237,8 @@ let tests =
       let card =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
-            {
-              Culture = culture
-              Id = Guid.NewGuid()
-              Memory = memory
-            },
+            memoryReviewEnv culture,
+            { Id = Guid.NewGuid(); Memory = memory },
             events.Add
           ))
 
@@ -263,11 +319,8 @@ let tests =
       let card =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
-            {
-              Culture = culture
-              Id = id
-              Memory = memory
-            },
+            memoryReviewEnv culture,
+            { Id = id; Memory = memory },
             events.Add
           ))
 
@@ -299,8 +352,8 @@ let tests =
         let review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
+              planReviewEnv culture,
               {
-                Culture = culture
                 Parsed = parsed
                 Week = ValueNone
                 Editing = false
@@ -350,6 +403,7 @@ let tests =
           | None -> failtest "the edit button did not render"
 
         onUi(fun () -> click editButton)
+        settle()
 
         let rowEditButton =
           match
@@ -505,8 +559,8 @@ let tests =
       let review =
         probeUi(fun () ->
           Briple.Trainer.Components.PlanReview.PlanReview(
+            planReviewEnv culture,
             {
-              Culture = culture
               Parsed = { Plan = plan; Warnings = [] }
               Week = ValueNone
               Editing = false
@@ -580,8 +634,8 @@ let tests =
         let review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
+              planReviewEnv culture,
               {
-                Culture = culture
                 Parsed = parsed
                 Week = ValueNone
                 Editing = false
@@ -637,8 +691,8 @@ let tests =
         let review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
+              planReviewEnv culture,
               {
-                Culture = culture
                 Parsed = parsed
                 Week = ValueNone
                 Editing = false
@@ -733,8 +787,8 @@ let tests =
         let review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
+              planReviewEnv culture,
               {
-                Culture = culture
                 Parsed = parsed
                 Week = ValueNone
                 Editing = false
@@ -882,6 +936,60 @@ let tests =
         "a hub that fits takes nothing"
     }
 
+    test "the hub starts at its initial column and reports a click" {
+      let picked = ref None
+
+      let hubControl =
+        probeUi(fun () ->
+          Briple.Trainer.Components.Hub.hub {
+            Title = ""
+            Slots = [
+              Briple.Trainer.Components.Hub.slot(
+                "Día 1",
+                TextBlock(Text = "contenido 1")
+              )
+              Briple.Trainer.Components.Hub.slot(
+                "Día 2",
+                TextBlock(Text = "contenido 2")
+              )
+            ]
+            InitialActive = ValueSome 1
+            Active = ValueNone
+            OnSelect = ValueSome(fun index -> picked.Value <- Some index)
+          })
+
+      probeUi(fun () ->
+        let window =
+          Window(Content = hubControl, Width = 900.0, Height = 400.0)
+
+        window.Show() |> ignore)
+
+      settle()
+
+      let started =
+        probeUi(fun () ->
+          match
+            buttonWithText(hubControl, "Día 1"),
+            buttonWithText(hubControl, "Día 2")
+          with
+          | Some first, Some second ->
+            first.FontWeight = FontWeight.Normal
+            && second.FontWeight = FontWeight.SemiBold
+          | _ -> false)
+
+      Expect.isTrue started "the hub used InitialActive for the active header"
+
+      let header =
+        match probeUi(fun () -> buttonWithText(hubControl, "Día 1")) with
+        | Some button -> button
+        | None -> failtest "the first header did not render"
+
+      onUi(fun () -> click header)
+
+      let reported = waitFor(2000, (fun () -> picked.Value), (=)(Some 0))
+
+      Expect.isTrue reported "the header click reached OnSelect"
+    }
     test "the hub overflows when the columns exceed the viewport" {
       let hubControl =
         probeUi(fun () ->
@@ -894,11 +1002,12 @@ let tests =
                   TextBlock(Text = $"contenido {index}")
                 )
             ]
+            InitialActive = ValueNone
             Active = ValueNone
             OnSelect = ValueNone
           })
 
-      // a titleless hub IS the scroller: five 400px columns in a 600px
+      // the hub owns one scroller: five 400px columns in a 600px
       // window must overflow, and the slot headers must render
       onUi(fun () ->
         let window =
@@ -909,7 +1018,7 @@ let tests =
       let overflow =
         waitFor(
           2000,
-          (fun () -> hubControl :?> ScrollViewer),
+          (fun () -> scrollerIn hubControl),
           fun scroller ->
             scroller.Extent.Width > scroller.Viewport.Width + 100.0
         )
@@ -937,6 +1046,7 @@ let tests =
                   TextBlock(Text = $"contenido {index}")
                 )
             ]
+            InitialActive = ValueNone
             Active = ValueNone
             OnSelect = ValueNone
           })
@@ -950,7 +1060,7 @@ let tests =
       let fitted =
         waitFor(
           2000,
-          (fun () -> hubControl :?> ScrollViewer),
+          (fun () -> scrollerIn hubControl),
           fun scroller -> scroller.Extent.Width <= scroller.Viewport.Width + 1.0
         )
 
@@ -979,6 +1089,7 @@ let tests =
                   TextBlock(Text = $"contenido {index}")
                 )
             ]
+            InitialActive = ValueNone
             Active = ValueNone
             OnSelect = ValueNone
           })
@@ -1015,7 +1126,7 @@ let tests =
 
         settle()
 
-      let hubScroller = hubControl :?> ScrollViewer
+      let hubScroller = scrollerIn hubControl
 
       // a forward turn over the hub pans it; the page holds
       wheel(Vector(0.0, -120.0))
@@ -1138,13 +1249,19 @@ let noteTests =
         Rejections = []
       }
 
+      let noteEnv: Briple.Trainer.Components.NoteSection.NoteEnv = {
+        Agent = FakeAgent(reading)
+        Memories = stores.Memories
+        Logger = testLogger
+        Culture = culture.Current()
+        CultureChanged = culture.Changed
+      }
+
       let section =
         probeUi(fun () ->
           Briple.Trainer.Components.NoteSection.NoteSection(
+            noteEnv,
             {
-              Culture = culture
-              Agent = FakeAgent(reading)
-              Memories = stores.Memories
               AthleteId = athleteId
               Plan = plan
               PlanId = planId
@@ -1154,6 +1271,7 @@ let noteTests =
                 Busy = false
                 Proposals = []
                 Status = Briple.Trainer.Components.NoteSection.Status.Idle
+                Culture = culture.Current()
               }
               OnState = ignore
             },
@@ -1273,16 +1391,15 @@ let reviewTests =
 
       let page =
         probeUi(fun () ->
-          Briple.Trainer.Views.Review.ReviewPage {
-            Culture = culture
-            Lead = ValueNone
-            Plans = stores.Plans
-            Memories = stores.Memories
-            Agent = FakeAgent(noReading)
-            Host = ValueNone
-            Entity = entity
-            Gate = gate
-          })
+          Briple.Trainer.Views.Review.ReviewPage(
+            reviewEnv stores (FakeAgent(noReading)) culture,
+            {
+              Lead = ValueNone
+              Entity = entity
+              Gate = gate
+              Lifetime = testLifetime()
+            }
+          ))
 
       mount page
       settle()
@@ -1302,6 +1419,7 @@ let reviewTests =
       Expect.isTrue rendered "the review rendered"
 
       onUi(fun () -> clickText(page, get(es, Keys.planEdit)))
+      settle()
 
       onUi(fun () -> clickText(page, get(es, Keys.planEdit)))
 
@@ -1431,18 +1549,15 @@ let wizardTests =
         probeUi(fun () ->
           let page =
             Briple.Trainer.Views.Generate.WizardPage(
+              generateEnv stores (FakeAgent(noReading)) culture,
               {
-                Culture = culture
                 Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
-                Store = stores.Raw
-                Memories = stores.Memories
-                Plans = stores.Plans
-                Agent = FakeAgent(noReading)
                 Athlete = athlete
                 Confirmed = []
                 Proposals = []
                 Previous = ValueNone
                 Gate = gate
+                Lifetime = testLifetime()
               },
               ignore
             )
@@ -1500,18 +1615,15 @@ let wizardTests =
       let page =
         probeUi(fun () ->
           Briple.Trainer.Views.Generate.WizardPage(
+            generateEnv stores (FakeAgent(noReading)) culture,
             {
-              Culture = culture
               Lead = ValueNone
-              Store = stores.Raw
-              Memories = stores.Memories
-              Plans = stores.Plans
-              Agent = FakeAgent(noReading)
               Athlete = athlete
               Confirmed = []
               Proposals = []
               Previous = ValueNone
               Gate = gate
+              Lifetime = testLifetime()
             },
             ignore
           ))
@@ -1550,6 +1662,7 @@ let wizardTests =
           | None -> failtest "the brief header did not render"
 
         onUi(fun () -> click briefHeader)
+        settle()
 
         let panned = waitFor(2000, (fun () -> hub.Offset.X), fun x -> x > 10.0)
 
@@ -1602,18 +1715,15 @@ let wizardTests =
         probeUi(fun () ->
           let page =
             Briple.Trainer.Views.Generate.WizardPage(
+              generateEnv stores agent culture,
               {
-                Culture = culture
                 Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
-                Store = stores.Raw
-                Memories = stores.Memories
-                Plans = stores.Plans
-                Agent = agent
                 Athlete = athlete
                 Confirmed = []
                 Proposals = []
                 Previous = ValueNone
                 Gate = gate
+                Lifetime = testLifetime()
               },
               ignore
             )

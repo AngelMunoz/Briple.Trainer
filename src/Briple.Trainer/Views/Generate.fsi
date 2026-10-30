@@ -6,6 +6,7 @@ module Briple.Trainer.Views.Generate
 // button and no second "Atras". The page tracks its derived phase.
 
 open System
+open System.Globalization
 open System.Threading
 
 open Avalonia.Controls
@@ -18,17 +19,25 @@ open Briple.Trainer.Navigation
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 
-/// The data of the page.
+/// The services the wizard page needs, built once at the route.
 [<Struct>]
-type WizardPageProps = {
-  Culture: PageCulture
-  /// The shell's back control, placed in the page header.
-  Lead: (unit -> Control) voption
-  /// The raw storage: the audit line only.
+type GenerateEnv = {
   Store: IStore
   Memories: MemoryStore
   Plans: PlanStore
   Agent: IProvideAgent
+  Logger: Microsoft.Extensions.Logging.ILogger
+  Dialogs: IDialogs
+  Toasts: IToasts
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+/// The data of the page.
+[<Struct>]
+type WizardPageProps = {
+  /// The shell's back control, placed in the page header.
+  Lead: (unit -> Control) voption
   Athlete: AthleteEntity
   Confirmed: Memory list
   Proposals: MemoryEntity list
@@ -36,6 +45,8 @@ type WizardPageProps = {
   /// The exit gate: the page tracks its derived phase and listens for
   /// the shell's cancel command.
   Gate: PageGate
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 /// What the page reports outward.
@@ -52,5 +63,7 @@ type WizardPage =
   inherit UserControl
 
   new:
-    props: WizardPageProps * [<InlineIfLambda>] onOutcome: (Outcome -> unit) ->
+    env: GenerateEnv *
+    props: WizardPageProps *
+    [<InlineIfLambda>] onOutcome: (Outcome -> unit) ->
       WizardPage

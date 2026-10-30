@@ -48,8 +48,13 @@ type Event =
   | ViewChanged of week: int * editing: bool
 
 [<Struct>]
+type PlanReviewEnv = {
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+[<Struct>]
 type Props = {
-  Culture: PageCulture
   Parsed: ParsedPlan
   Week: int voption
   Editing: bool
@@ -66,6 +71,7 @@ type Model = {
   /// The page-level edit mode: on, one row can be open; off, the tree
   /// reads as prose.
   Editing: bool
+  Culture: CultureInfo
 }
 
 type Msg =
@@ -78,6 +84,7 @@ type Msg =
   | SetEditing of on: bool
   | RevertEdit
   | Undo
+  | CultureChanged of CultureInfo
 
 /// The week numbers of the plan, in tree order.
 let weekNumbersOf(plan: Plan) : int list = [
@@ -91,29 +98,37 @@ let weekNumbersOf(plan: Plan) : int list = [
 let firstRowPath(plan: Plan, weekNumber: int) : RowPath voption =
   plan.Blocks
   |> List.tryHead
-  |> Option.bind(fun block ->
-    block.Variants
+  |> Option.bind(fun block -> block.Variants |> List.tryHead)
+  |> Option.bind(fun variant ->
+    variant.Weeks
+    |> List.tryFindIndex(fun week -> week.Number = weekNumber)
+    |> Option.map(fun index -> variant, index))
+  |> Option.bind(fun (variant, weekIndex) ->
+    variant.Weeks.[weekIndex].Days
     |> List.tryHead
-    |> Option.bind(fun variant ->
-      variant.Weeks
-      |> List.tryFindIndex(fun week -> week.Number = weekNumber)
-      |> Option.bind(fun weekIndex ->
-        variant.Weeks.[weekIndex].Days
-        |> List.tryHead
-        |> Option.bind(fun day ->
-          if List.isEmpty day.Exercises then
-            None
-          else
-            Some {
-              Block = 0
-              Variant = 0
-              Week = weekIndex
-              Day = 0
-              Index = 0
-            }))))
+    |> Option.map(fun day -> day, weekIndex))
+  |> Option.bind(fun (day, weekIndex) ->
+    if List.isEmpty day.Exercises then
+      None
+    else
+      Some {
+        Block = 0
+        Variant = 0
+        Week = weekIndex
+        Day = 0
+        Index = 0
+      })
   |> ValueOption.ofOption
 
-let init(props: Props) =
+[<Struct>]
+type PageContext = {
+  Env: PlanReviewEnv
+  Props: Props
+  OnEvent: Event -> unit
+}
+
+let init(ctx: PageContext) =
+  let props = ctx.Props
   let weeks = weekNumbersOf props.Parsed.Plan
 
   let week =
@@ -131,6 +146,7 @@ let init(props: Props) =
       else
         ValueNone
     Editing = props.Editing
+    Culture = ctx.Env.Culture
   },
   Cmd.none
 
@@ -305,48 +321,49 @@ let structureOf(plan: Plan) : PlanShape = {
 /// Every transition reports outward so the page keeps the draft and the
 /// navigation state across culture rebuilds. The initial model never
 /// emits: an untouched plan is not a change.
-let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
+let update (ctx: PageContext) (msg: Msg) (model: Model) =
+  let onEvent = ctx.OnEvent
+
+  let inline eventCmd(event: Event) : Cmd<Msg> =
+    Cmd.ofAction(fun () -> onEvent event)
+
   match msg with
+  | CultureChanged culture -> { model with Culture = culture }, Cmd.none
   | SetField(path, field, text) ->
     let edited = model.Plan |> editExercise path (applyField field text)
 
-    if edited <> model.Plan then
-      onEvent(Event.PlanChanged edited)
+    let cmd =
+      if edited <> model.Plan then
+        eventCmd(Event.PlanChanged edited)
+      else
+        Cmd.none
 
-    { model with Plan = edited }, Cmd.none
+    { model with Plan = edited }, cmd
 
   | SetWeek week ->
-    onEvent(Event.ViewChanged(week, model.Editing))
-    { model with Week = week }, Cmd.none
+    { model with Week = week }, eventCmd(Event.ViewChanged(week, model.Editing))
 
   | BeginEdit path ->
-    onEvent(Event.ViewChanged(model.Week, true))
-
     {
       model with
           ActiveRow = ValueSome path
           Editing = true
           Snapshot = model.Plan
     },
-    Cmd.none
+    eventCmd(Event.ViewChanged(model.Week, true))
 
   | EndEdit ->
-    onEvent(Event.ViewChanged(model.Week, true))
-
     {
       model with
           ActiveRow = ValueNone
           Editing = true
           Snapshot = model.Plan
     },
-    Cmd.none
+    eventCmd(Event.ViewChanged(model.Week, true))
 
   | RemoveRow path ->
     let edited = model.Plan |> removeExercise path
 
-    onEvent(Event.PlanChanged edited)
-    onEvent(Event.ViewChanged(model.Week, true))
-
     {
       model with
           Plan = edited
@@ -354,65 +371,60 @@ let update (props: Props) (onEvent: Event -> unit) (msg: Msg) (model: Model) =
           ActiveRow = ValueNone
           Editing = true
     },
-    Cmd.none
+    Cmd.batch [
+      eventCmd(Event.PlanChanged edited)
+      eventCmd(Event.ViewChanged(model.Week, true))
+    ]
 
   | AdjustLaps(path, delta) ->
     let edited = model.Plan |> adjustLaps path delta
 
-    onEvent(Event.PlanChanged edited)
-
     {
       model with
           Plan = edited
           Snapshot = edited
     },
-    Cmd.none
+    eventCmd(Event.PlanChanged edited)
 
   // leaving the edit mode commits: the snapshot rides the tree
   | SetEditing false ->
-    onEvent(Event.ViewChanged(model.Week, false))
-
     {
       model with
           Snapshot = model.Plan
           ActiveRow = ValueNone
           Editing = false
     },
-    Cmd.none
+    eventCmd(Event.ViewChanged(model.Week, false))
 
   | SetEditing true ->
-    onEvent(Event.ViewChanged(model.Week, true))
-
     {
       model with
           Snapshot = model.Plan
           ActiveRow = ValueNone
           Editing = true
     },
-    Cmd.none
+    eventCmd(Event.ViewChanged(model.Week, true))
 
   | RevertEdit ->
-    onEvent(Event.PlanChanged model.Snapshot)
-    onEvent(Event.ViewChanged(model.Week, true))
-
     {
       model with
           Plan = model.Snapshot
           ActiveRow = ValueNone
           Editing = true
     },
-    Cmd.none
+    Cmd.batch [
+      eventCmd(Event.PlanChanged model.Snapshot)
+      eventCmd(Event.ViewChanged(model.Week, true))
+    ]
 
   | Undo ->
-    onEvent(Event.PlanChanged model.Snapshot)
-
     {
       model with
           Plan = model.Snapshot
           ActiveRow = ValueNone
           Editing = false
     },
-    Cmd.none
+    eventCmd(Event.PlanChanged model.Snapshot)
 
 /// The dose line: reps, effort and rest. "-" and empty fields are
 /// omitted, and the effort value travels as written (RIR, RPE or zone).
@@ -548,6 +560,7 @@ type SectionContext = {
   Props: Props
   Model: IObservable<Model>
   Dispatch: Dispatch<Msg>
+  Culture: IObservable<CultureInfo>
 }
 
 /// The title line of one row.
@@ -773,10 +786,7 @@ let dayNotes(day: Day) : Control array =
 /// The count badge of the day.
 let dayBadgeBlock(ctx: SectionContext, day: Day) : Control =
   TextBlock()
-    .Text(
-      ctx.Props.Culture.Changed
-      |> Observable.map(fun current -> dayBadge(current, day))
-    )
+    .Text(ctx.Culture |> Observable.map(fun current -> dayBadge(current, day)))
     .Classes("caption", "secondary")
 
 /// The heading of one circuit, with its lap buttons.
@@ -793,7 +803,7 @@ let circuitHeader
     |> Observable.distinctUntilChanged
 
   let heading =
-    Observable.combineLatest laps ctx.Props.Culture.Changed
+    Observable.combineLatest laps ctx.Culture
     |> Observable.map(fun (laps, culture) ->
       circuitHeading(culture, circuit, laps))
 
@@ -872,7 +882,7 @@ let variantHeadingBlock
   : Control =
   TextBlock()
     .Text(
-      ctx.Props.Culture.Changed
+      ctx.Culture
       |> Observable.map(fun current -> variantHeading(current, block, variant))
     )
     .Classes("body-strong")
@@ -883,7 +893,7 @@ let weekCaption(ctx: SectionContext, plan: Plan, week: Week) : Control =
 
   TextBlock()
     .Text(
-      ctx.Props.Culture.Changed
+      ctx.Culture
       |> Observable.map(fun current ->
         let weekLabel =
           getf(
@@ -910,6 +920,7 @@ let daysHub(ctx: SectionContext, path: RowPath, week: Week) : Control =
   Hub.hub {
     Title = ""
     Slots = days
+    InitialActive = ValueNone
     Active = ValueNone
     OnSelect = ValueNone
   }
@@ -973,7 +984,7 @@ let weekButton(ctx: SectionContext, weekNumber: int) : Control =
     Content =
       TextBlock()
         .Text(
-          ctx.Props.Culture.Changed
+          ctx.Culture
           |> Observable.map(fun current ->
             getf(current, Keys.planWeek, [ weekNumber :> obj ]))
         )
@@ -1065,7 +1076,7 @@ let warningHost(ctx: SectionContext) : Control =
 
   ContentControl()
     .Content(
-      (Observable.combineLatest warnings ctx.Props.Culture.Changed
+      (Observable.combineLatest warnings ctx.Culture
        |> Observable.map(fun (warnings, culture) ->
          warningPanel(culture, warnings)))
         .ToBinding()
@@ -1116,11 +1127,22 @@ let topBar(ctx: SectionContext, plan: Plan) : Control =
     .LastChildFill(false)
     .Children(weekSelector(ctx, plan).DockLeft(), actions.DockRight())
 
-type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
+type PlanReview
+  (env: PlanReviewEnv, props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
   =
   inherit UserControl()
 
   do
+    let ctx = {
+      Env = env
+      Props = props
+      OnEvent = onEvent
+    }
+
+    let subscribe(_: Model) : Sub<Msg> =
+      Sub.fromObservable
+        "culture"
+        (env.CultureChanged |> Observable.map CultureChanged)
 
     let view (model: IObservable<Model>) (dispatch: Dispatch<Msg>) =
       this.AddHandler(
@@ -1137,6 +1159,7 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
         Props = props
         Model = model
         Dispatch = dispatch
+        Culture = model |> Observable.map _.Culture
       }
 
       let cache =
@@ -1148,5 +1171,10 @@ type PlanReview(props: Props, [<InlineIfLambda>] onEvent: Event -> unit) as this
         weekHost(ctx, cache)
       |]
 
-    let program = Program.mkProgram init (update props onEvent) view
-    base.Content <- Program.runWith props program
+    let program =
+      Program.mkProgram (fun (_: Props) -> init ctx) (update ctx) view
+      |> Program.withSubscription subscribe
+
+    let root, _ = Program.runWithLifetime this props program
+
+    base.Content <- root

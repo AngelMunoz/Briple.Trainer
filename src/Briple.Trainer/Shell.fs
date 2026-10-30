@@ -5,7 +5,9 @@ open System.Globalization
 open System.Reactive.Subjects
 
 open Avalonia
+open Avalonia.Automation
 open Avalonia.Controls
+open Avalonia.Controls.Chrome
 open Avalonia.Controls.Templates
 open Avalonia.Input
 open Avalonia.Layout
@@ -54,6 +56,7 @@ let leadOf (canBack: IObservable<bool>) (nav: INavigable) : unit -> Control =
       Button()
         .Content(PathIcon(Data = Icons.arrowLeft).Width(16.0).Height(16.0))
         .IsEnabled(canBack)
+        .IsVisible(canBack)
         .OnClickHandler(fun _ _ -> Routes.back nav)
         .Classes("chrome", "back")
 
@@ -149,19 +152,7 @@ let pane(context: Pane) : Control =
       .ItemsSource(navItems)
 
   DockPanel()
-    .Children(
-      settingsHost.DockBottom(),
-      StackPanel()
-        .Children(
-          toggle,
-          TextBlock()
-            .Text(Localization.text Keys.appTitle)
-            .Classes("pane-title")
-            .Margin(16.0, 8.0, 16.0, 12.0)
-            .IsVisible(context.IsOpen),
-          items
-        )
-    )
+    .Children(settingsHost.DockBottom(), StackPanel().Children(toggle, items))
 
 let titleOf(culture: CultureInfo, url: string) : string =
   let app = get(culture, Keys.appTitle)
@@ -211,12 +202,126 @@ let guardClose(window: Window, askLeave: unit -> Async<bool>) : unit =
       }
       |> Async.StartImmediate)
 
-// The Fluent window content fills the surface behind the system
+[<Struct>]
+type CaptionSpec = {
+  Role: WindowDecorationsElementRole
+  LabelKey: string
+  Label: string
+  OnClick: unit -> unit
+}
+
+// One app-drawn caption button. The role keeps the system behavior for
+// hit testing; the handler runs the window command.
+let captionButton (content: Control) (spec: CaptionSpec) : Button =
+  let button =
+    Button()
+      .Content(content)
+      .OnClickHandler(fun _ _ -> spec.OnClick())
+      .Classes("caption")
+
+  if spec.Role = WindowDecorationsElementRole.CloseButton then
+    button.Classes("caption-close") |> ignore
+
+  WindowDecorationProperties.SetElementRole(button, spec.Role)
+  AutomationProperties.SetName(button, spec.Label)
+  ToolTip.SetTip(button, TextBlock().Text(Localization.text spec.LabelKey))
+
+  button
+
+// The app-drawn title band: the app name, the drag surface and the
+// caption buttons. The band rides above the content and the dialogs.
+let band (window: Window) (culture: CultureInfo) : Control =
+  let state = window.GetObservable(Window.WindowStateProperty)
+
+  let drag =
+    Border()
+      .Background(Brushes.Transparent)
+      .Height(bandHeight)
+      .VerticalAlignment(VerticalAlignment.Top)
+
+  WindowDecorationProperties.SetElementRole(
+    drag,
+    WindowDecorationsElementRole.TitleBar
+  )
+
+  let title =
+    TextBlock()
+      .Text(Localization.text Keys.appTitle)
+      .Classes("body-strong")
+      .VerticalAlignment(VerticalAlignment.Center)
+      .Margin(24.0, 0.0, 0.0, 0.0)
+      .IsHitTestVisible(false)
+
+  let minimize =
+    captionButton (PathIcon(Data = Icons.minimize).Width(12.0).Height(12.0)) {
+      Role = WindowDecorationsElementRole.MinimizeButton
+      LabelKey = Keys.windowMinimize
+      Label = get(culture, Keys.windowMinimize)
+      OnClick = fun () -> window.WindowState <- WindowState.Minimized
+    }
+
+  minimize.Name <- "MinimizeButton"
+
+  let maximizeGlyph =
+    state
+    |> Observable.map(fun current ->
+      if current = WindowState.Maximized then
+        Icons.restore
+      else
+        Icons.maximize)
+    |> Observable.map(fun glyph -> glyph :> Geometry)
+
+  let maximize =
+    captionButton (PathIcon().Width(12.0).Height(12.0).Data(maximizeGlyph)) {
+      Role = WindowDecorationsElementRole.MaximizeButton
+      LabelKey = Keys.windowMaximizeRestore
+      Label = get(culture, Keys.windowMaximizeRestore)
+      OnClick =
+        fun () ->
+          match window.WindowState with
+          | WindowState.Maximized -> window.WindowState <- WindowState.Normal
+          | _ -> window.WindowState <- WindowState.Maximized
+    }
+
+  maximize.Name <- "MaximizeButton"
+
+  let close =
+    captionButton (PathIcon(Data = Icons.close).Width(12.0).Height(12.0)) {
+      Role = WindowDecorationsElementRole.CloseButton
+      LabelKey = Keys.windowClose
+      Label = get(culture, Keys.windowClose)
+      OnClick = fun () -> window.Close()
+    }
+
+  close.Name <- "CloseButton"
+
+  let captionRow =
+    StackPanel()
+      .Orientation(Orientation.Horizontal)
+      .HorizontalAlignment(HorizontalAlignment.Right)
+      .VerticalAlignment(VerticalAlignment.Center)
+      .Children(minimize, maximize, close)
+      .IsVisible(
+        state
+        |> Observable.map(fun current -> current <> WindowState.FullScreen)
+      )
+
+  let bar =
+    Panel()
+      .Height(bandHeight)
+      .VerticalAlignment(VerticalAlignment.Top)
+      .Children(drag, title, captionRow)
+
+  bar.Name <- "TitleBarBand"
+  bar
+
+// The Fluent window content fills the surface behind the app-drawn
 // caption. Only Windows answers the Mica chain; elsewhere the theme's
 // opaque region brush stays.
 let applyWindowChrome(window: Window) : unit =
   window.ExtendClientAreaToDecorationsHint <- true
-  window.ExtendClientAreaTitleBarHeightHint <- 32.0
+  window.ExtendClientAreaTitleBarHeightHint <- bandHeight
+  window.WindowDecorations <- WindowDecorations.BorderOnly
 
   if OperatingSystem.IsWindows() then
     window.TransparencyLevelHint <-
@@ -227,6 +332,9 @@ let applyWindowChrome(window: Window) : unit =
       ]
 
     window.Background <- Brushes.Transparent
+  else
+    // Mica is Windows-only. Every other platform keeps an opaque surface.
+    window.TransparencyLevelHint <- ResizeArray [ WindowTransparencyLevel.None ]
 
 // The tokens follow the live variant: light/dark retints every consumer
 // without rebinding.
@@ -324,7 +432,12 @@ let create(env: AppEnv) : Window =
       .Pane(pane)
       .Content(outlet)
 
-  window.Content(Grid().Children(split, Dialogs.host)) |> ignore
+  let content =
+    Grid().Margin(Thickness(0.0, bandHeight, 0.0, 0.0)).Children(split)
+
+  let chrome = band window env.Culture
+
+  window.Content(Panel().Children(content, Dialogs.host(), chrome)) |> ignore
 
   snapPane(paneOpen, window)
 

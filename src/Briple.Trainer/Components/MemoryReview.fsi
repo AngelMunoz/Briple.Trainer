@@ -30,13 +30,16 @@ type DeltaKind =
   | ZoneKind
   | ModalityKind
 
+/// The culture the card reads.
+[<Struct>]
+type MemoryReviewEnv = {
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
 /// The card inputs.
 [<Struct>]
-type Props = {
-  Culture: PageCulture
-  Id: Guid
-  Memory: Memory
-}
+type Props = { Id: Guid; Memory: Memory }
 
 type Model = {
   /// The deltas the model proposed; a toggle removes or restores one.
@@ -46,6 +49,7 @@ type Model = {
   Scope: MemoryScope
   Kind: DeltaKind
   Value: string
+  Culture: CultureInfo
 }
 
 type Msg =
@@ -57,10 +61,14 @@ type Msg =
   | RemoveAdded of Delta
   | Accept
   | Discard
+  | CultureChanged of CultureInfo
 
 /// The memory card.
 type MemoryReview =
   inherit UserControl
 
   new:
-    props: Props * [<InlineIfLambda>] onEvent: (Event -> unit) -> MemoryReview
+    env: MemoryReviewEnv *
+    props: Props *
+    [<InlineIfLambda>] onEvent: (Event -> unit) ->
+      MemoryReview

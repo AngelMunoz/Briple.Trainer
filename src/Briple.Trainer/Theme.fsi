@@ -2,7 +2,7 @@ module Briple.Trainer.Theme
 
 // Visual tokens and the one app-level style layer, code-first over the
 // FluentTheme as shipped. Classes: the type ramp (`title`, `subtitle`,
-// `body-strong`, `body`, `caption`, `caption-strong`, `pane-title`),
+// `body-strong`, `body`, `caption`, `caption-strong`),
 // the tone classes (`secondary`, `danger`, `accent-text`), `accent`
 // (primary action), `chrome` (flat in-bar buttons), `back` (the shell's
 // 40x40 header lead), `row` (tappable content rows), `nav-item` (pane
@@ -47,6 +47,9 @@ val errorTonal: IBrush
 
 /// The card surface fill over Mica.
 val cardFill: IBrush
+
+/// The height of the app-drawn title bar band.
+val bandHeight: float
 
 /// The OS UI font, like CSS `system-ui`: the platform FontManager
 /// resolves it (Segoe UI on Windows, the system default on macOS/Linux).

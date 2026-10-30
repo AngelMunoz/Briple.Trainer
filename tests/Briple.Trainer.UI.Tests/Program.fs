@@ -15,6 +15,7 @@ let main argv =
       Components.noteTests
       Components.reviewTests
       Components.wizardTests
+      Leaks.tests
     ]
 
   runTestsWithCLIArgs [] argv tests

@@ -6,6 +6,9 @@ module Briple.Trainer.Views.Review
 // it by hand. A culture switch rebuilds the page from the model, so the
 // draft and the note survive.
 
+open System
+open System.Globalization
+
 open Avalonia.Controls
 
 open Briple.Trainer.Components.Page
@@ -14,24 +17,35 @@ open Briple.Trainer.Navigation
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 
-/// The data of the page; the host window is the export picker's owner
-/// and may be absent while the shell builds.
+/// The services the review page needs, built once at the route; the
+/// host window is the export picker's owner and may be absent while the
+/// shell builds.
 [<Struct>]
-type ReviewPageProps = {
-  Culture: PageCulture
-  /// The shell's back control, placed in the page header.
-  Lead: (unit -> Control) voption
+type ReviewEnv = {
   Plans: PlanStore
   Memories: MemoryStore
   Agent: IProvideAgent
   Host: Window voption
+  Logger: Microsoft.Extensions.Logging.ILogger
+  Toasts: IToasts
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+/// The data of the page.
+[<Struct>]
+type ReviewPageProps = {
+  /// The shell's back control, placed in the page header.
+  Lead: (unit -> Control) voption
   Entity: PlanEntity
   /// The exit gate: the page tracks its derived phase.
   Gate: PageGate
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 /// The review page.
 type ReviewPage =
   inherit UserControl
 
-  new: props: ReviewPageProps -> ReviewPage
+  new: env: ReviewEnv * props: ReviewPageProps -> ReviewPage

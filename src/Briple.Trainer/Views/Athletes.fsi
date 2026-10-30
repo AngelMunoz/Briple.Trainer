@@ -6,21 +6,29 @@ module Briple.Trainer.Views.Athletes
 // Memories live in the plan context (the review page), not here.
 
 open System
+open System.Globalization
 
 open Avalonia.Controls
 
-open Briple.Trainer.Components.Page
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 
-/// The data of the page.
+/// The services the detail page needs, built once at the route.
+[<Struct>]
+type AthleteDetailEnv = {
+  Plans: PlanStore
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+/// The page data.
 [<Struct>]
 type DetailPageProps = {
-  Culture: PageCulture
   /// The shell's back control, placed in the page header.
   Lead: (unit -> Control) voption
-  Plans: PlanStore
   Athlete: AthleteEntity
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 /// What the page reports to its host.
@@ -34,5 +42,7 @@ type AthleteDetailPage =
   inherit UserControl
 
   new:
-    props: DetailPageProps * [<InlineIfLambda>] onEvent: (Event -> unit) ->
+    env: AthleteDetailEnv *
+    props: DetailPageProps *
+    [<InlineIfLambda>] onEvent: (Event -> unit) ->
       AthleteDetailPage

@@ -74,3 +74,15 @@ val key: StreamGeometry
 
 /// Empty athletes list. MDI `account-search-outline` (no MDIL glyph).
 val accountSearchOutline: StreamGeometry
+
+/// Minimize the window. MDI `window-minimize`.
+val minimize: StreamGeometry
+
+/// Maximize the window. MDI `window-maximize`.
+val maximize: StreamGeometry
+
+/// Restore the window. MDI `window-restore`.
+val restore: StreamGeometry
+
+/// Close the window. MDI `close`.
+val close: StreamGeometry

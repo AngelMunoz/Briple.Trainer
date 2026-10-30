@@ -13,15 +13,15 @@ open Briple.Trainer.Env
 /// The data and callbacks of the page.
 [<Struct>]
 type LoginPageProps = {
-  Culture: PageCulture
   /// The shell's back control, placed in the page header.
   Lead: (unit -> Control) voption
-  Save: string -> Result<CredentialSave, string>
   OnDone: unit -> unit
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 /// The login page.
-type LoginPage =
+type LoginPage<'T when 'T :> IProvideCredentials and 'T :> IProvideCulture> =
   inherit UserControl
 
-  new: props: LoginPageProps -> LoginPage
+  new: env: 'T * props: LoginPageProps -> LoginPage<'T>

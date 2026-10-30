@@ -81,26 +81,22 @@ let inline confirmAsync(request: ConfirmRequest) : Async<bool> =
 
 /// The overlay layer the shell mounts last; it shows only while a
 /// request is pending. The content is a binding, not a subscription.
-let host: Control =
-  let layer =
-    ContentControl()
-      .IsVisible(pending |> Observable.map ValueOption.isSome)
-      .Content(
-        (pending
-         |> Observable.map(fun current ->
-           match current with
-           | ValueSome(request, _) -> dialogView request
-           | ValueNone -> Grid()))
-          .ToBinding()
-      )
-
-  layer.OnKeyDownHandler(
-    (fun _ args ->
-      match args.Key with
-      | Key.Escape -> answer false
-      | _ -> ()),
-    RoutingStrategies.Tunnel
-  )
-  |> ignore
-
-  layer
+/// Each host is a new control, so a test window can release it cleanly.
+let host() : Control =
+  ContentControl()
+    .IsVisible(pending |> Observable.map ValueOption.isSome)
+    .Content(
+      (pending
+       |> Observable.map(fun current ->
+         match current with
+         | ValueSome(request, _) -> dialogView request
+         | ValueNone -> Grid()))
+        .ToBinding()
+    )
+    .OnKeyDownHandler(
+      (fun _ args ->
+        match args.Key with
+        | Key.Escape -> answer false
+        | _ -> ()),
+      RoutingStrategies.Tunnel
+    )

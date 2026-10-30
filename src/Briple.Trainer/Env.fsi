@@ -127,6 +127,29 @@ type IProvideHost =
 type IProvideLogging =
   abstract LoggerFactory: ILoggerFactory
 
+/// The confirmation dialog worker: one question at a time.
+type IDialogs =
+  abstract ConfirmAsync: request: Dialogs.ConfirmRequest -> Async<bool>
+
+type IProvideDialogs =
+  abstract Dialogs: IDialogs
+
+/// The toast worker: a short notification in the shell overlay.
+type IToasts =
+  abstract Show: title: string * body: string * isError: bool -> unit
+
+type IProvideToasts =
+  abstract Toasts: IToasts
+
+/// The UI resource worker: static text follows the live dictionary.
+type ILocalization =
+  abstract Text: key: string -> IObservable<string>
+
+  abstract TextBlock: key: string -> TextBlock
+
+type IProvideLocalization =
+  abstract Localization: ILocalization
+
 /// The Core agent capabilities: one provider client plus the app's
 /// logger. One value per call; Core never sees the concrete app env.
 type AgentEnv =
@@ -147,6 +170,9 @@ type AppEnv =
   interface IProvideCredentials
   interface IProvideHost
   interface IProvideLogging
+  interface IProvideDialogs
+  interface IProvideToasts
+  interface IProvideLocalization
 
   new:
     stores: DataStores * vault: ISecureStorage * settings: AppSettings voption ->

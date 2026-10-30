@@ -20,7 +20,10 @@ type RouteDeps<'T
   and 'T :> IProvideHost
   and 'T :> IProvideAgent
   and 'T :> IProvideCredentials
-  and 'T :> IProvideLogging> = 'T
+  and 'T :> IProvideLogging
+  and 'T :> IProvideDialogs
+  and 'T :> IProvideToasts
+  and 'T :> IProvideLocalization> = 'T
 
 /// Navigates and reports a failure through the log.
 val inline go: nav: INavigable * url: string -> unit

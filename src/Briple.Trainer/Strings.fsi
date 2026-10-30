@@ -55,6 +55,15 @@ module Keys =
   val commonBack: string = "common.back"
 
   [<Literal>]
+  val windowMinimize: string = "window.minimize"
+
+  [<Literal>]
+  val windowMaximizeRestore: string = "window.maximizeRestore"
+
+  [<Literal>]
+  val windowClose: string = "window.close"
+
+  [<Literal>]
   val commonCancel: string = "common.cancel"
 
   [<Literal>]

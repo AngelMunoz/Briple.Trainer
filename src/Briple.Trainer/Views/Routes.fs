@@ -15,7 +15,6 @@ open Serilog
 open Briple.Trainer.Components
 open Briple.Trainer.Components.AthleteList
 open Briple.Trainer.Components.NewAthleteForm
-open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Env
@@ -34,7 +33,10 @@ type RouteDeps<'T
   and 'T :> IProvideHost
   and 'T :> IProvideAgent
   and 'T :> IProvideCredentials
-  and 'T :> IProvideLogging> = 'T
+  and 'T :> IProvideLogging
+  and 'T :> IProvideDialogs
+  and 'T :> IProvideToasts
+  and 'T :> IProvideLocalization> = 'T
 
 let inline go(nav: INavigable, url: string) : unit =
   asyncEx {
@@ -65,49 +67,77 @@ let inline orEmpty(what: string) : Result<'a list, exn> -> 'a list =
 let inline (|GuidParam|_|) (name: string) (ctx: RouteContext) =
   ctx.GetParam<Guid>(name)
 
-/// The live culture a page reads.
-let inline cultureOf(env: #IProvideCulture) : PageCulture = {
-  Current = fun () -> env.Culture
-  Changed = env.CultureChanged
+/// The route-owned page data: the exit gate, the disposable bag and the
+/// navigable the page reports to.
+[<Struct>]
+type RoutePage = {
+  Gate: PageGate
+  Lifetime: Navs.IDisposableBag
+  Nav: INavigable
+}
+
+[<Struct>]
+type WizardRoute = { Page: RoutePage; AthleteId: Guid }
+
+[<Struct>]
+type ReviewRoute = { Page: RoutePage; PlanId: Guid }
+
+[<Struct>]
+type PlainRoute = {
+  Lifetime: Navs.IDisposableBag
+  Nav: INavigable
+}
+
+[<Struct>]
+type DetailRoute = {
+  Lifetime: Navs.IDisposableBag
+  Nav: INavigable
+  AthleteId: Guid
 }
 
 let athletesPage
   (
     env: #IProvideStores & #IProvideCulture,
-    lead: unit -> Control,
-    nav: INavigable
+    route: PlainRoute,
+    lead: unit -> Control
   ) : Control =
+  let pageEnv: AthleteList.AthleteListEnv = {
+    Observe = env.Stores.Athletes.Observe
+    Snapshot = env.Stores.Athletes.Snapshot
+    Culture = env.Culture
+    CultureChanged = env.CultureChanged
+  }
+
   AthleteList(
+    pageEnv,
     {
-      Culture = cultureOf env
       Lead = ValueSome lead
-      Athletes = env.Stores.Athletes.Observe()
+      Lifetime = route.Lifetime
     },
     fun event ->
       match event with
-      | AthleteList.NewRequested -> go(nav, "/athletes/new")
-      | AthleteList.OpenRequested id -> go(nav, $"/athletes/{id}")
+      | AthleteList.NewRequested -> go(route.Nav, "/athletes/new")
+      | AthleteList.OpenRequested id -> go(route.Nav, $"/athletes/{id}")
   )
 
 let newAthletePage
   (
     env: #IProvideStores & #IProvideCulture,
-    lead: unit -> Control,
-    gate: PageGate,
-    nav: INavigable
+    page: RoutePage,
+    lead: unit -> Control
   ) : Control =
   NewAthleteForm(
     {
-      Culture = cultureOf env
       Lead = ValueSome lead
-      Gate = gate
+      Gate = page.Gate
+      Lifetime = page.Lifetime
     },
     fun event ->
       match event with
       | NewAthleteForm.Saved athlete ->
         asyncEx {
           match! env.Stores.Athletes.Add athlete with
-          | Ok _ -> go(nav, "/")
+          | Ok _ -> go(page.Nav, "/")
           | Error e ->
             Log.Error(e, "athlete save failed")
 
@@ -120,16 +150,16 @@ let newAthletePage
             )
         }
         |> Async.StartImmediate
-      | NewAthleteForm.Cancelled -> go(nav, "/")
+      | NewAthleteForm.Cancelled -> go(page.Nav, "/")
   )
 
 let detailPage
   (
     env: #IProvideStore & #IProvideStores & #IProvideCulture,
-    lead: unit -> Control,
-    athleteId: Guid,
-    nav: INavigable
+    route: DetailRoute,
+    lead: unit -> Control
   ) : Async<Control> = asyncEx {
+  let athleteId = route.AthleteId
   let! athlete = env.Store.FindAthlete athleteId
 
   match athlete with
@@ -138,31 +168,37 @@ let detailPage
     return TextBlock(Text = string e.Message)
   | Ok ValueNone -> return notFound()
   | Ok(ValueSome athlete) ->
+    let pageEnv: Athletes.AthleteDetailEnv = {
+      Plans = env.Stores.Plans
+      Culture = env.Culture
+      CultureChanged = env.CultureChanged
+    }
+
     return
       Athletes.AthleteDetailPage(
+        pageEnv,
         {
-          Culture = cultureOf env
           Lead = ValueSome lead
-          Plans = env.Stores.Plans
           Athlete = athlete
+          Lifetime = route.Lifetime
         },
         fun event ->
           match event with
           | Athletes.Event.GenerateRequested ->
-            go(nav, $"/athletes/{athleteId}/generate")
+            go(route.Nav, $"/athletes/{athleteId}/generate")
           | Athletes.Event.ReviewRequested planId ->
-            go(nav, $"/athletes/{athleteId}/review/{planId}")
+            go(route.Nav, $"/athletes/{athleteId}/review/{planId}")
       )
 }
 
 let wizardPage
   (
-    env: #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideAgent,
-    lead: unit -> Control,
-    gate: PageGate,
-    athleteId: Guid,
-    nav: INavigable
+    env:
+      #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideAgent & #IProvideLogging & #IProvideDialogs & #IProvideToasts,
+    route: WizardRoute,
+    lead: unit -> Control
   ) : Async<Control> = asyncEx {
+  let athleteId = route.AthleteId
   let! athlete = env.Store.FindAthlete athleteId
   let! memories = env.Store.ListMemories athleteId
   let! plans = env.Store.ListPlans athleteId
@@ -182,87 +218,116 @@ let wizardPage
 
   match athlete with
   | Ok(ValueSome athlete) ->
+    let pageEnv: Generate.GenerateEnv = {
+      Store = env.Store
+      Memories = env.Stores.Memories
+      Plans = env.Stores.Plans
+      Agent = env
+      Logger = env.LoggerFactory.CreateLogger "Generate"
+      Dialogs = env.Dialogs
+      Toasts = env.Toasts
+      Culture = env.Culture
+      CultureChanged = env.CultureChanged
+    }
+
     return
       Generate.WizardPage(
+        pageEnv,
         {
-          Culture = cultureOf env
           Lead = ValueSome lead
-          Store = env.Store
-          Memories = env.Stores.Memories
-          Plans = env.Stores.Plans
-          Agent = env
           Athlete = athlete
           Confirmed = confirmed
           Proposals = proposals
           Previous = previous
-          Gate = gate
+          Gate = route.Page.Gate
+          Lifetime = route.Page.Lifetime
         },
         fun outcome ->
           match outcome with
           | Generate.PlanFinished planId ->
-            go(nav, $"/athletes/{athleteId}/review/{planId}")
-          | Generate.WizardCancelled -> go(nav, $"/athletes/{athleteId}")
+            go(route.Page.Nav, $"/athletes/{athleteId}/review/{planId}")
+          | Generate.WizardCancelled ->
+            go(route.Page.Nav, $"/athletes/{athleteId}")
       )
   | _ -> return notFound()
 }
 
 let reviewPage
   (
-    env: #IProvideStores & #IProvideCulture & #IProvideHost & #IProvideAgent,
-    lead: unit -> Control,
-    gate: PageGate,
-    planId: Guid
+    env:
+      #IProvideStores & #IProvideCulture & #IProvideHost & #IProvideAgent & #IProvideLogging & #IProvideToasts,
+    route: ReviewRoute,
+    lead: unit -> Control
   ) : Async<Control> = asyncEx {
+  let planId = route.PlanId
   let! plan = env.Stores.Plans.Find planId
 
   match plan with
   | Ok(ValueSome entity) ->
+    let pageEnv: Review.ReviewEnv = {
+      Plans = env.Stores.Plans
+      Memories = env.Stores.Memories
+      Agent = env
+      Host = env.Host
+      Logger = env.LoggerFactory.CreateLogger "Review"
+      Toasts = env.Toasts
+      Culture = env.Culture
+      CultureChanged = env.CultureChanged
+    }
+
     return
-      Review.ReviewPage {
-        Culture = cultureOf env
-        Lead = ValueSome lead
-        Plans = env.Stores.Plans
-        Memories = env.Stores.Memories
-        Agent = env
-        Host = env.Host
-        Entity = entity
-        Gate = gate
-      }
+      Review.ReviewPage(
+        pageEnv,
+        {
+          Lead = ValueSome lead
+          Entity = entity
+          Gate = route.Page.Gate
+          Lifetime = route.Page.Lifetime
+        }
+      )
   | _ -> return notFound()
 }
 
 let loginPage
   (
     env: #IProvideCulture & #IProvideCredentials,
-    lead: unit -> Control,
-    nav: INavigable
+    route: PlainRoute,
+    lead: unit -> Control
   ) : Control =
-  Login.LoginPage {
-    Culture = cultureOf env
-    Lead = ValueSome lead
-    Save = env.SaveCredentials
-    OnDone = fun () -> go(nav, "/")
-  }
+  Login.LoginPage(
+    env,
+    {
+      Lead = ValueSome lead
+      OnDone = fun () -> go(route.Nav, "/")
+      Lifetime = route.Lifetime
+    }
+  )
 
 let settingsPage
   (
-    env: #IProvideCulture & #IProvideLanguage & #IProvideTheme & #IProvideAgent,
-    lead: unit -> Control,
-    nav: INavigable
+    env: #IProvideLanguage & #IProvideTheme & #IProvideAgent,
+    route: PlainRoute,
+    lead: unit -> Control
   ) : Control =
-  Settings.SettingsPage {
-    Culture = cultureOf env
-    Lead = ValueSome lead
-    Language = fun () -> env.Language
-    Theme = fun () -> env.Theme
-    AgentAvailable = fun () -> env.AgentAvailable
-    OnLanguage = env.SetLanguage
-    OnTheme =
-      fun theme ->
-        env.SetTheme theme
-        applyTheme theme
-    OpenLogin = fun () -> go(nav, "/login")
+  let pageEnv: Settings.SettingsEnv = {
+    Language = env.Language
+    Theme = env.Theme
+    AgentAvailable = env.AgentAvailable
   }
+
+  Settings.SettingsPage(
+    pageEnv,
+    {
+      Lead = ValueSome lead
+      OnLanguage = env.SetLanguage
+      OnTheme =
+        fun theme ->
+          env.SetTheme theme
+          applyTheme theme
+      OpenLogin = fun () -> go(route.Nav, "/login")
+      Lifetime = route.Lifetime
+    }
+  )
 
 /// The agent gate, shared by every data route.
 let requiresAgent(env: #IProvideAgent) : GuardResult =
@@ -372,22 +437,50 @@ let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
     Route.define<Control>(
       "athletes",
       "/",
-      fun _ nav -> athletesPage(env, leadOf nav, nav)
+      fun context nav ->
+        athletesPage(
+          env,
+          {
+            Lifetime = context.Disposables
+            Nav = nav
+          },
+          leadOf nav
+        )
     )
+    // the page program stops with the route lifetime; a cached control
+    // would come back disposed, so every visit builds a fresh page
+    |> Route.cache CachePolicy.NoCache
     |> gate
     |> shown
 
     Route.define<Control>(
       "login",
       "/login",
-      fun _ nav -> loginPage(env, leadOf nav, nav)
+      fun context nav ->
+        loginPage(
+          env,
+          {
+            Lifetime = context.Disposables
+            Nav = nav
+          },
+          leadOf nav
+        )
     )
     |> Route.cache CachePolicy.NoCache
 
     Route.define<Control>(
       "new-athlete",
       "/athletes/new",
-      fun ctx nav -> newAthletePage(env, leadOf nav, gates.Gate(ctx.Path), nav)
+      fun ctx nav ->
+        newAthletePage(
+          env,
+          {
+            Gate = gates.Gate(ctx.Path)
+            Lifetime = ctx.Disposables
+            Nav = nav
+          },
+          leadOf nav
+        )
     )
     |> Route.cache CachePolicy.NoCache
     |> confirmLeave
@@ -400,10 +493,19 @@ let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
       fun context nav -> asyncEx {
         match context with
         | GuidParam "athleteId" athleteId ->
-          return! detailPage(env, leadOf nav, athleteId, nav)
+          let route = {
+            Lifetime = context.Disposables
+            Nav = nav
+            AthleteId = athleteId
+          }
+
+          return! detailPage(env, route, leadOf nav)
         | _ -> return notFound()
       }
     )
+    // the page program stops with the route lifetime; a cached control
+    // would come back disposed, so every visit builds a fresh page
+    |> Route.cache CachePolicy.NoCache
     |> gate
     |> shown
 
@@ -413,14 +515,14 @@ let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
       fun context nav -> asyncEx {
         match context with
         | GuidParam "athleteId" athleteId ->
+          let page = {
+            Gate = gates.Gate(context.Path)
+            Lifetime = context.Disposables
+            Nav = nav
+          }
+
           return!
-            wizardPage(
-              env,
-              leadOf nav,
-              gates.Gate(context.Path),
-              athleteId,
-              nav
-            )
+            wizardPage(env, { Page = page; AthleteId = athleteId }, leadOf nav)
         | _ -> return notFound()
       }
     )
@@ -437,7 +539,13 @@ let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
       fun context nav -> asyncEx {
         match context with
         | GuidParam "planId" planId ->
-          return! reviewPage(env, leadOf nav, gates.Gate(context.Path), planId)
+          let page = {
+            Gate = gates.Gate(context.Path)
+            Lifetime = context.Disposables
+            Nav = nav
+          }
+
+          return! reviewPage(env, { Page = page; PlanId = planId }, leadOf nav)
         | _ -> return notFound()
       }
     )
@@ -451,7 +559,15 @@ let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
     Route.define<Control>(
       "settings",
       "/settings",
-      fun _ nav -> settingsPage(env, leadOf nav, nav)
+      fun context nav ->
+        settingsPage(
+          env,
+          {
+            Lifetime = context.Disposables
+            Nav = nav
+          },
+          leadOf nav
+        )
     )
     // the provider status and the preferences are read live; a fresh
     // page on every visit keeps them honest

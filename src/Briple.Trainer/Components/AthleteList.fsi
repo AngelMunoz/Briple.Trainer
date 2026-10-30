@@ -6,19 +6,28 @@ module Briple.Trainer.Components.AthleteList
 // constructor callback. The content rebuilds when the culture changes.
 
 open System
+open System.Globalization
+
 open Avalonia.Controls
 
-open Briple.Trainer.Components.Page
 open Briple.Trainer.Persistence
 
-/// The data source of the page.
+/// The services the athletes page needs, built once at the route.
+[<Struct>]
+type AthleteListEnv = {
+  Observe: unit -> IObservable<AthleteEntity list>
+  Snapshot: unit -> AthleteEntity list
+  Culture: CultureInfo
+  CultureChanged: IObservable<CultureInfo>
+}
+
+/// The page data.
 [<Struct>]
 type AthleteListProps = {
-  Culture: PageCulture
   /// The shell's back control, placed in the page header.
   Lead: (unit -> Control) voption
-  /// The live athletes list, straight from the store.
-  Athletes: IObservable<AthleteEntity list>
+  /// The route lifetime: the page program stops when the route leaves.
+  Lifetime: Navs.IDisposableBag
 }
 
 /// What the page reports to its host.
@@ -32,5 +41,7 @@ type AthleteList =
   inherit UserControl
 
   new:
-    props: AthleteListProps * [<InlineIfLambda>] onEvent: (Event -> unit) ->
+    env: AthleteListEnv *
+    props: AthleteListProps *
+    [<InlineIfLambda>] onEvent: (Event -> unit) ->
       AthleteList
