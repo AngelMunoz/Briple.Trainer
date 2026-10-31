@@ -2,6 +2,7 @@ module Briple.Trainer.Views.Review
 
 open System
 open System.Globalization
+open System.Reactive.Subjects
 
 open Avalonia
 open Avalonia.Controls
@@ -93,6 +94,7 @@ type Msg =
 let noteInitial: NoteSection.Model = {
   Note = ""
   Busy = false
+  Saving = false
   Proposals = []
   Status = NoteSection.Status.Idle
   Culture = CultureInfo.InvariantCulture
@@ -132,7 +134,7 @@ let inline isDirty(document: Document) =
 /// The one phase rule: a running reading, pending proposals and a
 /// pending draft are work leaving would lose.
 let inline phaseOf(model: Model) : PagePhase =
-  if model.Note.Busy then
+  if model.Note.Busy || model.Note.Saving then
     Working
   elif not(List.isEmpty model.Note.Proposals) || isDirty model.Document then
     UnsavedChanges
@@ -423,6 +425,23 @@ let view
   | Broken failure -> invalidBody(props, model, failure)
   | Loaded(parsed, draft) ->
     let plan = draft |> Option.defaultValue parsed.Plan
+
+    // The note asks for the vocabulary at the time of the reading, not
+    // the tree this view was built from. The subject is the page-model
+    // slice: the value now, read on demand.
+    let latestPlan = new BehaviorSubject<Plan>(plan)
+
+    let planSubscription =
+      model
+      |> Observable.map(fun current ->
+        match current.Document with
+        | Loaded(parsed, draft) -> draft |> Option.defaultValue parsed.Plan
+        | Broken _ -> plan)
+      |> Observable.subscribe(fun value -> latestPlan.OnNext value)
+
+    props.Lifetime.AddDisposable planSubscription
+    props.Lifetime.AddDisposable latestPlan
+
     let dirty = model |> Observable.map(fun m -> isDirty m.Document)
 
     let save =
@@ -487,7 +506,7 @@ let view
         noteEnv,
         {
           AthleteId = props.Entity.AthleteId
-          Plan = plan
+          Plan = fun () -> latestPlan.Value
           PlanId = props.Entity.Id
           Cancel = notes
           Initial = current.Note

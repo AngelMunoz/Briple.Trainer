@@ -65,6 +65,14 @@ let private buttons(root: Control) : Button list =
     | _ -> None)
   |> List.ofSeq
 
+let private radioWithText(root: Control, text: string) : RadioButton option =
+  root.GetVisualDescendants()
+  |> Seq.choose(fun visual ->
+    match visual with
+    | :? RadioButton as radio when hasText(radio, text) -> Some radio
+    | _ -> None)
+  |> Seq.tryHead
+
 let private controlByName(root: Control, name: string) : Control option =
   root.GetVisualDescendants()
   |> Seq.tryPick(fun visual ->
@@ -81,29 +89,42 @@ let private textBlockWith(root: Control, text: string) : TextBlock option =
 
 /// Mounts the dialog overlay, asks one confirmation and answers through
 /// the buttons; the tuple is the reply cell, the overlay and its window.
-let private askDialog() =
-  let overlay = probeUi(fun () -> Briple.Trainer.Dialogs.host())
+let private askDialog() = task {
+  let! overlay = probeUi(fun () -> Briple.Trainer.Dialogs.host())
 
-  let window = mountWindow overlay
+  let! window = mountWindow overlay
 
   let replied = ref None
 
-  onUi(fun () ->
-    Async.StartWithContinuations(
-      Briple.Trainer.Dialogs.confirmAsync(
-        {
-          Title = "¿Descartar?"
-          Body = "Se pierde el plan"
-          Accept = "Descartar"
-          Cancel = "Cancelar"
-        }
-      ),
-      (fun value -> replied.Value <- Some value),
-      ignore,
-      ignore
-    ))
+  do!
+    runUi(fun () ->
+      Async.StartWithContinuations(
+        Briple.Trainer.Dialogs.confirmAsync(
+          {
+            Title = "¿Descartar?"
+            Body = "Se pierde el plan"
+            Accept = "Descartar"
+            Cancel = "Cancelar"
+          }
+        ),
+        (fun value -> replied.Value <- Some value),
+        ignore,
+        ignore
+      ))
 
-  replied, overlay, window
+  return replied, overlay, window
+}
+
+type private LoginEnv() =
+  interface Briple.Trainer.Env.IProvideCredentials with
+    member _.TokenInsecure = false
+
+    member _.SaveCredentials(_) =
+      Ok Briple.Trainer.Env.CredentialSave.Secured
+
+  interface Briple.Trainer.Env.IProvideCulture with
+    member _.Culture = es
+    member _.CultureChanged = Observable.empty
 
 let tests =
   testList "app" [
@@ -126,29 +147,30 @@ let tests =
     ]
 
     testList "localization resources" [
-      test "a resource dictionary updates static text without a rebuild" {
+      uiTest "a resource dictionary updates static text without a rebuild"
+      <| fun () -> task {
         // a local host: the test never mutates the app dictionary that
         // the other parallel tests read
-        let host =
+        let! host =
           probeUi(fun () ->
             let host = Border()
             host.Resources["athletes.title"] <- "Atletas"
             host)
 
-        let text =
+        let! text =
           probeUi(fun () ->
             Briple.Trainer.Localization.textBlockFor(host, Keys.athletesTitle))
 
-        mount text
+        do! mount text
 
-        let spanish =
+        let! spanish =
           waitFor(2000, (fun () -> text), fun block -> block.Text = "Atletas")
 
         Expect.isTrue spanish "the initial resource dictionary"
 
-        onUi(fun () -> host.Resources["athletes.title"] <- "Athletes")
+        do! runUi(fun () -> host.Resources["athletes.title"] <- "Athletes")
 
-        let english =
+        let! english =
           waitFor(2000, (fun () -> text), fun block -> block.Text = "Athletes")
 
         Expect.isTrue english "the swapped dictionary updated the bound text"
@@ -156,18 +178,15 @@ let tests =
     ]
 
     testList "theme" [
-      test "theme text follows the applied variant" {
-        let block: TextBlock =
+      uiTest "theme text follows the applied variant"
+      <| fun () -> task {
+        let! block =
           probeUi(fun () ->
             let block = TextBlock(Text = "Tema")
             block.Classes.Add("body")
             block)
 
-        let window =
-          probeUi(fun () ->
-            let window = Window(Content = block)
-            window.Show() |> ignore
-            window)
+        do! mount block
 
         let color() =
           probeUi(fun () ->
@@ -176,25 +195,36 @@ let tests =
             | _ -> failwith "the text has no solid foreground")
 
         try
-          onUi(fun () -> Briple.Trainer.Theme.applyVariant ThemeVariant.Light)
+          do!
+            runUi(fun () ->
+              Briple.Trainer.Theme.applyVariant ThemeVariant.Light)
 
-          Expect.equal (color()) (Color.Parse "#1A1A1A") "light text"
+          let! light = color()
+          Expect.equal light (Color.Parse "#1A1A1A") "light text"
 
-          onUi(fun () -> Briple.Trainer.Theme.applyVariant ThemeVariant.Dark)
+          do!
+            runUi(fun () -> Briple.Trainer.Theme.applyVariant ThemeVariant.Dark)
 
-          Expect.equal (color()) (Color.Parse "#FFFFFF") "dark text"
-        finally
-          onUi(fun () ->
-            Briple.Trainer.Theme.applyVariant ThemeVariant.Light
-            window.Close())
+          let! dark = color()
+          Expect.equal dark (Color.Parse "#FFFFFF") "dark text"
+        with error ->
+          do!
+            runUi(fun () ->
+              Briple.Trainer.Theme.applyVariant ThemeVariant.Light)
+
+          return raise error
+
+        do!
+          runUi(fun () -> Briple.Trainer.Theme.applyVariant ThemeVariant.Light)
       }
     ]
 
     testList "athlete list" [
-      test "the empty page renders the empty-state text" {
+      uiTest "the empty page renders the empty-state text"
+      <| fun () -> task {
         let _, culture = liveCulture es
 
-        let control =
+        let! control =
           probeUi(fun () ->
             AthleteList(
               athleteListEnv
@@ -207,9 +237,9 @@ let tests =
               ignore
             ))
 
-        mount control
+        do! mount control
 
-        let rendered =
+        let! rendered =
           waitFor(
             2000,
             (fun () -> control),
@@ -219,7 +249,8 @@ let tests =
         Expect.isTrue rendered "the empty state did not render"
       }
 
-      test "a registered athlete renders as a row and opens" {
+      uiTest "a registered athlete renders as a row and opens"
+      <| fun () -> task {
         let opened = ref None
 
         let entity = {
@@ -233,7 +264,7 @@ let tests =
 
         let _, culture = liveCulture es
 
-        let control =
+        let! control =
           probeUi(fun () ->
             AthleteList(
               athleteListEnv
@@ -249,9 +280,9 @@ let tests =
                 | NewRequested -> ()
             ))
 
-        mount control
+        do! mount control
 
-        let rendered =
+        let! rendered =
           waitFor(
             2000,
             (fun () -> control),
@@ -260,16 +291,16 @@ let tests =
 
         Expect.isTrue rendered "the athlete row did not render"
 
-        settle()
+        let! row = probeUi(fun () -> buttonWithText(control, "Ana"))
 
         let row =
-          match probeUi(fun () -> buttonWithText(control, "Ana")) with
-          | Some row -> row
-          | None -> failtest "the row vanished"
+          row |> Option.defaultWith(fun () -> failtest "the row vanished")
 
-        onUi(fun () -> click row)
+        do! runUi(fun () -> click row)
 
-        settle()
+        let! openedOk = waitFor(2000, (fun () -> opened.Value), Option.isSome)
+
+        Expect.isTrue openedOk "the open event was dispatched"
 
         Expect.equal
           opened.Value
@@ -277,7 +308,8 @@ let tests =
           "the open event carries the id"
       }
 
-      test "rows of different lengths share one chevron edge" {
+      uiTest "rows of different lengths share one chevron edge"
+      <| fun () -> task {
         let entity name goals = {
           Id = Guid.NewGuid()
           Profile = {
@@ -300,7 +332,7 @@ let tests =
 
         let _, culture = liveCulture es
 
-        let control =
+        let! control =
           probeUi(fun () ->
             AthleteList(
               athleteListEnv
@@ -313,15 +345,9 @@ let tests =
               ignore
             ))
 
-        let window =
-          probeUi(fun () ->
-            let window =
-              Window(Content = control, Width = 1000.0, Height = 700.0)
+        let! window = mountWindowSized(control, 1000.0, 700.0)
 
-            window.Show() |> ignore
-            window)
-
-        let rendered =
+        let! rendered =
           waitFor(
             2000,
             (fun () -> control),
@@ -331,8 +357,6 @@ let tests =
           )
 
         Expect.isTrue rendered "the rows did not render"
-
-        settle()
 
         let measure name =
           probeUi(fun () ->
@@ -361,22 +385,22 @@ let tests =
             iconLeft.Value.Y,
             icon.Bounds.Height)
 
-        let (anaLeft,
-             anaRight,
-             anaChevron,
-             anaTop,
-             anaHeight,
-             anaIconTop,
-             anaIconHeight) =
+        let! (anaLeft,
+              anaRight,
+              anaChevron,
+              anaTop,
+              anaHeight,
+              anaIconTop,
+              anaIconHeight) =
           measure "Ana"
 
-        let (betoLeft,
-             betoRight,
-             betoChevron,
-             betoTop,
-             betoHeight,
-             betoIconTop,
-             betoIconHeight) =
+        let! (betoLeft,
+              betoRight,
+              betoChevron,
+              betoTop,
+              betoHeight,
+              betoIconTop,
+              betoIconHeight) =
           measure "Beto"
 
         Expect.equal anaLeft betoLeft "both rows share the left edge"
@@ -412,7 +436,8 @@ let tests =
           "the longer row centers its chevron too"
       }
 
-      test "the page fills a wide window to its edge" {
+      uiTest "the page fills a wide window to its edge"
+      <| fun () -> task {
         let entity name = {
           Id = Guid.NewGuid()
           Profile = {
@@ -425,7 +450,7 @@ let tests =
         let ana = entity "Ana"
         let _, culture = liveCulture es
 
-        let control =
+        let! control =
           probeUi(fun () ->
             AthleteList(
               athleteListEnv
@@ -438,15 +463,9 @@ let tests =
               ignore
             ))
 
-        let window =
-          probeUi(fun () ->
-            let window =
-              Window(Content = control, Width = 1600.0, Height = 800.0)
+        let! window = mountWindowSized(control, 1600.0, 800.0)
 
-            window.Show() |> ignore
-            window)
-
-        let rendered =
+        let! rendered =
           waitFor(
             2000,
             (fun () -> control),
@@ -455,9 +474,7 @@ let tests =
 
         Expect.isTrue rendered "the row did not render"
 
-        settle()
-
-        let right =
+        let! right =
           probeUi(fun () ->
             let row =
               buttonWithText(control, "Ana")
@@ -473,10 +490,11 @@ let tests =
           "the page has no width cap: the row reaches the window edge"
       }
 
-      test "the page lead sits before the title" {
+      uiTest "the page lead sits before the title"
+      <| fun () -> task {
         let _, culture = liveCulture es
 
-        let control =
+        let! control =
           probeUi(fun () ->
             AthleteList(
               athleteListEnv
@@ -489,10 +507,9 @@ let tests =
               ignore
             ))
 
-        mount control
-        settle()
+        do! mount control
 
-        let header =
+        let! header =
           waitFor(
             2000,
             (fun () -> control),
@@ -510,7 +527,7 @@ let tests =
 
         Expect.isTrue header "the lead and the title rendered"
 
-        let lead, title =
+        let! lead, title =
           probeUi(fun () ->
             let blocks =
               control.GetVisualDescendants()
@@ -532,7 +549,8 @@ let tests =
         | _ -> failtest "the lead or the title did not render"
       }
 
-      test "a store emission after detach does not reach the disposed list" {
+      uiTest "a store emission after detach does not reach the disposed list"
+      <| fun () -> task {
         let entity name = {
           Id = Guid.NewGuid()
           Profile = {
@@ -547,7 +565,7 @@ let tests =
         let _, culture = liveCulture es
         let lifetime = new TestLifetime()
 
-        let control =
+        let! control =
           probeUi(fun () ->
             AthleteList(
               athleteListEnv source culture,
@@ -559,13 +577,9 @@ let tests =
             ))
 
         // the test owns the window so the detach is exact
-        let host =
-          probeUi(fun () ->
-            let window = Window(Content = control)
-            window.Show() |> ignore
-            window)
+        let! host = mountWindow control
 
-        let ana =
+        let! ana =
           waitFor(
             2000,
             (fun () -> control),
@@ -577,27 +591,23 @@ let tests =
         // leaving the page detaches the control and disposes the route
         // lifetime, the way the router does on every navigation away; the
         // list route is NoCache, so the next visit builds a fresh page
-        onUi(fun () ->
-          host.Content <- null
-          (lifetime :> IDisposable).Dispose())
+        do!
+          runUi(fun () ->
+            host.Content <- null
+            (lifetime :> IDisposable).Dispose())
 
-        settle()
+        let! stopped = waitFor(2000, (fun () -> source.HasObservers), not)
 
-        Expect.isFalse
-          source.HasObservers
-          "the detached page stopped listening to the store"
+        Expect.isTrue stopped "the detached page stopped listening to the store"
 
         // the store emits while nobody is watching
-        onUi(fun () -> source.OnNext([ entity "Ana"; entity "Beto" ]))
-
-        settle()
+        do! runUi(fun () -> source.OnNext([ entity "Ana"; entity "Beto" ]))
 
         // the route builds a new page on the next visit; this instance
         // must not restart its disposed program on reattach
-        mount control
-        settle()
+        do! mount control
 
-        let beto =
+        let! beto =
           probeUi(fun () -> buttonWithText(control, "Beto") |> Option.isSome)
 
         Expect.isFalse beto "the disposed page did not resume on reattach"
@@ -605,11 +615,12 @@ let tests =
     ]
 
     testList "new athlete form" [
-      test "a name is enough to save and the default gender rides" {
+      uiTest "a name is enough to save and the default gender rides"
+      <| fun () -> task {
         let events = ResizeArray<Event>()
         let _, culture = liveCulture es
 
-        let form =
+        let! form =
           probeUi(fun () ->
             NewAthleteForm(
               {
@@ -624,25 +635,29 @@ let tests =
               events.Add
             ))
 
-        mount form
+        do! mount form
 
         // the name entry is the only TextBox; the gender already reads
         // Hombre from the model
-        onUi(fun () ->
-          match textBoxes form with
-          | nameEntry :: _ -> nameEntry.Text <- "Pepe"
-          | [] -> failtest "the name entry did not render")
+        do!
+          runUi(fun () ->
+            match textBoxes form with
+            | nameEntry :: _ -> nameEntry.Text <- "Pepe"
+            | [] -> failtest "the name entry did not render")
 
-        settle()
+        let! saveButton = probeUi(fun () -> buttonWithText(form, "Guardar"))
 
         let saveButton =
-          match probeUi(fun () -> buttonWithText(form, "Guardar")) with
-          | Some button -> button
-          | None -> failtest "the save button did not render"
+          saveButton
+          |> Option.defaultWith(fun () ->
+            failtest "the save button did not render")
 
-        onUi(fun () -> click saveButton)
+        let! canSave = waitFor(2000, (fun () -> saveButton.IsEnabled), id)
+        Expect.isTrue canSave "the form accepted the typed name"
 
-        let reported =
+        do! runUi(fun () -> click saveButton)
+
+        let! reported =
           waitFor(
             2000,
             (fun () -> List.ofSeq events),
@@ -671,11 +686,12 @@ let tests =
         | None -> failtest "no saved profile"
       }
 
-      test "a double click on save reports one athlete" {
+      uiTest "the picked gender reaches the saved profile"
+      <| fun () -> task {
         let events = ResizeArray<Event>()
         let _, culture = liveCulture es
 
-        let form =
+        let! form =
           probeUi(fun () ->
             NewAthleteForm(
               {
@@ -690,26 +706,104 @@ let tests =
               events.Add
             ))
 
-        mount form
+        do! mount form
 
-        onUi(fun () ->
-          match textBoxes form with
-          | nameEntry :: _ -> nameEntry.Text <- "Pepe"
-          | [] -> failtest "the name entry did not render")
+        let! female =
+          probeUi(fun () -> radioWithText(form, get(es, Keys.genderFemale)))
 
-        settle()
+        let female =
+          female
+          |> Option.defaultWith(fun () ->
+            failtest "the female radio did not render")
+
+        do! runUi(fun () -> click female)
+
+        do!
+          runUi(fun () ->
+            match textBoxes form with
+            | nameEntry :: _ -> nameEntry.Text <- "Ana"
+            | [] -> failtest "the name entry did not render")
+
+        let! saveButton = probeUi(fun () -> buttonWithText(form, "Guardar"))
 
         let saveButton =
-          match probeUi(fun () -> buttonWithText(form, "Guardar")) with
-          | Some button -> button
-          | None -> failtest "the save button did not render"
+          saveButton
+          |> Option.defaultWith(fun () ->
+            failtest "the save button did not render")
+
+        let! canSave = waitFor(2000, (fun () -> saveButton.IsEnabled), id)
+        Expect.isTrue canSave "the form accepted the typed name"
+
+        do! runUi(fun () -> click saveButton)
+
+        let! saved =
+          waitFor(
+            2000,
+            (fun () ->
+              events
+              |> Seq.tryPick(function
+                | Saved athlete -> Some athlete
+                | Cancelled -> None)),
+            Option.isSome
+          )
+
+        Expect.isTrue saved "the save event reached the parent"
+
+        match
+          events
+          |> Seq.tryPick(function
+            | Saved athlete -> Some athlete
+            | Cancelled -> None)
+        with
+        | Some athlete ->
+          Expect.equal athlete.Gender Female "the picked gender rides"
+        | None -> failtest "no saved profile"
+      }
+
+      uiTest "a double click on save reports one athlete"
+      <| fun () -> task {
+        let events = ResizeArray<Event>()
+        let _, culture = liveCulture es
+
+        let! form =
+          probeUi(fun () ->
+            NewAthleteForm(
+              {
+                Lead = ValueNone
+                Gate =
+                  Briple.Trainer.Navigation.PageGate(
+                    "/athletes/new",
+                    fun _ _ -> async { return true }
+                  )
+                Lifetime = testLifetime()
+              },
+              events.Add
+            ))
+
+        do! mount form
+
+        do!
+          runUi(fun () ->
+            match textBoxes form with
+            | nameEntry :: _ -> nameEntry.Text <- "Pepe"
+            | [] -> failtest "the name entry did not render")
+
+        let! saveButton = probeUi(fun () -> buttonWithText(form, "Guardar"))
+
+        let saveButton =
+          saveButton
+          |> Option.defaultWith(fun () ->
+            failtest "the save button did not render")
+
+        let! canSave = waitFor(2000, (fun () -> saveButton.IsEnabled), id)
+        Expect.isTrue canSave "the form accepted the typed name"
 
         // a double click: two clicks land before the form has any reason
         // to consider itself done
-        onUi(fun () -> click saveButton)
-        onUi(fun () -> click saveButton)
+        do! runUi(fun () -> click saveButton)
+        do! runUi(fun () -> click saveButton)
 
-        let reported =
+        let! reported =
           waitFor(
             2000,
             (fun () -> List.ofSeq events),
@@ -732,7 +826,8 @@ let tests =
         Expect.equal saves 1 "one save per form, no matter the clicks"
       }
 
-      test "the phase is derived: typing marks unsaved, the save clears it" {
+      uiTest "the phase is derived: typing marks unsaved, the save clears it"
+      <| fun () -> task {
         let gate =
           Briple.Trainer.Navigation.PageGate(
             "/athletes/new",
@@ -742,7 +837,7 @@ let tests =
         let events = ResizeArray<Event>()
         let _, culture = liveCulture es
 
-        let form =
+        let! form =
           probeUi(fun () ->
             NewAthleteForm(
               {
@@ -753,19 +848,20 @@ let tests =
               events.Add
             ))
 
-        mount form
+        do! mount form
 
         Expect.equal
           gate.PhaseValue
           Briple.Trainer.Navigation.PagePhase.Ready
           "a fresh form is ready"
 
-        onUi(fun () ->
-          match textBoxes form with
-          | nameEntry :: _ -> nameEntry.Text <- "Pepe"
-          | [] -> failtest "the name entry did not render")
+        do!
+          runUi(fun () ->
+            match textBoxes form with
+            | nameEntry :: _ -> nameEntry.Text <- "Pepe"
+            | [] -> failtest "the name entry did not render")
 
-        let dirty =
+        let! dirty =
           waitFor(
             2000,
             (fun () -> gate.PhaseValue),
@@ -775,14 +871,16 @@ let tests =
 
         Expect.isTrue dirty "typing marks the form unsaved"
 
+        let! saveButton = probeUi(fun () -> buttonWithText(form, "Guardar"))
+
         let saveButton =
-          match probeUi(fun () -> buttonWithText(form, "Guardar")) with
-          | Some button -> button
-          | None -> failtest "the save button did not render"
+          saveButton
+          |> Option.defaultWith(fun () ->
+            failtest "the save button did not render")
 
-        onUi(fun () -> click saveButton)
+        do! runUi(fun () -> click saveButton)
 
-        let ready =
+        let! ready =
           waitFor(
             2000,
             (fun () -> gate.PhaseValue),
@@ -792,7 +890,8 @@ let tests =
         Expect.isTrue ready "an in-flight save is not lost work"
       }
 
-      test "a culture switch keeps the typed name" {
+      uiTest "a culture switch keeps the typed name"
+      <| fun () -> task {
         let source, culture = liveCulture es
         let en = Language.toCulture En
 
@@ -802,7 +901,7 @@ let tests =
             fun _ _ -> async { return true }
           )
 
-        let form =
+        let! form =
           probeUi(fun () ->
             NewAthleteForm(
               {
@@ -813,19 +912,17 @@ let tests =
               ignore
             ))
 
-        mount form
+        do! mount form
 
-        onUi(fun () ->
-          match textBoxes form with
-          | nameEntry :: _ -> nameEntry.Text <- "Emilio"
-          | [] -> failtest "the name entry did not render")
+        do!
+          runUi(fun () ->
+            match textBoxes form with
+            | nameEntry :: _ -> nameEntry.Text <- "Emilio"
+            | [] -> failtest "the name entry did not render")
 
-        settle()
+        do! runUi(fun () -> source.OnNext en)
 
-        onUi(fun () -> source.OnNext en)
-        settle()
-
-        let nameStillThere =
+        let! nameStillThere =
           probeUi(fun () ->
             match textBoxes form with
             | nameEntry :: _ -> nameEntry.Text
@@ -859,7 +956,8 @@ let tests =
       }
     ]
 
-    test "a back navigation through the router returns to the previous page" {
+    uiTest "a back navigation through the router returns to the previous page"
+    <| fun () -> task {
       let db =
         Path.Combine(Path.GetTempPath(), $"briple-back-{Guid.NewGuid():N}.db")
 
@@ -867,7 +965,7 @@ let tests =
       | Error e -> failtest $"migrate failed: {e}"
       | Ok() -> ()
 
-      let env =
+      let! env =
         probeUi(fun () ->
           Briple.Trainer.Env.AppEnv(
             Briple.Trainer.Stores.createStores(sqliteStore db, ignore),
@@ -878,7 +976,7 @@ let tests =
             }
           ))
 
-      let shell =
+      let! shell =
         probeUi(fun () -> Briple.Trainer.Views.Routes.build(env, stubLeadOf))
 
       let router = shell.Router
@@ -886,13 +984,14 @@ let tests =
       let path() =
         router.Snapshot.Route |> ValueOption.map _.Path |> ValueOption.toOption
 
-      let booted = waitFor(5000, path, fun current -> current = Some "/")
+      let! booted = waitFor(5000, path, fun current -> current = Some "/")
       Expect.isTrue booted "the boot landed on the athletes list"
       Expect.isFalse router.History.CanGoBack "the list is the first entry"
 
-      onUi(fun () -> Briple.Trainer.Views.Routes.go(router, "/athletes/new"))
+      do!
+        runUi(fun () -> Briple.Trainer.Views.Routes.go(router, "/athletes/new"))
 
-      let atForm =
+      let! atForm =
         waitFor(5000, path, fun current -> current = Some "/athletes/new")
 
       Expect.isTrue atForm "the form opened"
@@ -904,9 +1003,9 @@ let tests =
         "the form is the current history entry"
 
       // no input: the form is Ready and the back proceeds
-      onUi(fun () -> Briple.Trainer.Views.Routes.back router)
+      do! runUi(fun () -> Briple.Trainer.Views.Routes.back router)
 
-      let returned = waitFor(5000, path, fun current -> current = Some "/")
+      let! returned = waitFor(5000, path, fun current -> current = Some "/")
 
       Expect.isTrue returned "the back navigation landed on the list"
       Expect.isFalse router.History.CanGoBack "the list is the first entry"
@@ -935,10 +1034,11 @@ let tests =
     testList "confirmation dialog" [
       // one mounted overlay: the host is a single control, so both
       // answers run over the same instance
-      test "the dialog answers accept and cancel through its buttons" {
-        let replied, overlay, window = askDialog()
+      uiTest "the dialog answers accept and cancel through its buttons"
+      <| fun () -> task {
+        let! replied, overlay, window = askDialog()
 
-        let shown =
+        let! shown =
           waitFor(
             2000,
             (fun () -> overlay),
@@ -947,18 +1047,25 @@ let tests =
 
         Expect.isTrue shown "the dialog did not render"
 
+        let! accept = probeUi(fun () -> buttonWithText(overlay, "Descartar"))
+
         let accept =
-          match probeUi(fun () -> buttonWithText(overlay, "Descartar")) with
-          | Some button -> button
-          | None -> failtest "the accept button did not render"
+          accept
+          |> Option.defaultWith(fun () ->
+            failtest "the accept button did not render")
 
-        onUi(fun () -> click accept)
+        do! runUi(fun () -> click accept)
 
-        settle()
+        let! accepted =
+          waitFor(
+            2000,
+            (fun () -> replied.Value),
+            fun value -> value = Some true
+          )
 
-        Expect.equal replied.Value (Some true) "accepted"
+        Expect.isTrue accepted "accepted"
 
-        let cleared =
+        let! cleared =
           waitFor(
             2000,
             (fun () -> overlay),
@@ -967,22 +1074,23 @@ let tests =
 
         Expect.isTrue cleared "the overlay did not clear"
 
-        onUi(fun () ->
-          Async.StartWithContinuations(
-            Briple.Trainer.Dialogs.confirmAsync(
-              {
-                Title = "¿Descartar?"
-                Body = "Se pierde el plan"
-                Accept = "Descartar"
-                Cancel = "Cancelar"
-              }
-            ),
-            (fun value -> replied.Value <- Some value),
-            ignore,
-            ignore
-          ))
+        do!
+          runUi(fun () ->
+            Async.StartWithContinuations(
+              Briple.Trainer.Dialogs.confirmAsync(
+                {
+                  Title = "¿Descartar?"
+                  Body = "Se pierde el plan"
+                  Accept = "Descartar"
+                  Cancel = "Cancelar"
+                }
+              ),
+              (fun value -> replied.Value <- Some value),
+              ignore,
+              ignore
+            ))
 
-        let shownAgain =
+        let! shownAgain =
           waitFor(
             2000,
             (fun () -> overlay),
@@ -991,28 +1099,35 @@ let tests =
 
         Expect.isTrue shownAgain "the dialog did not render again"
 
+        let! cancel = probeUi(fun () -> buttonWithText(overlay, "Cancelar"))
+
         let cancel =
-          match probeUi(fun () -> buttonWithText(overlay, "Cancelar")) with
-          | Some button -> button
-          | None -> failtest "the cancel button did not render"
+          cancel
+          |> Option.defaultWith(fun () ->
+            failtest "the cancel button did not render")
 
-        onUi(fun () -> click cancel)
+        do! runUi(fun () -> click cancel)
 
-        settle()
+        let! cancelled =
+          waitFor(
+            2000,
+            (fun () -> replied.Value),
+            fun value -> value = Some false
+          )
 
-        Expect.equal replied.Value (Some false) "cancelled"
+        Expect.isTrue cancelled "cancelled"
 
         // release the singleton host so the shell can mount it next
-        onUi(fun () ->
-          window.Content <- null
-          window.Close())
-
-        settle()
+        do!
+          runUi(fun () ->
+            window.Content <- null
+            window.Close())
       }
     ]
 
     testList "agent guard" [
-      test "the agent routes redirect to login without a token" {
+      uiTest "the agent routes redirect to login without a token"
+      <| fun () -> task {
         let db =
           Path.Combine(
             Path.GetTempPath(),
@@ -1025,7 +1140,7 @@ let tests =
 
         // a constructed env with an empty key: no token, no matter what
         // the real user's vault holds
-        let env =
+        let! env =
           probeUi(fun () ->
             Briple.Trainer.Env.AppEnv(
               Briple.Trainer.Stores.createStores(sqliteStore db, fun _ -> ()),
@@ -1040,7 +1155,7 @@ let tests =
           ((env :> Briple.Trainer.Env.IProvideAgent).AgentAvailable)
           "the env carries no token"
 
-        let shell =
+        let! shell =
           probeUi(fun () -> Briple.Trainer.Views.Routes.build(env, stubLeadOf))
 
         let router = shell.Router
@@ -1050,13 +1165,14 @@ let tests =
           |> ValueOption.map _.Path
           |> ValueOption.toOption
 
-        onUi(fun () ->
-          Briple.Trainer.Views.Routes.go(
-            router,
-            $"/athletes/{Guid.NewGuid()}/generate"
-          ))
+        do!
+          runUi(fun () ->
+            Briple.Trainer.Views.Routes.go(
+              router,
+              $"/athletes/{Guid.NewGuid()}/generate"
+            ))
 
-        let landed = waitFor(5000, current, (fun path -> path = Some "/login"))
+        let! landed = waitFor(5000, current, (fun path -> path = Some "/login"))
 
         Expect.isTrue landed "the guard did not redirect to login"
       }
@@ -1066,7 +1182,8 @@ let tests =
       // The token gates the data routes: the boot lands on the login
       // without one, on the athletes list with one. Both envs are
       // constructed, so the real user settings never interfere.
-      test "the first page follows the token" {
+      uiTest "the first page follows the token"
+      <| fun () -> task {
         let db =
           Path.Combine(Path.GetTempPath(), $"briple-boot-{Guid.NewGuid():N}.db")
 
@@ -1074,33 +1191,38 @@ let tests =
         | Error e -> failtest $"migrate failed: {e}"
         | Ok() -> ()
 
-        let envOf(key: string) =
-          probeUi(fun () ->
-            Briple.Trainer.Env.AppEnv(
-              Briple.Trainer.Stores.createStores(sqliteStore db, fun _ -> ()),
-              Briple.Trainer.Secrets.create(),
-              ValueSome {
-                Briple.Trainer.Env.defaultSettings with
-                    Key = key
-              }
-            ))
+        let windowOf(key: string) = task {
+          let! env =
+            probeUi(fun () ->
+              Briple.Trainer.Env.AppEnv(
+                Briple.Trainer.Stores.createStores(sqliteStore db, fun _ -> ()),
+                Briple.Trainer.Secrets.create(),
+                ValueSome {
+                  Briple.Trainer.Env.defaultSettings with
+                      Key = key
+                }
+              ))
 
-        let windowOf(env: Briple.Trainer.Env.AppEnv) =
-          probeUi(fun () ->
-            let router =
-              (Briple.Trainer.Views.Routes.build(env, stubLeadOf)).Router
+          let! window =
+            probeUi(fun () ->
+              let router =
+                (Briple.Trainer.Views.Routes.build(env, stubLeadOf)).Router
 
-            let outlet = RouterOutlet()
-            outlet.Router <- Some router
+              let outlet = RouterOutlet()
+              outlet.Router <- Some router
 
-            let window = Window(Content = outlet)
-            window.Show() |> ignore
+              let window = Window(Content = outlet)
+              window.Show() |> ignore
 
-            window)
+              window)
 
-        let closed = windowOf(envOf "")
+          trackWindowForTest window
+          return window
+        }
 
-        let onLogin =
+        let! closed = windowOf ""
+
+        let! onLogin =
           waitFor(
             5000,
             (fun () -> closed),
@@ -1109,9 +1231,9 @@ let tests =
 
         Expect.isTrue onLogin "no token: the boot did not land on the login"
 
-        let openWindow = windowOf(envOf "token")
+        let! openWindow = windowOf "token"
 
-        let onList =
+        let! onList =
           waitFor(
             5000,
             (fun () -> openWindow),
@@ -1123,7 +1245,8 @@ let tests =
           "with token: the boot did not land on the athletes list"
       }
 
-      test "the title bar band clears the page and hides the root back" {
+      uiTest "the title bar band clears the page and hides the root back"
+      <| fun () -> task {
         let db =
           Path.Combine(Path.GetTempPath(), $"briple-band-{Guid.NewGuid():N}.db")
 
@@ -1131,7 +1254,7 @@ let tests =
         | Error e -> failtest $"migrate failed: {e}"
         | Ok() -> ()
 
-        let env =
+        let! env =
           probeUi(fun () ->
             Briple.Trainer.Env.AppEnv(
               Briple.Trainer.Stores.createStores(sqliteStore db, fun _ -> ()),
@@ -1142,11 +1265,12 @@ let tests =
               }
             ))
 
-        let window = probeUi(fun () -> Briple.Trainer.Shell.create env)
+        let! window = probeUi(fun () -> Briple.Trainer.Shell.create env)
+        trackWindowForTest window
 
-        onUi(fun () -> window.Show() |> ignore)
+        do! runUi(fun () -> window.Show() |> ignore)
 
-        let rendered =
+        let! rendered =
           waitFor(
             5000,
             (fun () -> window),
@@ -1155,22 +1279,28 @@ let tests =
 
         Expect.isTrue rendered "the athletes page did not render"
 
-        settle()
+        let! band = probeUi(fun () -> controlByName(window, "TitleBarBand"))
 
         let band =
-          probeUi(fun () -> controlByName(window, "TitleBarBand"))
+          band
           |> Option.defaultWith(fun () ->
             failtest "the title bar band is missing")
 
-        let title =
+        let! title =
           probeUi(fun () -> textBlockWith(window, get(es, Keys.athletesTitle)))
+
+        let title =
+          title
           |> Option.defaultWith(fun () -> failtest "the page title is missing")
 
-        let command =
+        let! command =
           probeUi(fun () -> buttonWithText(window, get(es, Keys.athletesNew)))
+
+        let command =
+          command
           |> Option.defaultWith(fun () -> failtest "the new command is missing")
 
-        let bandHeight, bandBottom, titleTop, commandTop =
+        let! bandHeight, bandBottom, titleTop, commandTop =
           probeUi(fun () ->
             let bandHeight = band.Bounds.Height
 
@@ -1197,7 +1327,7 @@ let tests =
           bandBottom
           "the page command starts below the band"
 
-        let rootBack =
+        let! rootBack =
           probeUi(fun () ->
             buttons(window)
             |> List.tryFind(fun button -> button.Classes.Contains("back"))
@@ -1208,13 +1338,13 @@ let tests =
           Expect.isFalse visible "the root back control is hidden"
         | None -> ()
 
-        let minimize =
+        let! minimize =
           probeUi(fun () -> controlByName(window, "MinimizeButton"))
 
-        let maximize =
+        let! maximize =
           probeUi(fun () -> controlByName(window, "MaximizeButton"))
 
-        let close = probeUi(fun () -> controlByName(window, "CloseButton"))
+        let! close = probeUi(fun () -> controlByName(window, "CloseButton"))
 
         Expect.isSome minimize "the minimize button is missing"
         Expect.isSome maximize "the maximize button is missing"
@@ -1226,7 +1356,7 @@ let tests =
               control
             ))
 
-        let dragRole =
+        let! dragRole =
           probeUi(fun () ->
             band.GetVisualDescendants()
             |> Seq.tryFind(fun visual ->
@@ -1238,46 +1368,59 @@ let tests =
 
         Expect.isSome dragRole "the band has a title bar drag surface"
 
+        let! minimizeRole = roleOf minimize.Value
+        let! maximizeRole = roleOf maximize.Value
+        let! closeRole = roleOf close.Value
+
         Expect.equal
-          (roleOf minimize.Value)
+          minimizeRole
           Avalonia.Input.WindowDecorationsElementRole.MinimizeButton
           "the minimize button carries its system role"
 
         Expect.equal
-          (roleOf maximize.Value)
+          maximizeRole
           Avalonia.Input.WindowDecorationsElementRole.MaximizeButton
           "the maximize button carries its system role"
 
         Expect.equal
-          (roleOf close.Value)
+          closeRole
           Avalonia.Input.WindowDecorationsElementRole.CloseButton
           "the close button carries its system role"
 
         let maximizeButton = maximize.Value :?> Button
 
-        onUi(fun () -> click maximizeButton)
-        settle()
+        do! runUi(fun () -> click maximizeButton)
 
-        Expect.equal
-          (probeUi(fun () -> window.WindowState))
-          WindowState.Maximized
-          "the caption button maximizes the window"
+        let! maximized =
+          waitFor(
+            2000,
+            (fun () -> window.WindowState),
+            fun state -> state = WindowState.Maximized
+          )
 
-        onUi(fun () -> click maximizeButton)
-        settle()
+        Expect.isTrue maximized "the caption button maximizes the window"
 
-        Expect.equal
-          (probeUi(fun () -> window.WindowState))
-          WindowState.Normal
-          "the caption button restores the window"
+        do! runUi(fun () -> click maximizeButton)
+
+        let! restored =
+          waitFor(
+            2000,
+            (fun () -> window.WindowState),
+            fun state -> state = WindowState.Normal
+          )
+
+        Expect.isTrue restored "the caption button restores the window"
+
+        let! newButton =
+          probeUi(fun () -> buttonWithText(window, get(es, Keys.athletesNew)))
 
         let newButton =
-          probeUi(fun () -> buttonWithText(window, get(es, Keys.athletesNew)))
+          newButton
           |> Option.defaultWith(fun () -> failtest "the new command vanished")
 
-        onUi(fun () -> click newButton)
+        do! runUi(fun () -> click newButton)
 
-        let form =
+        let! form =
           waitFor(
             5000,
             (fun () -> window),
@@ -1285,9 +1428,8 @@ let tests =
           )
 
         Expect.isTrue form "the form did not open"
-        settle()
 
-        let formBack =
+        let! formBack =
           probeUi(fun () ->
             buttons(window)
             |> List.tryFind(fun button -> button.Classes.Contains("back"))
@@ -1298,8 +1440,77 @@ let tests =
           Expect.isTrue visible "the form back control is visible"
         | None -> failtest "the form back control is missing"
 
-        onUi(fun () -> window.Close())
-        settle()
+        do! runUi(fun () -> window.Close())
+      }
+    ]
+
+    testList "login guards" [
+      uiTest "typing keeps the outcome band; a save rebuilds it"
+      <| fun () -> task {
+        let env = LoginEnv()
+
+        let! page =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Login.LoginPage<LoginEnv>(
+              env,
+              {
+                Lead = ValueNone
+                OnDone = ignore
+                Lifetime = testLifetime()
+              }
+            ))
+
+        do! mount page
+
+        let! token = probeUi(fun () -> textBoxes page |> List.tryHead)
+
+        let token =
+          token
+          |> Option.defaultWith(fun () ->
+            failtest "the token entry did not render")
+
+        let! host = probeUi(fun () -> controlByName(page, "login-outcome"))
+
+        let host =
+          host
+          |> Option.map(fun control -> control :?> ContentControl)
+          |> Option.defaultWith(fun () ->
+            failtest "the outcome host did not render")
+
+        let before = host.Content
+
+        do! runUi(fun () -> token.Text <- "abc")
+
+        let! save =
+          probeUi(fun () -> buttonWithText(page, get(es, Keys.loginSave)))
+
+        let save =
+          save
+          |> Option.defaultWith(fun () ->
+            failtest "the save button did not render")
+
+        let! canSave = waitFor(2000, (fun () -> save.IsEnabled), id)
+        Expect.isTrue canSave "the token reached the model"
+
+        let! unchanged =
+          waitFor(
+            2000,
+            (fun () -> obj.ReferenceEquals(host.Content, before)),
+            id
+          )
+
+        Expect.isTrue unchanged "typing does not rebuild the outcome band"
+
+        do! runUi(fun () -> click save)
+
+        let! changed =
+          waitFor(
+            2000,
+            (fun () -> obj.ReferenceEquals(host.Content, before)),
+            not
+          )
+
+        Expect.isTrue changed "a save state change rebuilds the outcome band"
       }
     ]
   ]

@@ -327,45 +327,51 @@ let inline cardRowKey(key: string, control: Control) : Control =
     )
     .Classes("card")
 
-/// A radio button per typed option in one group; the selected value
-/// comes from the model.
-let inline radioRow
-  (
-    options: ('T * string) list,
-    group: string,
-    selected: 'T,
-    [<InlineIfLambda>] onPick: 'T -> unit
-  ) : Control =
-  let row((choice, label): 'T * string) : Control =
-    let isChecked = choice = selected
+/// The inputs of one single-choice row: the options, the group name, the
+/// live selected value and the pick callback.
+[<Struct>]
+type RadioRow<'T when 'T: equality> = {
+  Options: ('T * string) list
+  Group: string
+  Selected: IObservable<'T>
+  OnPick: 'T -> unit
+}
 
-    RadioButton(Content = label, GroupName = group)
-      .IsChecked(Nullable isChecked)
+/// A radio button per typed option in one group; the checked state
+/// follows the selected value.
+let inline radioRow(row: RadioRow<'T>) : Control =
+  let optionRow((choice, label): 'T * string) : Control =
+    let isChecked =
+      row.Selected
+      |> Observable.map(fun selected ->
+        let checkedHere = choice = selected
+        Nullable checkedHere)
+
+    RadioButton(Content = label, GroupName = row.Group)
+      .IsChecked(isChecked)
       .Margin(0.0, 0.0, 12.0, 4.0)
-      .OnClickHandler(fun _ _ -> onPick choice)
+      .OnClickHandler(fun _ _ -> row.OnPick choice)
 
-  WrapPanel().Children [| for option in options -> row option |]
+  WrapPanel().Children [| for option in row.Options -> optionRow option |]
 
 /// Radio options whose labels are resource keys.
-let inline radioRowKeys
-  (
-    options: ('T * string) list,
-    group: string,
-    selected: 'T,
-    [<InlineIfLambda>] onPick: 'T -> unit
-  ) : Control =
-  let row((choice, key): 'T * string) : Control =
-    let isChecked = choice = selected
+let inline radioRowKeys(row: RadioRow<'T>) : Control =
+  let optionRow((choice, key): 'T * string) : Control =
+    let isChecked =
+      row.Selected
+      |> Observable.map(fun selected ->
+        let checkedHere = choice = selected
+        Nullable checkedHere)
 
     RadioButton(
       Content = TextBlock().Text(Localization.text key),
-      GroupName = group
+      GroupName = row.Group
     )
-      .IsChecked(Nullable isChecked)
+      .IsChecked(isChecked)
       .Margin(0.0, 0.0, 12.0, 4.0)
-      .OnClickHandler(fun _ _ -> onPick choice)
+      .OnClickHandler(fun _ _ -> row.OnPick choice)
 
-  WrapPanel().Children [| for option in options -> row option |]
+  WrapPanel().Children [| for option in row.Options -> optionRow option |]
 
 /// One checkbox whose checked state follows an observable.
 let inline checkRow

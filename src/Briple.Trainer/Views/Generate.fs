@@ -7,6 +7,7 @@ open System.Threading
 
 open Avalonia
 open Avalonia.Controls
+open Avalonia.Controls.Templates
 open Avalonia.Layout
 open Avalonia.Media
 open NXUI.Extensions
@@ -16,6 +17,7 @@ open IcedTasks
 open JDeck
 open Microsoft.Extensions.Logging
 open MVUish.Avalonia
+open MVUish.Avalonia.Collections
 
 open Serilog
 
@@ -470,7 +472,9 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
 
   match msg with
   | CultureChanged culture -> { model with Culture = culture }, Cmd.none
-  | MemoryDecided(MemoryReview.Event.Confirmed(id, memory)) ->
+  | MemoryDecided(MemoryReview.Event.Confirmed(id, memory)) when
+    not(List.contains id model.Decided)
+    ->
     let decided = {
       model with
           Decided =
@@ -502,7 +506,11 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
 
     decided, persist
 
-  | MemoryDecided(MemoryReview.Event.Discarded id) ->
+  | MemoryDecided(MemoryReview.Event.Confirmed _) -> model, Cmd.none
+
+  | MemoryDecided(MemoryReview.Event.Discarded id) when
+    not(List.contains id model.Decided)
+    ->
     let decided = {
       model with
           Decided =
@@ -527,6 +535,8 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
       |> Option.defaultValue Cmd.none
 
     decided, persist
+
+  | MemoryDecided(MemoryReview.Event.Discarded _) -> model, Cmd.none
 
   | GoSection section ->
     match model.Phase with
@@ -740,53 +750,92 @@ let inline stepCaption
     )
     .Classes("caption", "secondary")
 
+[<Struct>]
+type MemoriesColumnContext = {
+  Props: WizardPageProps
+  Culture: ViewCulture
+  Model: IObservable<Model>
+  Dispatch: Dispatch<Msg>
+}
+
 /// The memories section: what the athlete remembers. It reads only;
 /// the decision is the brief's.
-let memoriesColumn
-  (props: WizardPageProps, culture: ViewCulture, dispatch: Dispatch<Msg>)
-  : Control =
+let memoriesColumn(context: MemoriesColumnContext) : Control =
+  let props = context.Props
+  let culture = context.Culture
+  let model = context.Model
+  let dispatch = context.Dispatch
+
   let memoryEnv: MemoryReview.MemoryReviewEnv = {
     Culture = culture.Current
     CultureChanged = culture.Changed
   }
 
-  let cards: Control array = [|
-    for entity in props.Proposals ->
-      MemoryReview.MemoryReview(
-        memoryEnv,
-        {
-          Id = entity.Id
-          Memory = entity.Memory
-        },
-        MemoryDecided >> dispatch
+  let pending =
+    model
+    |> Observable.map(fun current ->
+      props.Proposals
+      |> List.filter(fun entity ->
+        not(List.contains entity.Id current.Decided)))
+
+  let proposalCard(entity: MemoryEntity) : Control =
+    MemoryReview.MemoryReview(
+      memoryEnv,
+      {
+        Id = entity.Id
+        Memory = entity.Memory
+      },
+      MemoryDecided >> dispatch
+    )
+
+  let cards =
+    let template =
+      FuncDataTemplate<MemoryEntity>(
+        (fun entity _ -> proposalCard entity),
+        false
       )
-  |]
+
+    ItemsControl()
+      .ItemTemplate(template)
+      .BindItemsSource(pending, fun entity -> entity.Id)
+
+  let emptyState =
+    (labelKey Keys.memoriesEmpty)
+      .IsVisible(pending |> Observable.map List.isEmpty)
 
   // the adjustments that were already confirmed when the wizard
-  // opened; the cards below carry the decisions of this visit
-  let confirmedRows =
-    props.Confirmed
-    |> List.filter(fun memory -> not(String.IsNullOrWhiteSpace memory.Summary))
-    |> List.map(fun memory -> label memory.Summary)
-    |> Array.ofList
-    |> linesPanel
+  // opened followed by the decisions of this visit
+  let applies =
+    model
+    |> Observable.map(fun current ->
+      props.Confirmed @ (current.Confirmed |> List.map snd))
+    |> Observable.map(
+      List.filter(fun memory -> not(String.IsNullOrWhiteSpace memory.Summary))
+    )
 
-  let appliesHeading: Control =
-    if List.isEmpty props.Confirmed then
-      StackPanel()
-    else
-      sectionTitleKey Keys.wizardApplies
+  let appliesRows =
+    let template =
+      FuncDataTemplate<Memory>((fun memory _ -> label memory.Summary), false)
+
+    ItemsControl()
+      .ItemTemplate(template)
+      .ItemsPanel(FuncTemplate<Panel>(fun () -> StackPanel(Spacing = 4.0)))
+      .BindItemsSource(applies)
+
+  let appliesHeading =
+    (sectionTitleKey Keys.wizardApplies)
+      .IsVisible(
+        applies |> Observable.map(fun memories -> not(List.isEmpty memories))
+      )
 
   StackPanel()
     .Spacing(8.0)
     .Children(
       stepCaption(culture.Changed, 1),
-      (if Array.isEmpty cards then
-         labelKey Keys.memoriesEmpty
-       else
-         linesPanel cards),
+      emptyState,
+      cards,
       appliesHeading,
-      confirmedRows
+      appliesRows
     )
 
 let briefColumn
@@ -849,7 +898,12 @@ let editingView
       Slots = [
         Hub.slotView(
           Localization.textBlock Keys.wizardStepMemories,
-          memoriesColumn(props, culture, dispatch)
+          memoriesColumn {
+            Props = props
+            Culture = culture
+            Model = model
+            Dispatch = dispatch
+          }
         )
         Hub.slotView(
           Localization.textBlock Keys.wizardStepBrief,

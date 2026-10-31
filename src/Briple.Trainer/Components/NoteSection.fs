@@ -49,6 +49,8 @@ type Status =
 type Model = {
   Note: string
   Busy: bool
+  /// A confirmation is in flight; a second decision is ignored.
+  Saving: bool
   Proposals: (Guid * Memory) list
   Status: Status
   Culture: CultureInfo
@@ -66,9 +68,10 @@ type NoteEnv = {
 [<Struct>]
 type Props = {
   AthleteId: Guid
-  /// The plan the note is observed on: its vocabulary closes the
-  /// surface and its id stamps plan-scoped memories.
-  Plan: Plan
+  /// The plan the note is observed on, read when the note is asked.
+  /// Its vocabulary closes the surface; the plan id stamps plan-scoped
+  /// memories.
+  Plan: unit -> Plan
   PlanId: Guid
   /// The page's token: leaving the review page cancels the reading.
   Cancel: CancellationToken
@@ -123,7 +126,7 @@ let read (ctx: Context) (note: string) : Task<Reading> = task {
     return SurfaceFull
   else
     let ask: NoteAsk = {
-      Targets = vocabularyOfPlan props.Plan
+      Targets = vocabularyOfPlan(props.Plan())
       Note = note
       Date = DateOnly.FromDateTime DateTime.Today
     }
@@ -162,7 +165,9 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
   | SetNote note -> settled({ model with Note = note }, Cmd.none)
 
   | InterpretRequested when
-    not model.Busy && not(String.IsNullOrWhiteSpace model.Note)
+    not model.Busy
+    && not model.Saving
+    && not(String.IsNullOrWhiteSpace model.Note)
     ->
     settled(
       {
@@ -237,12 +242,18 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
       log
     )
 
-  | Decided(MemoryReview.Confirmed(localId, memory)) ->
+  | Decided(MemoryReview.Confirmed(localId, memory)) when
+    not model.Saving
+    && model.Proposals |> List.exists(fun (key, _) -> key = localId)
+    ->
     let decided = confirm memory.Deltas memory
 
-    model, Cmd.OfTask.perform (saveMemory ctx) (localId, decided) Saved
+    { model with Saving = true },
+    Cmd.OfTask.perform (saveMemory ctx) (localId, decided) Saved
 
-  | Decided(MemoryReview.Discarded localId) ->
+  | Decided(MemoryReview.Confirmed _) -> model, Cmd.none
+
+  | Decided(MemoryReview.Discarded localId) when not model.Saving ->
     settled(
       {
         model with
@@ -252,12 +263,15 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
       Cmd.none
     )
 
+  | Decided(MemoryReview.Discarded _) -> model, Cmd.none
+
   | Saved(localId, Ok entity) ->
     let notify = Cmd.ofAction(fun () -> onEvent(Event.MemoryConfirmed entity))
 
     settled(
       {
         model with
+            Saving = false
             Proposals =
               model.Proposals |> List.filter(fun (key, _) -> key <> localId)
       },
@@ -268,7 +282,14 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
     let log =
       Cmd.ofAction(fun () -> ctx.Env.Logger.LogError(e, "memory save failed"))
 
-    settled({ model with Status = Failed e.Message }, log)
+    settled(
+      {
+        model with
+            Saving = false
+            Status = Failed e.Message
+      },
+      log
+    )
 
 /// One status line: the text and whether it carries the error tone.
 [<Struct>]
@@ -332,7 +353,7 @@ let view
     primary.IsEnabled(
       model
       |> Observable.map(fun m ->
-        not m.Busy && not(String.IsNullOrWhiteSpace m.Note))
+        not m.Busy && not m.Saving && not(String.IsNullOrWhiteSpace m.Note))
     )
 
   // one named stream, two bindings: the status reaches the text and the

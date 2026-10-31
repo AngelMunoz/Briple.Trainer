@@ -275,16 +275,18 @@ type MemoryReview
 
         checkRowObs(text, selected, fun () -> dispatch(Toggle delta))
 
-      // the deltas the trainer adds in this card
+      // the deltas the trainer adds in this card; typing in the value
+      // box must not rebuild the rows
       let addedRows =
         ContentControl()
+          .Name($"memory-added-{props.Id}")
           .Content(
             (model
-             |> Observable.map(fun current ->
-               let culture = current.Culture
-
+             |> Observable.map(fun current -> current.Added, current.Culture)
+             |> Observable.distinctUntilChanged
+             |> Observable.map(fun (added, culture) ->
                let children: Control array = [|
-                 for delta in current.Added ->
+                 for delta in added ->
                    DockPanel()
                      .LastChildFill(false)
                      .Children(
@@ -394,12 +396,15 @@ type MemoryReview
 
       // how far the confirmed memory travels: this plan or the athlete
       let scopeRow =
-        radioRowKeys(
-          [ Plan, Keys.memoryScopePlan; Athlete, Keys.memoryScopeAthlete ],
-          $"memory-scope-{props.Id}",
-          props.Memory.Scope,
-          SetScope >> dispatch
-        )
+        radioRowKeys {
+          Options = [
+            Plan, Keys.memoryScopePlan
+            Athlete, Keys.memoryScopeAthlete
+          ]
+          Group = $"memory-scope-{props.Id}"
+          Selected = model |> Observable.map _.Scope
+          OnPick = SetScope >> dispatch
+        }
 
       // the proposal rides a card: the Fluent content surface
 

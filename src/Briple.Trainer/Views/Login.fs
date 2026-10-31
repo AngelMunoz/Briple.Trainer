@@ -192,10 +192,13 @@ let view
 
   let outcomeHost =
     ContentControl()
+      .Name("login-outcome")
       .Content(
         (model
-         |> Observable.map(fun current ->
-           outcomeView(current.Culture, current.State, dispatch)))
+         |> Observable.map(fun current -> current.State, current.Culture)
+         |> Observable.distinctUntilChanged
+         |> Observable.map(fun (state, culture) ->
+           outcomeView(culture, state, dispatch)))
           .ToBinding()
       )
 

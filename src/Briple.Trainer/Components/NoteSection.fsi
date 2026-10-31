@@ -37,6 +37,8 @@ type Status =
 type Model = {
   Note: string
   Busy: bool
+  /// A confirmation is in flight; a second decision is ignored.
+  Saving: bool
   Proposals: (Guid * Memory) list
   Status: Status
   Culture: CultureInfo
@@ -56,9 +58,10 @@ type NoteEnv = {
 [<Struct>]
 type Props = {
   AthleteId: Guid
-  /// The plan the note is observed on: its vocabulary closes the
-  /// surface and its id stamps plan-scoped memories.
-  Plan: Plan
+  /// The plan the note is observed on, read when the note is asked.
+  /// Its vocabulary closes the surface; the plan id stamps plan-scoped
+  /// memories.
+  Plan: unit -> Plan
   PlanId: Guid
   /// The page's token: leaving the review page cancels the reading.
   Cancel: CancellationToken

@@ -151,8 +151,6 @@ let view
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
-  let current = props.Draft
-
   // the goal radio is built from the athlete's own goals
   let athleteGoals =
     if List.isEmpty props.Athlete.Goals then
@@ -165,39 +163,42 @@ let view
       fieldKey(
         Keys.wizardMode,
         fun () ->
-          radioRowKeys(
-            [ Adjust, Keys.wizardModeAdjust; Fresh, Keys.wizardModeNew ],
-            "brief-mode",
-            current.Mode,
-            SetMode >> dispatch
-          )
+          radioRowKeys {
+            Options = [
+              Adjust, Keys.wizardModeAdjust
+              Fresh, Keys.wizardModeNew
+            ]
+            Group = "brief-mode"
+            Selected = model |> Observable.map _.Mode
+            OnPick = SetMode >> dispatch
+          }
       )
     else
       StackPanel()
 
   let weeksChips =
-    radioRow(
-      [ for week in 1..4 -> week, string week ],
-      "brief-weeks",
-      current.Weeks,
-      SetWeeks >> dispatch
-    )
+    radioRow {
+      Options = [ for week in 1..4 -> week, string week ]
+      Group = "brief-weeks"
+      Selected = model |> Observable.map _.Weeks
+      OnPick = SetWeeks >> dispatch
+    }
 
   let goalChips =
-    radioRowKeys(
-      [ for goal in athleteGoals -> goal, goalKey goal ],
-      "brief-goal",
-      current.Goal,
-      SetGoal >> dispatch
-    )
+    radioRowKeys {
+      Options = [ for goal in athleteGoals -> goal, goalKey goal ]
+      Group = "brief-goal"
+      Selected = model |> Observable.map _.Goal
+      OnPick = SetGoal >> dispatch
+    }
 
   let frequencyChips =
-    radioRowKeys(
-      frequencyOptions,
-      "brief-frequency",
-      current.Frequency,
-      SetFrequency >> dispatch
-    )
+    radioRowKeys {
+      Options = frequencyOptions
+      Group = "brief-frequency"
+      Selected = model |> Observable.map _.Frequency
+      OnPick = SetFrequency >> dispatch
+    }
 
   // the emphasis catalog follows the picked goal: the keyed binding
   // diffs the snapshots, so rows survive a goal change

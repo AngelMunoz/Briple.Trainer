@@ -7,11 +7,14 @@ module Briple.Trainer.UI.Tests.Leaks
 
 open System
 open System.Reactive.Subjects
+open System.Threading.Tasks
 
 open Avalonia.Controls
 open Avalonia.VisualTree
+open NXUI.Extensions
 
 open Expecto
+open MVUish.Avalonia
 
 open Briple.Trainer.Components.AthleteList
 open Briple.Trainer.Components.Page
@@ -42,8 +45,8 @@ let private rowButton(root: Control, text: string) : Button option =
 
 let tests =
   testList "leaks" [
-    testCase "an athlete page releases its store subscription on leave"
-    <| fun _ ->
+    uiTest "an athlete page releases its store subscription on leave"
+    <| fun () -> task {
       let athlete = {
         Id = Guid.NewGuid()
         Profile = {
@@ -57,7 +60,7 @@ let tests =
       let _, culture = liveCulture es
       let lifetime = new TestLifetime()
 
-      let page =
+      let! page =
         probeUi(fun () ->
           AthleteList(
             listEnv source culture,
@@ -68,13 +71,9 @@ let tests =
             ignore
           ))
 
-      let window =
-        probeUi(fun () ->
-          let window = Window(Content = page, Width = 600.0, Height = 400.0)
-          window.Show() |> ignore
-          window)
+      let! window = mountWindowSized(page, 600.0, 400.0)
 
-      let rendered =
+      let! rendered =
         waitFor(
           2000,
           (fun () -> page),
@@ -83,14 +82,54 @@ let tests =
 
       Expect.isTrue rendered "the athlete row rendered before the leave"
 
-      onUi(fun () ->
-        window.Content <- null
-        window.Close()
-        (lifetime :> IDisposable).Dispose())
+      do!
+        runUi(fun () ->
+          window.Content <- null
+          window.Close()
+          (lifetime :> IDisposable).Dispose())
 
-      settle()
+      let! stopped = waitFor(2000, (fun () -> source.HasObservers), not)
 
-      Expect.isFalse
-        source.HasObservers
-        "the page left its store subscription behind"
+      Expect.isTrue stopped "the page left its store subscription behind"
+    }
+
+    uiTest "a disposed program completes the stream and freezes the model"
+    <| fun () -> task {
+      let harness = RecordingHarness<int, unit>()
+      let block = TextBlock()
+
+      let view model dispatch =
+        block.Bind(TextBlock.TextProperty, Observable.map string model)
+        |> ignore
+
+        harness.View model dispatch |> ignore
+        block
+
+      let program =
+        Program.mkSimple (fun () -> 0) (fun _ count -> count + 1) view
+
+      let _, lifetime = Program.runWithLifecycle () program
+
+      harness.Dispatch()
+
+      let! raised = waitFor(2000, (fun () -> harness.Model), (=) 1)
+
+      Expect.isTrue raised "the message reached the model"
+
+      lifetime.Dispose()
+      lifetime.Dispose()
+      harness.Dispatch()
+      do! Task.Delay 50
+
+      Expect.isTrue harness.Completed "the model stream completed"
+
+      Expect.equal
+        harness.Model
+        1
+        "a message after dispose does not change the model"
+
+      Expect.isTrue
+        (String.IsNullOrEmpty block.Text)
+        "the bound text reverted to its default"
+    }
   ]

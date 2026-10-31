@@ -6,7 +6,6 @@ module Briple.Trainer.UI.Tests.Stores
 
 open System
 open System.IO
-open System.Threading.Tasks
 
 open Expecto
 
@@ -21,9 +20,6 @@ open Briple.Trainer.UI.Tests.Harness
 // default Serilog)
 let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
 
-let private wait(task: Task<Result<'a, exn>>) : Result<'a, exn> =
-  task.GetAwaiter().GetResult()
-
 let private tempDb() : string =
   Path.Combine(Path.GetTempPath(), $"briple-stores-{Guid.NewGuid():N}.db")
 
@@ -35,7 +31,8 @@ let private sampleAthlete: Athlete = {
 
 let tests =
   testList "stores" [
-    test "the athlete store emits the saved athlete and replays it" {
+    uiTest "the athlete store emits the saved athlete and replays it"
+    <| fun () -> task {
       let db = tempDb()
       migrate(testLogger, db) |> ignore
 
@@ -45,9 +42,9 @@ let tests =
 
       let tap = stores.Athletes.Observe() |> Observable.subscribe seen.Add
 
-      wait(stores.Athletes.Add sampleAthlete) |> ignore
+      let! _ = stores.Athletes.Add sampleAthlete
 
-      let emitted =
+      let! emitted =
         waitFor(
           2000,
           (fun () -> List.ofSeq seen),
@@ -64,24 +61,30 @@ let tests =
 
       let late = stores.Athletes.Observe() |> Observable.subscribe replayed.Add
 
-      settle()
+      let! replayedOk =
+        waitFor(
+          2000,
+          (fun () -> List.ofSeq replayed),
+          fun lists -> not(List.isEmpty lists)
+        )
 
-      Expect.isNonEmpty
-        (List.ofSeq replayed)
-        "a late subscriber received the snapshot"
+      Expect.isTrue replayedOk "a late subscriber received the snapshot"
 
       late.Dispose()
       tap.Dispose()
     }
 
-    test "the memory store loads the slice per athlete and re-emits writes" {
+    uiTest "the memory store loads the slice per athlete and re-emits writes"
+    <| fun () -> task {
       let db = tempDb()
       migrate(testLogger, db) |> ignore
 
       let stores = createStores(sqliteStore db, ignore)
 
+      let! athleteResult = stores.Athletes.Add sampleAthlete
+
       let athleteId =
-        match wait(stores.Athletes.Add sampleAthlete) with
+        match athleteResult with
         | Ok entity -> entity.Id
         | Error e -> failtest $"add failed: {e}"
 
@@ -91,7 +94,7 @@ let tests =
         stores.Memories.Observe athleteId |> Observable.subscribe seen.Add
 
       // the first subscription loads the (empty) slice
-      let loaded =
+      let! loaded =
         waitFor(
           2000,
           (fun () -> List.ofSeq seen),
@@ -106,16 +109,14 @@ let tests =
         Date = DateOnly(2026, 10, 6)
       }
 
-      wait(
+      let! _ =
         stores.Memories.Add(
           athleteId,
           consolidate mark,
           ValueSome(Guid.NewGuid())
         )
-      )
-      |> ignore
 
-      let emitted =
+      let! emitted =
         waitFor(
           2000,
           (fun () -> List.ofSeq seen),
@@ -128,14 +129,17 @@ let tests =
       tap.Dispose()
     }
 
-    test "the plan store emits the saved plan slice" {
+    uiTest "the plan store emits the saved plan slice"
+    <| fun () -> task {
       let db = tempDb()
       migrate(testLogger, db) |> ignore
 
       let stores = createStores(sqliteStore db, ignore)
 
+      let! athleteResult = stores.Athletes.Add sampleAthlete
+
       let athleteId =
-        match wait(stores.Athletes.Add sampleAthlete) with
+        match athleteResult with
         | Ok entity -> entity.Id
         | Error e -> failtest $"add failed: {e}"
 
@@ -153,7 +157,7 @@ let tests =
 
       let tap = stores.Plans.Observe athleteId |> Observable.subscribe seen.Add
 
-      wait(
+      let! _ =
         stores.Plans.Add(
           {
             AthleteId = athleteId
@@ -162,10 +166,8 @@ let tests =
           },
           plan
         )
-      )
-      |> ignore
 
-      let emitted =
+      let! emitted =
         waitFor(
           2000,
           (fun () -> List.ofSeq seen),

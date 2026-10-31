@@ -190,24 +190,22 @@ val inline cardRow: title: string * control: Control -> Control
 /// One settings card row whose title is a resource key.
 val inline cardRowKey: key: string * control: Control -> Control
 
-/// A single-choice row of radio buttons over typed options; the control
-/// owns the visual state, the value comes from the model.
-val inline radioRow:
-  options: ('T * string) list *
-  group: string *
-  selected: 'T *
-  [<InlineIfLambda>] onPick: ('T -> unit) ->
-    Control
-    when 'T: equality
+/// The inputs of one single-choice row: the options, the group name, the
+/// live selected value and the pick callback.
+[<Struct>]
+type RadioRow<'T when 'T: equality> = {
+  Options: ('T * string) list
+  Group: string
+  Selected: IObservable<'T>
+  OnPick: 'T -> unit
+}
+
+/// A single-choice row of radio buttons over typed options. The checked
+/// state follows the selected value; a model change moves the choice.
+val inline radioRow: row: RadioRow<'T> -> Control when 'T: equality
 
 /// Radio options whose labels are resource keys.
-val inline radioRowKeys:
-  options: ('T * string) list *
-  group: string *
-  selected: 'T *
-  [<InlineIfLambda>] onPick: ('T -> unit) ->
-    Control
-    when 'T: equality
+val inline radioRowKeys: row: RadioRow<'T> -> Control when 'T: equality
 
 /// One checkbox whose checked state follows an observable; the
 /// subscription is disposed when the control detaches.

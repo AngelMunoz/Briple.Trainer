@@ -177,8 +177,8 @@ let private radioWithText(root: Control, text: string) : RadioButton option =
 
 let tests =
   testList "components" [
-    testCase "memory review confirms with the accepted deltas"
-    <| fun () ->
+    uiTest "memory review confirms with the accepted deltas"
+    <| fun () -> task {
       let events = ResizeArray<Briple.Trainer.Components.MemoryReview.Event>()
       let _, culture = liveCulture es
 
@@ -189,7 +189,7 @@ let tests =
           Date = DateOnly(2026, 10, 6)
         }
 
-      let card =
+      let! card =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
             memoryReviewEnv culture,
@@ -197,12 +197,11 @@ let tests =
             events.Add
           ))
 
-      mount card
-      settle()
+      do! mount card
 
-      onUi(fun () -> clickText(card, get(es, Keys.memoriesConfirm)))
+      do! runUi(fun () -> clickText(card, get(es, Keys.memoriesConfirm)))
 
-      let reported =
+      let! reported =
         waitFor(
           2000,
           (fun () -> List.ofSeq events),
@@ -221,9 +220,10 @@ let tests =
       | Briple.Trainer.Components.MemoryReview.Event.Confirmed(_, confirmed) :: _ ->
         Expect.equal confirmed.Deltas memory.Deltas "the proposal deltas travel"
       | _ -> failtest "no confirmed memory"
+    }
 
-    testCase "memory review adds a delta and keeps the chosen scope"
-    <| fun () ->
+    uiTest "memory review adds a delta and keeps the chosen scope"
+    <| fun () -> task {
       let events = ResizeArray<Briple.Trainer.Components.MemoryReview.Event>()
       let _, culture = liveCulture es
 
@@ -234,7 +234,7 @@ let tests =
           Date = DateOnly(2026, 10, 6)
         }
 
-      let card =
+      let! card =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
             memoryReviewEnv culture,
@@ -242,43 +242,59 @@ let tests =
             events.Add
           ))
 
-      mount card
-      settle()
+      do! mount card
+
+      let! athleteScope =
+        probeUi(fun () ->
+          card.GetVisualDescendants()
+          |> Seq.choose(function
+            | :? RadioButton as radio when
+              hasText(radio, get(es, Keys.memoryScopeAthlete))
+              ->
+              Some radio
+            | _ -> None)
+          |> Seq.tryHead)
 
       let athleteScope =
-        match
-          probeUi(fun () ->
-            card.GetVisualDescendants()
-            |> Seq.choose(function
-              | :? RadioButton as radio when
-                hasText(radio, get(es, Keys.memoryScopeAthlete))
-                ->
-                Some radio
-              | _ -> None)
-            |> Seq.tryHead)
-        with
-        | Some radio -> radio
-        | None -> failtest "the athlete scope did not render"
+        athleteScope
+        |> Option.defaultWith(fun () ->
+          failtest "the athlete scope did not render")
 
-      onUi(fun () -> click athleteScope)
+      do! runUi(fun () -> click athleteScope)
+
+      let! value =
+        probeUi(fun () ->
+          textBoxes card |> List.tryFind(fun box -> box.Width = 140.0))
 
       let value =
-        match
-          probeUi(fun () ->
-            textBoxes card |> List.tryFind(fun box -> box.Width = 140.0))
-        with
-        | Some box -> box
-        | None -> failtest "the adjustment value did not render"
+        value
+        |> Option.defaultWith(fun () ->
+          failtest "the adjustment value did not render")
 
-      onUi(fun () -> value.Text <- "2")
-      settle()
+      do! runUi(fun () -> value.Text <- "2")
 
-      onUi(fun () -> clickText(card, get(es, Keys.memoryAddAdjustment)))
-      settle()
+      let! addButton =
+        probeUi(fun () ->
+          buttonWithText(card, get(es, Keys.memoryAddAdjustment)))
 
-      onUi(fun () -> clickText(card, get(es, Keys.memoriesConfirm)))
+      let addButton =
+        addButton
+        |> Option.defaultWith(fun () ->
+          failtest "the add adjustment button did not render")
 
-      let reported =
+      let! canAdd = waitFor(2000, (fun () -> addButton.IsEnabled), id)
+      Expect.isTrue canAdd "the adjustment value reached the model"
+
+      do! runUi(fun () -> click addButton)
+
+      let! added =
+        waitFor(2000, (fun () -> card), fun root -> hasText(root, "RIR +2"))
+
+      Expect.isTrue added "the added delta rendered"
+
+      do! runUi(fun () -> clickText(card, get(es, Keys.memoriesConfirm)))
+
+      let! reported =
         waitFor(
           2000,
           (fun () -> List.ofSeq events),
@@ -301,9 +317,10 @@ let tests =
           MemoryScope.Athlete
           "the chosen scope travels"
       | _ -> failtest "no confirmed memory"
+    }
 
-    testCase "memory review discards"
-    <| fun () ->
+    uiTest "memory review discards"
+    <| fun () -> task {
       let events = ResizeArray<Briple.Trainer.Components.MemoryReview.Event>()
       let _, culture = liveCulture es
 
@@ -316,7 +333,7 @@ let tests =
 
       let id = Guid.NewGuid()
 
-      let card =
+      let! card =
         probeUi(fun () ->
           Briple.Trainer.Components.MemoryReview.MemoryReview(
             memoryReviewEnv culture,
@@ -324,12 +341,11 @@ let tests =
             events.Add
           ))
 
-      mount card
-      settle()
+      do! mount card
 
-      onUi(fun () -> clickText(card, get(es, Keys.memoriesDiscard)))
+      do! runUi(fun () -> clickText(card, get(es, Keys.memoriesDiscard)))
 
-      let reported =
+      let! reported =
         waitFor(
           2000,
           (fun () -> List.ofSeq events),
@@ -340,16 +356,120 @@ let tests =
         )
 
       Expect.isTrue reported "the discard event reached the parent"
+    }
 
-    testCase "the plan reads first and edits by row"
-    <| fun () ->
+    uiTest "the added rows rebuild for a delta, not for another field"
+    <| fun () -> task {
+      let _, culture = liveCulture es
+      let id = Guid.NewGuid()
+
+      let memory =
+        consolidate {
+          Target = Exercise "Press de banca"
+          Label = Light
+          Date = DateOnly(2026, 10, 6)
+        }
+
+      let! card =
+        probeUi(fun () ->
+          Briple.Trainer.Components.MemoryReview.MemoryReview(
+            memoryReviewEnv culture,
+            { Id = id; Memory = memory },
+            ignore
+          ))
+
+      do! mount card
+
+      let addedHost() =
+        probeUi(fun () ->
+          controlByName(card, $"memory-added-{id}")
+          |> Option.map(fun control -> control :?> ContentControl))
+
+      let! value =
+        probeUi(fun () ->
+          textBoxes card |> List.tryFind(fun box -> box.Width = 140.0))
+
+      let value =
+        value
+        |> Option.defaultWith(fun () ->
+          failtest "the adjustment value did not render")
+
+      let! addButton =
+        probeUi(fun () ->
+          buttonWithText(card, get(es, Keys.memoryAddAdjustment)))
+
+      let addButton =
+        addButton
+        |> Option.defaultWith(fun () ->
+          failtest "the add adjustment button did not render")
+
+      let! hostOption = addedHost()
+
+      let host =
+        hostOption
+        |> Option.defaultWith(fun () ->
+          failtest "the added rows host did not render")
+
+      let emptyContent = host.Content
+
+      do! runUi(fun () -> value.Text <- "2")
+
+      let! canAdd =
+        waitFor(2000, (fun () -> addButton.IsEnabled), fun value -> value)
+
+      Expect.isTrue canAdd "the value reached the model"
+
+      do! runUi(fun () -> click addButton)
+
+      let! added =
+        waitFor(
+          2000,
+          (fun () -> host.Content),
+          fun content -> not(obj.ReferenceEquals(content, emptyContent))
+        )
+
+      Expect.isTrue added "the added delta rebuilt the rows"
+
+      let addedContent = host.Content
+
+      let! kindPicker =
+        probeUi(fun () ->
+          card.GetVisualDescendants()
+          |> Seq.choose(function
+            | :? ComboBox as picker -> Some picker
+            | _ -> None)
+          |> Seq.tryHead)
+
+      let kindPicker =
+        kindPicker
+        |> Option.defaultWith(fun () ->
+          failtest "the kind picker did not render")
+
+      do! runUi(fun () -> kindPicker.SelectedIndex <- 1)
+
+      let! cleared = waitFor(2000, (fun () -> value.Text), String.IsNullOrEmpty)
+
+      Expect.isTrue cleared "the kind change reached the model"
+
+      let! unchanged =
+        waitFor(
+          500,
+          (fun () -> obj.ReferenceEquals(host.Content, addedContent)),
+          fun value -> value
+        )
+
+      Expect.isTrue unchanged "another field does not rebuild the added rows"
+    }
+
+    uiTest "the plan reads first and edits by row"
+    <| fun () -> task {
       match Briple.Trainer.Core.Plan.Parser.Parse.parse sampleRaw with
       | Error e -> failtest $"the sample plan does not parse: {e}"
       | Ok parsed ->
         let events = ResizeArray<Briple.Trainer.Components.PlanReview.Event>()
         let _, culture = liveCulture es
 
-        let review =
+        let! review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
               planReviewEnv culture,
@@ -361,13 +481,12 @@ let tests =
               events.Add
             ))
 
-        mount review
-        settle()
+        do! mount review
 
         Expect.isEmpty (List.ofSeq events) "an untouched plan reports no change"
 
         // reading first: the exercise renders as prose lines, no entries
-        let readable =
+        let! readable =
           waitFor(
             2000,
             (fun () -> review),
@@ -378,43 +497,54 @@ let tests =
 
         Expect.isTrue readable "the exercise lines did not render"
 
-        Expect.isTrue
-          (probeUi(fun () -> hasText(review, "Circuito A · 3 vueltas")))
-          "the circuit heading did not render"
+        let! circuitHeading =
+          probeUi(fun () -> hasText(review, "Circuito A · 3 vueltas"))
 
-        Expect.isTrue
-          (probeUi(fun () -> hasText(review, "1 ejercicio · 1 circuito")))
-          "the day badge did not render"
+        Expect.isTrue circuitHeading "the circuit heading did not render"
 
-        Expect.isTrue
-          (probeUi(fun () -> hasText(review, "Semana 1 de 1")))
-          "the week badge did not render"
+        let! dayBadge =
+          probeUi(fun () -> hasText(review, "1 ejercicio · 1 circuito"))
 
-        Expect.isEmpty
-          (probeUi(fun () -> textBoxes review))
-          "no entries before the explicit edit"
+        Expect.isTrue dayBadge "the day badge did not render"
+
+        let! weekBadge = probeUi(fun () -> hasText(review, "Semana 1 de 1"))
+
+        Expect.isTrue weekBadge "the week badge did not render"
+
+        let! boxes = probeUi(fun () -> textBoxes review)
+        Expect.isEmpty boxes "no entries before the explicit edit"
 
         // the explicit edit opens the row's entries
-        let editButton =
-          match
-            probeUi(fun () -> buttonWithText(review, get(es, Keys.planEdit)))
-          with
-          | Some button -> button
-          | None -> failtest "the edit button did not render"
+        let! editButton =
+          probeUi(fun () -> buttonWithText(review, get(es, Keys.planEdit)))
 
-        onUi(fun () -> click editButton)
-        settle()
+        let editButton =
+          editButton
+          |> Option.defaultWith(fun () ->
+            failtest "the edit button did not render")
+
+        do! runUi(fun () -> click editButton)
+
+        let! editing =
+          waitFor(
+            2000,
+            (fun () -> buttonWithText(review, get(es, Keys.planDone))),
+            Option.isSome
+          )
+
+        Expect.isTrue editing "the edit mode opened"
+
+        let! rowEditButton =
+          probeUi(fun () -> buttonWithText(review, get(es, Keys.planEdit)))
 
         let rowEditButton =
-          match
-            probeUi(fun () -> buttonWithText(review, get(es, Keys.planEdit)))
-          with
-          | Some button -> button
-          | None -> failtest "the row edit button did not render"
+          rowEditButton
+          |> Option.defaultWith(fun () ->
+            failtest "the row edit button did not render")
 
-        onUi(fun () -> click rowEditButton)
+        do! runUi(fun () -> click rowEditButton)
 
-        let opened =
+        let! opened =
           waitFor(
             2000,
             (fun () -> textBoxes review),
@@ -424,19 +554,33 @@ let tests =
 
         Expect.isTrue opened "the row entries did not open"
 
-        let repsEntries =
+        let! repsEntries =
           probeUi(fun () ->
             textBoxes review
             |> List.filter(fun textBox -> textBox.Width = 48.0))
 
         match repsEntries with
         | [ lo; hi ] ->
-          onUi(fun () ->
-            lo.Text <- "6"
-            hi.Text <- "8")
+          do!
+            runUi(fun () ->
+              lo.Text <- "6"
+              hi.Text <- "8")
         | _ -> failtest "the two rep fields did not open"
 
-        settle()
+        let! changed =
+          waitFor(
+            2000,
+            (fun () ->
+              events
+              |> Seq.choose(function
+                | Briple.Trainer.Components.PlanReview.Event.PlanChanged plan ->
+                  Some plan
+                | _ -> None)
+              |> Seq.tryLast),
+            Option.isSome
+          )
+
+        Expect.isTrue changed "the rep edit reported a plan"
 
         let lastPlan =
           events
@@ -458,16 +602,20 @@ let tests =
         Expect.equal (repsOf lastPlan) "6-8" "the edit lands in the tree"
 
         // the revert restores the last snapshot and closes the row
+        let! revertButton =
+          probeUi(fun () -> buttonWithText(review, get(es, Keys.planRevert)))
+
         let revertButton =
-          match
-            probeUi(fun () -> buttonWithText(review, get(es, Keys.planRevert)))
-          with
-          | Some button -> button
-          | None -> failtest "the revert button did not render"
+          revertButton
+          |> Option.defaultWith(fun () ->
+            failtest "the revert button did not render")
 
-        onUi(fun () -> click revertButton)
+        do! runUi(fun () -> click revertButton)
 
-        settle()
+        let! reverted =
+          waitFor(2000, (fun () -> textBoxes review), List.isEmpty)
+
+        Expect.isTrue reverted "the row closed after the revert"
 
         let restored =
           events
@@ -479,12 +627,12 @@ let tests =
 
         Expect.equal (repsOf restored) "8-10" "the snapshot comes back"
 
-        Expect.isEmpty
-          (probeUi(fun () -> textBoxes review))
-          "the row closes after the revert"
+        let! boxesAfter = probeUi(fun () -> textBoxes review)
+        Expect.isEmpty boxesAfter "the row closes after the revert"
+    }
 
-    testCase "the row key follows the position, not the file order"
-    <| fun () ->
+    uiTest "the row key follows the position, not the file order"
+    <| fun () -> task {
       let plan: Plan = {
         Version = 1
         Title = "dos circuitos"
@@ -556,7 +704,7 @@ let tests =
 
       let _, culture = liveCulture es
 
-      let review =
+      let! review =
         probeUi(fun () ->
           Briple.Trainer.Components.PlanReview.PlanReview(
             planReviewEnv culture,
@@ -568,10 +716,9 @@ let tests =
             ignore
           ))
 
-      mount review
-      settle()
+      do! mount review
 
-      let readable =
+      let! readable =
         waitFor(
           2000,
           (fun () -> review),
@@ -582,28 +729,32 @@ let tests =
         readable
         "circuit B must show its own first row, not circuit A's order 1"
 
-      Expect.isTrue
-        (probeUi(fun () -> hasText(review, "Circuito A · 2 vueltas")))
-        "circuit A keeps its own laps"
+      let! circuitA =
+        probeUi(fun () -> hasText(review, "Circuito A · 2 vueltas"))
 
-      Expect.isTrue
-        (probeUi(fun () -> hasText(review, "Circuito B · 2 vueltas")))
-        "circuit B keeps its own laps"
+      Expect.isTrue circuitA "circuit A keeps its own laps"
 
-      Expect.isTrue
-        (probeUi(fun () -> hasText(review, "3 ejercicios · 2 circuitos")))
-        "the day badge counts both circuits"
+      let! circuitB =
+        probeUi(fun () -> hasText(review, "Circuito B · 2 vueltas"))
 
-      Expect.isTrue
-        (probeUi(fun () -> hasText(review, "· 60-90 s")))
-        "the guide trailer shows descansos"
+      Expect.isTrue circuitB "circuit B keeps its own laps"
 
-      Expect.isTrue
-        (probeUi(fun () -> hasText(review, "· vueltas iguales")))
-        "the guide trailer shows regla-circuito"
+      let! dayBadge =
+        probeUi(fun () -> hasText(review, "3 ejercicios · 2 circuitos"))
 
-    testCase "a content warning names the field and the token"
-    <| fun () ->
+      Expect.isTrue dayBadge "the day badge counts both circuits"
+
+      let! restGuide = probeUi(fun () -> hasText(review, "· 60-90 s"))
+      Expect.isTrue restGuide "the guide trailer shows descansos"
+
+      let! circuitGuide =
+        probeUi(fun () -> hasText(review, "· vueltas iguales"))
+
+      Expect.isTrue circuitGuide "the guide trailer shows regla-circuito"
+    }
+
+    uiTest "a content warning names the field and the token"
+    <| fun () -> task {
       let raw =
         """
 #start plan v1
@@ -631,7 +782,7 @@ let tests =
       | Ok parsed ->
         let _, culture = liveCulture es
 
-        let review =
+        let! review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
               planReviewEnv culture,
@@ -643,10 +794,9 @@ let tests =
               ignore
             ))
 
-        mount review
-        settle()
+        do! mount review
 
-        let warned =
+        let! warned =
           waitFor(
             2000,
             (fun () -> review),
@@ -658,9 +808,10 @@ let tests =
           )
 
         Expect.isTrue warned "the content warning did not render"
+    }
 
-    testCase "removing a row renumbers its circuit"
-    <| fun () ->
+    uiTest "removing a row renumbers its circuit"
+    <| fun () -> task {
       let raw =
         """
 #start plan v1
@@ -688,7 +839,7 @@ let tests =
         let events = ResizeArray<Briple.Trainer.Components.PlanReview.Event>()
         let _, culture = liveCulture es
 
-        let review =
+        let! review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
               planReviewEnv culture,
@@ -700,20 +851,20 @@ let tests =
               events.Add
             ))
 
-        mount review
-        settle()
+        do! mount review
+
+        let! remove =
+          probeUi(fun () ->
+            buttonWithText(review, get(es, Keys.memoriesDiscard)))
 
         let remove =
-          match
-            probeUi(fun () ->
-              buttonWithText(review, get(es, Keys.memoriesDiscard)))
-          with
-          | Some button -> button
-          | None -> failtest "the remove button did not render"
+          remove
+          |> Option.defaultWith(fun () ->
+            failtest "the remove button did not render")
 
-        onUi(fun () -> click remove)
+        do! runUi(fun () -> click remove)
 
-        let changed =
+        let! changed =
           waitFor(
             2000,
             (fun () ->
@@ -754,9 +905,10 @@ let tests =
             [ "2"; "2" ]
             "the laps do not change"
         | None -> failtest "no plan event"
+    }
 
-    testCase "the circuit buttons add one lap only to that circuit"
-    <| fun () ->
+    uiTest "the circuit buttons add one lap only to that circuit"
+    <| fun () -> task {
       let raw =
         """
 #start plan v1
@@ -784,7 +936,7 @@ let tests =
         let events = ResizeArray<Briple.Trainer.Components.PlanReview.Event>()
         let _, culture = liveCulture es
 
-        let review =
+        let! review =
           probeUi(fun () ->
             Briple.Trainer.Components.PlanReview.PlanReview(
               planReviewEnv culture,
@@ -796,17 +948,18 @@ let tests =
               events.Add
             ))
 
-        mount review
-        settle()
+        do! mount review
+
+        let! plus = probeUi(fun () -> buttonWithText(review, "+"))
 
         let plus =
-          match probeUi(fun () -> buttonWithText(review, "+")) with
-          | Some button -> button
-          | None -> failtest "the lap button did not render"
+          plus
+          |> Option.defaultWith(fun () ->
+            failtest "the lap button did not render")
 
-        onUi(fun () -> click plus)
+        do! runUi(fun () -> click plus)
 
-        let changed =
+        let! changed =
           waitFor(
             2000,
             (fun () ->
@@ -838,10 +991,10 @@ let tests =
             [ "3"; "3"; "2" ]
             "only circuit A gains a lap"
         | None -> failtest "no plan event"
+    }
 
-    testCase "wizard brief reports every draft change"
-
-    <| fun () ->
+    uiTest "wizard brief reports every draft change"
+    <| fun () -> task {
       let updates =
         ResizeArray<Briple.Trainer.Components.WizardBrief.BriefDraft>()
 
@@ -852,7 +1005,7 @@ let tests =
           ContentLanguage.Spanish
         )
 
-      let brief =
+      let! brief =
         probeUi(fun () ->
           Briple.Trainer.Components.WizardBrief.WizardBrief {
             Athlete = sampleAthlete
@@ -861,8 +1014,7 @@ let tests =
             OnChanged = updates.Add
           })
 
-      mount brief
-      settle()
+      do! mount brief
 
       // the default draft is the seeded one
       Expect.equal draft.Goal Hypertrophy "the athlete's first goal"
@@ -876,14 +1028,16 @@ let tests =
         Briple.Trainer.Components.WizardBrief.Mode.Fresh
         "a first plan starts fresh"
 
+      let! weekTwo = probeUi(fun () -> radioWithText(brief, "2"))
+
       let weekTwo =
-        match probeUi(fun () -> radioWithText(brief, "2")) with
-        | Some radio -> radio
-        | None -> failtest "the week radio did not render"
+        weekTwo
+        |> Option.defaultWith(fun () ->
+          failtest "the week radio did not render")
 
-      onUi(fun () -> click weekTwo)
+      do! runUi(fun () -> click weekTwo)
 
-      let reported =
+      let! reported =
         waitFor(
           2000,
           (fun () -> List.ofSeq updates),
@@ -899,8 +1053,51 @@ let tests =
       Expect.equal last.Goal Hypertrophy "the goal stays"
 
       Expect.equal last.Emphasis [] "the emphasis stays"
+    }
 
-    test "the hub wheel pans and releases at the ends" {
+    uiTest "the radio row follows a model change"
+    <| fun () -> task {
+      let selected = new BehaviorSubject<int>(1)
+
+      let row =
+        Briple.Trainer.Components.Fields.radioRow {
+          Options = [ 1, "uno"; 2, "dos" ]
+          Group = "radio-row-test"
+          Selected = selected :> IObservable<int>
+          OnPick = ignore
+        }
+
+      do! mount row
+
+      let! first =
+        waitFor(
+          2000,
+          (fun () -> radioWithText(row, "uno")),
+          fun radio ->
+            radio
+            |> Option.exists(fun button ->
+              button.IsChecked.GetValueOrDefault false)
+        )
+
+      Expect.isTrue first "the first option starts selected"
+
+      selected.OnNext 2
+
+      let! second =
+        waitFor(
+          2000,
+          (fun () -> radioWithText(row, "dos")),
+          fun radio ->
+            radio
+            |> Option.exists(fun button ->
+              button.IsChecked.GetValueOrDefault false)
+        )
+
+      Expect.isTrue second "the selected value moved the check"
+    }
+
+    uiTest "the hub wheel pans and releases at the ends"
+    <| fun () -> task {
       let step = Briple.Trainer.Components.Hub.wheelStep
       let down = Vector(0.0, -120.0)
       let up = Vector(0.0, 120.0)
@@ -936,10 +1133,11 @@ let tests =
         "a hub that fits takes nothing"
     }
 
-    test "the hub starts at its initial column and reports a click" {
+    uiTest "the hub starts at its initial column and reports a click"
+    <| fun () -> task {
       let picked = ref None
 
-      let hubControl =
+      let! hubControl =
         probeUi(fun () ->
           Briple.Trainer.Components.Hub.hub {
             Title = ""
@@ -958,15 +1156,9 @@ let tests =
             OnSelect = ValueSome(fun index -> picked.Value <- Some index)
           })
 
-      probeUi(fun () ->
-        let window =
-          Window(Content = hubControl, Width = 900.0, Height = 400.0)
+      let! _ = mountWindowSized(hubControl, 900.0, 400.0)
 
-        window.Show() |> ignore)
-
-      settle()
-
-      let started =
+      let! started =
         probeUi(fun () ->
           match
             buttonWithText(hubControl, "Día 1"),
@@ -979,19 +1171,22 @@ let tests =
 
       Expect.isTrue started "the hub used InitialActive for the active header"
 
+      let! header = probeUi(fun () -> buttonWithText(hubControl, "Día 1"))
+
       let header =
-        match probeUi(fun () -> buttonWithText(hubControl, "Día 1")) with
-        | Some button -> button
-        | None -> failtest "the first header did not render"
+        header
+        |> Option.defaultWith(fun () ->
+          failtest "the first header did not render")
 
-      onUi(fun () -> click header)
+      do! runUi(fun () -> click header)
 
-      let reported = waitFor(2000, (fun () -> picked.Value), (=)(Some 0))
+      let! reported = waitFor(2000, (fun () -> picked.Value), (=)(Some 0))
 
       Expect.isTrue reported "the header click reached OnSelect"
     }
-    test "the hub overflows when the columns exceed the viewport" {
-      let hubControl =
+    uiTest "the hub overflows when the columns exceed the viewport"
+    <| fun () -> task {
+      let! hubControl =
         probeUi(fun () ->
           Briple.Trainer.Components.Hub.hub {
             Title = ""
@@ -1009,13 +1204,9 @@ let tests =
 
       // the hub owns one scroller: five 400px columns in a 600px
       // window must overflow, and the slot headers must render
-      onUi(fun () ->
-        let window =
-          Window(Content = hubControl, Width = 600.0, Height = 400.0)
+      let! _ = mountWindowSized(hubControl, 600.0, 400.0)
 
-        window.Show() |> ignore)
-
-      let overflow =
+      let! overflow =
         waitFor(
           2000,
           (fun () -> scrollerIn hubControl),
@@ -1025,7 +1216,7 @@ let tests =
 
       Expect.isTrue overflow "the columns overflow the viewport"
 
-      let headers =
+      let! headers =
         waitFor(
           2000,
           (fun () -> hubControl),
@@ -1034,8 +1225,9 @@ let tests =
 
       Expect.isTrue headers "the slot headers rendered"
     }
-    test "the hub shares the viewport when its columns fit" {
-      let hubControl =
+    uiTest "the hub shares the viewport when its columns fit"
+    <| fun () -> task {
+      let! hubControl =
         probeUi(fun () ->
           Briple.Trainer.Components.Hub.hub {
             Title = ""
@@ -1051,13 +1243,9 @@ let tests =
             OnSelect = ValueNone
           })
 
-      probeUi(fun () ->
-        let window =
-          Window(Content = hubControl, Width = 900.0, Height = 400.0)
+      let! _ = mountWindowSized(hubControl, 900.0, 400.0)
 
-        window.Show() |> ignore)
-
-      let fitted =
+      let! fitted =
         waitFor(
           2000,
           (fun () -> scrollerIn hubControl),
@@ -1068,7 +1256,7 @@ let tests =
         fitted
         "the two columns share the viewport instead of overflowing"
 
-      let headers =
+      let! headers =
         waitFor(
           2000,
           (fun () -> hubControl),
@@ -1077,8 +1265,9 @@ let tests =
 
       Expect.isTrue headers "both columns stay whole in a wide window"
     }
-    test "the hub pans on a vertical wheel and releases at its ends" {
-      let hubControl =
+    uiTest "the hub pans on a vertical wheel and releases at its ends"
+    <| fun () -> task {
+      let! hubControl =
         probeUi(fun () ->
           Briple.Trainer.Components.Hub.hub {
             Title = ""
@@ -1094,29 +1283,23 @@ let tests =
             OnSelect = ValueNone
           })
 
-      let window, outer =
+      let! outer =
         probeUi(fun () ->
-          let outer =
-            ScrollViewer(
-              Content =
-                StackPanel().Children(hubControl, Border().Height(1200.0))
-            )
+          ScrollViewer(
+            Content =
+              StackPanel().Children(hubControl, Border().Height(1200.0))
+          ))
 
-          let window = Window(Content = outer, Width = 600.0, Height = 400.0)
+      let! window = mountWindowSized(outer, 600.0, 400.0)
 
-          window.Show() |> ignore
-          window, outer)
-
-      settle()
-
-      let point =
+      let! point =
         probeUi(fun () ->
           match hubControl.TranslatePoint(Point(20.0, 20.0), window) with
           | point when point.HasValue -> point.Value
           | _ -> Point(20.0, 20.0))
 
       let wheel(delta: Vector) =
-        onUi(fun () ->
+        runUi(fun () ->
           HeadlessWindowExtensions.MouseWheel(
             window,
             point,
@@ -1124,32 +1307,28 @@ let tests =
             RawInputModifiers.None
           ))
 
-        settle()
-
-      let hubScroller = scrollerIn hubControl
+      let! hubScroller = probeUi(fun () -> scrollerIn hubControl)
 
       // a forward turn over the hub pans it; the page holds
-      wheel(Vector(0.0, -120.0))
+      do! wheel(Vector(0.0, -120.0))
 
-      Expect.isGreaterThan
-        (probeUi(fun () -> hubScroller.Offset.X))
-        0.0
-        "the vertical wheel pans the hub"
+      let! hubOffset = probeUi(fun () -> hubScroller.Offset.X)
 
-      Expect.equal
-        (probeUi(fun () -> outer.Offset.Y))
-        0.0
-        "the page holds while the hub can still pan"
+      Expect.isGreaterThan hubOffset 0.0 "the vertical wheel pans the hub"
+
+      let! pageOffset = probeUi(fun () -> outer.Offset.Y)
+
+      Expect.equal pageOffset 0.0 "the page holds while the hub can still pan"
 
       // at the end the same turn belongs to the page
-      onUi(fun () ->
-        hubScroller.Offset <-
-          Vector(hubScroller.Extent.Width - hubScroller.Viewport.Width, 0.0))
+      do!
+        runUi(fun () ->
+          hubScroller.Offset <-
+            Vector(hubScroller.Extent.Width - hubScroller.Viewport.Width, 0.0))
 
-      settle()
-      wheel(Vector(0.0, -120.0))
+      do! wheel(Vector(0.0, -120.0))
 
-      let scrolledDown = probeUi(fun () -> outer.Offset.Y)
+      let! scrolledDown = probeUi(fun () -> outer.Offset.Y)
 
       Expect.isGreaterThan
         scrolledDown
@@ -1157,12 +1336,13 @@ let tests =
         "the page scrolls once the hub reaches its end"
 
       // at the start a backward turn belongs to the page
-      onUi(fun () -> hubScroller.Offset <- Vector(0.0, 0.0))
-      settle()
-      wheel(Vector(0.0, 120.0))
+      do! runUi(fun () -> hubScroller.Offset <- Vector(0.0, 0.0))
+      do! wheel(Vector(0.0, 120.0))
+
+      let! scrolledBack = probeUi(fun () -> outer.Offset.Y)
 
       Expect.isLessThan
-        (probeUi(fun () -> outer.Offset.Y))
+        scrolledBack
         scrolledDown
         "the page scrolls back once the hub reaches its start"
     }
@@ -1186,6 +1366,26 @@ type private FakeAgent(reading: NoteInterpretation) =
 
     member _.InterpretNote(_, _) = Task.FromResult(Ok reading)
 
+/// Answers the reading and records every note ask, so a test can assert
+/// the live plan vocabulary the agent receives.
+type private RecordingAgent(reading: NoteInterpretation) =
+  let asks = ResizeArray<NoteAsk>()
+
+  member _.Asks = asks
+
+  interface Briple.Trainer.Env.IProvideAgent with
+    member _.AgentAvailable = true
+
+    member _.GenerateNew(_, _) = failwith "not used in this flow"
+
+    member _.GenerateAdjustment(_, _) = failwith "not used in this flow"
+
+    member _.ConsolidateMarks(_, _) = failwith "not used in this flow"
+
+    member _.InterpretNote(ask, _) =
+      asks.Add ask
+      Task.FromResult(Ok reading)
+
 /// Holds one generation open until the test releases it.
 type private PendingAgent() =
   let completion =
@@ -1208,8 +1408,8 @@ type private PendingAgent() =
 
 let noteTests =
   testList "note section" [
-    testCase "a note becomes a proposal and the confirmation persists it"
-    <| fun () ->
+    uiTest "a note becomes a proposal and the confirmation persists it"
+    <| fun () -> task {
       let db =
         Path.Combine(Path.GetTempPath(), $"briple-note-{Guid.NewGuid():N}.db")
 
@@ -1257,18 +1457,19 @@ let noteTests =
         CultureChanged = culture.Changed
       }
 
-      let section =
+      let! section =
         probeUi(fun () ->
           Briple.Trainer.Components.NoteSection.NoteSection(
             noteEnv,
             {
               AthleteId = athleteId
-              Plan = plan
+              Plan = fun () -> plan
               PlanId = planId
               Cancel = System.Threading.CancellationToken.None
               Initial = {
                 Note = ""
                 Busy = false
+                Saving = false
                 Proposals = []
                 Status = Briple.Trainer.Components.NoteSection.Status.Idle
                 Culture = culture.Current()
@@ -1278,21 +1479,33 @@ let noteTests =
             ignore
           ))
 
-      mount section
-      settle()
+      do! mount section
 
       // the note entry is the section's only TextBox
-      onUi(fun () ->
-        match textBoxes section with
-        | note :: _ -> note.Text <- "el press quedó liviano"
-        | [] -> failtest "the note entry did not render")
+      do!
+        runUi(fun () ->
+          match textBoxes section with
+          | note :: _ -> note.Text <- "el press quedó liviano"
+          | [] -> failtest "the note entry did not render")
 
-      settle()
+      let! interpretButton =
+        probeUi(fun () ->
+          buttonWithText(section, get(es, Keys.reviewNoteInterpret)))
 
-      onUi(fun () -> clickText(section, get(es, Keys.reviewNoteInterpret)))
+      let interpretButton =
+        interpretButton
+        |> Option.defaultWith(fun () ->
+          failtest "the interpret button did not render")
+
+      let! canInterpret =
+        waitFor(2000, (fun () -> interpretButton.IsEnabled), id)
+
+      Expect.isTrue canInterpret "the note reached the model"
+
+      do! runUi(fun () -> click interpretButton)
 
       // the reading lands as a confirm/discard card
-      let card =
+      let! card =
         waitFor(
           2000,
           (fun () -> section),
@@ -1302,19 +1515,21 @@ let noteTests =
 
       Expect.isTrue card "the proposal card did not render"
 
-      settle()
+      let! confirm =
+        probeUi(fun () ->
+          buttonWithText(section, get(es, Keys.memoriesConfirm)))
 
       let confirm =
-        match
-          probeUi(fun () ->
-            buttonWithText(section, get(es, Keys.memoriesConfirm)))
-        with
-        | Some button -> button
-        | None -> failtest "the confirm button vanished"
+        confirm
+        |> Option.defaultWith(fun () -> failtest "the confirm button vanished")
 
-      onUi(fun () -> click confirm)
+      // a double click: the in-flight save ignores the second decision
+      do!
+        runUi(fun () ->
+          click confirm
+          click confirm)
 
-      let persisted =
+      let! persisted =
         waitFor(
           2000,
           (fun () -> stores.Memories.Snapshot athleteId),
@@ -1325,13 +1540,174 @@ let noteTests =
 
       Expect.isTrue persisted "the confirmation reached the store"
 
-      let stored =
+      // give a second save, if the guard failed, time to land
+      do! Task.Delay 100
+
+      let confirmed =
         stores.Memories.Snapshot athleteId
-        |> List.find(fun entity -> entity.Memory.Status = Confirmed)
+        |> List.filter(fun entity -> entity.Memory.Status = Confirmed)
+
+      Expect.equal (List.length confirmed) 1 "one decision writes one memory"
+
+      let stored = List.head confirmed
 
       Expect.equal stored.PlanId (ValueSome planId) "the plan id rides"
 
       Expect.equal stored.Memory.Scope Plan "the situational scope rides"
+    }
+
+    uiTest "a note ask reads the plan at ask time, not at first render"
+    <| fun () -> task {
+      let db =
+        Path.Combine(
+          Path.GetTempPath(),
+          $"briple-note-live-{Guid.NewGuid():N}.db"
+        )
+
+      migrate(testLogger, db) |> ignore
+
+      let stores = createStores(sqliteStore db, ignore)
+
+      let! athleteResult = stores.Athletes.Add sampleAthlete
+
+      let athleteId =
+        match athleteResult with
+        | Ok entity -> entity.Id
+        | Error e -> failtest $"add failed: {e}"
+
+      let plan =
+        match Parse.parse sampleRaw with
+        | Ok parsed -> parsed.Plan
+        | Error error ->
+          failtest $"the sample plan broke: {Parse.describe error}"
+
+      let latestPlan = new BehaviorSubject<Plan>(plan)
+
+      let reading: NoteInterpretation = { Memories = []; Rejections = [] }
+
+      let agent = RecordingAgent(reading)
+      let _, culture = liveCulture es
+
+      let noteEnv: Briple.Trainer.Components.NoteSection.NoteEnv = {
+        Agent = agent
+        Memories = stores.Memories
+        Logger = testLogger
+        Culture = culture.Current()
+        CultureChanged = culture.Changed
+      }
+
+      let! section =
+        probeUi(fun () ->
+          Briple.Trainer.Components.NoteSection.NoteSection(
+            noteEnv,
+            {
+              AthleteId = athleteId
+              Plan = fun () -> latestPlan.Value
+              PlanId = Guid.NewGuid()
+              Cancel = System.Threading.CancellationToken.None
+              Initial = {
+                Note = ""
+                Busy = false
+                Saving = false
+                Proposals = []
+                Status = Briple.Trainer.Components.NoteSection.Status.Idle
+                Culture = culture.Current()
+              }
+              OnState = ignore
+            },
+            ignore
+          ))
+
+      do! mount section
+
+      let! note =
+        probeUi(fun () ->
+          match textBoxes section with
+          | note :: _ -> note
+          | [] -> failtest "the note entry did not render")
+
+      let! interpretButton =
+        probeUi(fun () ->
+          buttonWithText(section, get(es, Keys.reviewNoteInterpret)))
+
+      let interpretButton =
+        interpretButton
+        |> Option.defaultWith(fun () ->
+          failtest "the interpret button did not render")
+
+      do! runUi(fun () -> note.Text <- "el press quedó liviano")
+
+      let! firstReady = waitFor(2000, (fun () -> interpretButton.IsEnabled), id)
+
+      Expect.isTrue firstReady "the first note reached the model"
+
+      do! runUi(fun () -> click interpretButton)
+
+      let! firstAsk =
+        waitFor(2000, (fun () -> agent.Asks.Count), fun count -> count >= 1)
+
+      Expect.isTrue firstAsk "the first ask reached the agent"
+
+      Expect.contains
+        agent.Asks.[0].Targets
+        (Exercise "Press de banca")
+        "the first ask carries the first plan vocabulary"
+
+      let renameExercise(exercise: Exercise) = {
+        exercise with
+            Name = "Press renombrado"
+      }
+
+      let renameDay(day: Day) = {
+        day with
+            Exercises = day.Exercises |> List.map renameExercise
+      }
+
+      let renameWeek(week: Week) = {
+        week with
+            Days = week.Days |> List.map renameDay
+      }
+
+      let renameVariant(variant: Variant) = {
+        variant with
+            Weeks = variant.Weeks |> List.map renameWeek
+      }
+
+      let renameBlock(block: Block) = {
+        block with
+            Variants = block.Variants |> List.map renameVariant
+      }
+
+      let renamed = {
+        plan with
+            Blocks = plan.Blocks |> List.map renameBlock
+      }
+
+      do! runUi(fun () -> latestPlan.OnNext renamed)
+
+      do! runUi(fun () -> note.Text <- "segunda lectura")
+
+      let! secondReady =
+        waitFor(2000, (fun () -> interpretButton.IsEnabled), id)
+
+      Expect.isTrue secondReady "the second note reached the model"
+
+      do! runUi(fun () -> click interpretButton)
+
+      let! secondAsk =
+        waitFor(2000, (fun () -> agent.Asks.Count), fun count -> count >= 2)
+
+      Expect.isTrue secondAsk "the second ask reached the agent"
+
+      Expect.contains
+        agent.Asks.[1].Targets
+        (Exercise "Press renombrado")
+        "the second ask carries the edited vocabulary"
+
+      Expect.isFalse
+        (List.contains (Exercise "Press de banca") agent.Asks.[1].Targets)
+        "the stale vocabulary is gone"
+    }
   ]
 
 // --- the review page --------------------------------------------------------
@@ -1377,8 +1753,8 @@ let private reviewSetup() =
 
 let reviewTests =
   testList "review page" [
-    testCase "a clean review is Ready, an edit is Unsaved, the save clears it"
-    <| fun () ->
+    uiTest "a clean review is Ready, an edit is Unsaved, the save clears it"
+    <| fun () -> task {
       let stores, _, entity = reviewSetup()
 
       let source, culture = liveCulture es
@@ -1389,7 +1765,7 @@ let reviewTests =
           fun _ _ -> async { return true }
         )
 
-      let page =
+      let! page =
         probeUi(fun () ->
           Briple.Trainer.Views.Review.ReviewPage(
             reviewEnv stores (FakeAgent(noReading)) culture,
@@ -1401,15 +1777,14 @@ let reviewTests =
             }
           ))
 
-      mount page
-      settle()
+      do! mount page
 
       Expect.equal
         gate.PhaseValue
         Briple.Trainer.Navigation.PagePhase.Ready
         "an untouched review is ready"
 
-      let rendered =
+      let! rendered =
         waitFor(
           2000,
           (fun () -> page),
@@ -1418,12 +1793,20 @@ let reviewTests =
 
       Expect.isTrue rendered "the review rendered"
 
-      onUi(fun () -> clickText(page, get(es, Keys.planEdit)))
-      settle()
+      do! runUi(fun () -> clickText(page, get(es, Keys.planEdit)))
 
-      onUi(fun () -> clickText(page, get(es, Keys.planEdit)))
+      let! editing =
+        waitFor(
+          2000,
+          (fun () -> buttonWithText(page, get(es, Keys.planDone))),
+          Option.isSome
+        )
 
-      let opened =
+      Expect.isTrue editing "the edit mode opened"
+
+      do! runUi(fun () -> clickText(page, get(es, Keys.planEdit)))
+
+      let! opened =
         waitFor(
           2000,
           (fun () -> page),
@@ -1433,18 +1816,19 @@ let reviewTests =
 
       Expect.isTrue opened "the edit mode opened"
 
-      let repsEntries =
+      let! repsEntries =
         probeUi(fun () ->
           textBoxes page |> List.filter(fun box -> box.Width = 48.0))
 
       match repsEntries with
       | [ lo; hi ] ->
-        onUi(fun () ->
-          lo.Text <- "6"
-          hi.Text <- "8")
+        do!
+          runUi(fun () ->
+            lo.Text <- "6"
+            hi.Text <- "8")
       | _ -> failtest "the two rep fields did not open"
 
-      let dirty =
+      let! dirty =
         waitFor(
           2000,
           (fun () -> gate.PhaseValue),
@@ -1454,9 +1838,9 @@ let reviewTests =
 
       Expect.isTrue dirty "the edit marks the review unsaved"
 
-      onUi(fun () -> clickText(page, get(es, Keys.reviewSave)))
+      do! runUi(fun () -> clickText(page, get(es, Keys.reviewSave)))
 
-      let saved =
+      let! saved =
         waitFor(
           2000,
           (fun () -> gate.PhaseValue),
@@ -1465,7 +1849,7 @@ let reviewTests =
 
       Expect.isTrue saved "the save clears the phase"
 
-      let persisted =
+      let! persisted =
         waitFor(
           2000,
           (fun () -> stores.Plans.Snapshot entity.AthleteId),
@@ -1479,9 +1863,9 @@ let reviewTests =
 
       // a culture switch updates the composed plan text in place; the
       // static title stays in the app language and the draft survives
-      onUi(fun () -> source.OnNext(Language.toCulture En))
+      do! runUi(fun () -> source.OnNext(Language.toCulture En))
 
-      let retitled =
+      let! retitled =
         waitFor(
           2000,
           (fun () -> page),
@@ -1490,7 +1874,7 @@ let reviewTests =
 
       Expect.isTrue retitled "the composed plan text changed language"
 
-      let repsAfter =
+      let! repsAfter =
         probeUi(fun () ->
           textBoxes page
           |> List.filter(fun box -> box.Width = 48.0)
@@ -1499,6 +1883,7 @@ let reviewTests =
           |> String.concat "-")
 
       Expect.equal repsAfter "6-8" "the draft survived the rebuild"
+    }
   ]
 
 // --- the wizard hub ---------------------------------------------------------
@@ -1520,8 +1905,8 @@ let wizardTests =
           "2026-10-17"
           "the app writes the local date")
 
-    testCase "the wizard shows both sections whole at the default window"
-    <| fun () ->
+    uiTest "the wizard shows both sections whole at the default window"
+    <| fun () -> task {
       let db =
         Path.Combine(
           Path.GetTempPath(),
@@ -1545,29 +1930,25 @@ let wizardTests =
           fun _ _ -> async { return true }
         )
 
-      let page =
+      let! page =
         probeUi(fun () ->
-          let page =
-            Briple.Trainer.Views.Generate.WizardPage(
-              generateEnv stores (FakeAgent(noReading)) culture,
-              {
-                Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
-                Athlete = athlete
-                Confirmed = []
-                Proposals = []
-                Previous = ValueNone
-                Gate = gate
-                Lifetime = testLifetime()
-              },
-              ignore
-            )
+          Briple.Trainer.Views.Generate.WizardPage(
+            generateEnv stores (FakeAgent(noReading)) culture,
+            {
+              Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
+              Athlete = athlete
+              Confirmed = []
+              Proposals = []
+              Previous = ValueNone
+              Gate = gate
+              Lifetime = testLifetime()
+            },
+            ignore
+          ))
 
-          let window = Window(Content = page, Width = 1100.0, Height = 800.0)
+      let! _ = mountWindowSized(page, 1100.0, 800.0)
 
-          window.Show() |> ignore
-          page)
-
-      let fitted =
+      let! fitted =
         waitFor(
           2000,
           (fun () ->
@@ -1589,9 +1970,118 @@ let wizardTests =
         )
 
       Expect.isTrue fitted "the two sections share the page, with no clipping"
+    }
 
-    testCase "the hub moves between sections and resets on activation"
-    <| fun () ->
+    uiTest "a decided proposal leaves the wizard and reaches the applies list"
+    <| fun () -> task {
+      let db =
+        Path.Combine(
+          Path.GetTempPath(),
+          $"briple-wizard-proposal-{Guid.NewGuid():N}.db"
+        )
+
+      migrate(testLogger, db) |> ignore
+
+      let stores = createStores(sqliteStore db, ignore)
+
+      let! athleteResult = stores.Athletes.Add sampleAthlete
+
+      let athlete =
+        match athleteResult with
+        | Ok entity -> entity
+        | Error e -> failtest $"add failed: {e}"
+
+      let _, culture = liveCulture es
+
+      let gate =
+        Briple.Trainer.Navigation.PageGate(
+          "/athletes/test/generate",
+          fun _ _ -> async { return true }
+        )
+
+      let proposalMemory: Memory = {
+        Summary = "Ajuste de prueba"
+        Deltas = [ Load 5 ]
+        Origin =
+          Mark {
+            Target = Exercise "Press de banca"
+            Label = Light
+            Date = DateOnly(2026, 10, 15)
+          }
+        Status = Proposed
+        Scope = Plan
+      }
+
+      let proposal: Briple.Trainer.Persistence.MemoryEntity = {
+        Id = Guid.NewGuid()
+        AthleteId = athlete.Id
+        Memory = proposalMemory
+        PlanId = ValueSome(Guid.NewGuid())
+        CreatedAt = DateTime.UtcNow
+      }
+
+      let! page =
+        probeUi(fun () ->
+          Briple.Trainer.Views.Generate.WizardPage(
+            generateEnv stores (FakeAgent(noReading)) culture,
+            {
+              Lead = ValueNone
+              Athlete = athlete
+              Confirmed = []
+              Proposals = [ proposal ]
+              Previous = ValueNone
+              Gate = gate
+              Lifetime = testLifetime()
+            },
+            ignore
+          ))
+
+      let! _ = mountWindowSized(page, 1100.0, 800.0)
+
+      let! confirm =
+        probeUi(fun () -> buttonWithText(page, get(es, Keys.memoriesConfirm)))
+
+      let confirm =
+        confirm
+        |> Option.defaultWith(fun () ->
+          failtest "the proposal card did not render")
+
+      // a double click: the first decision wins, the second is ignored
+      do!
+        runUi(fun () ->
+          click confirm
+          click confirm)
+
+      let! gone =
+        waitFor(
+          2000,
+          (fun () -> buttonWithText(page, get(es, Keys.memoriesConfirm))),
+          Option.isNone
+        )
+
+      Expect.isTrue gone "the decided card left the list"
+
+      let! applies =
+        waitFor(
+          2000,
+          (fun () -> page),
+          fun root -> hasText(root, get(es, Keys.wizardApplies))
+        )
+
+      Expect.isTrue applies "the applies list updated"
+
+      let! summary =
+        waitFor(
+          2000,
+          (fun () -> page),
+          fun root -> hasText(root, "Ajuste de prueba")
+        )
+
+      Expect.isTrue summary "the confirmed summary is listed"
+    }
+
+    uiTest "the hub moves between sections and resets on activation"
+    <| fun () -> task {
       let db =
         Path.Combine(Path.GetTempPath(), $"briple-wizard-{Guid.NewGuid():N}.db")
 
@@ -1612,7 +2102,7 @@ let wizardTests =
           fun _ _ -> async { return true }
         )
 
-      let page =
+      let! page =
         probeUi(fun () ->
           Briple.Trainer.Views.Generate.WizardPage(
             generateEnv stores (FakeAgent(noReading)) culture,
@@ -1630,14 +2120,9 @@ let wizardTests =
 
       // narrow enough that the two 400px columns cannot share it: the
       // headers then pan the hub from one section to the other
-      probeUi(fun () ->
-        let window = Window(Content = page, Width = 620.0, Height = 700.0)
+      let! _ = mountWindowSized(page, 620.0, 700.0)
 
-        window.Show() |> ignore)
-
-      settle()
-
-      let hub =
+      let! hub =
         probeUi(fun () ->
           page.GetVisualDescendants()
           |> Seq.choose(fun visual ->
@@ -1653,40 +2138,40 @@ let wizardTests =
       match hub with
       | None -> failtest "the hub did not render"
       | Some hub ->
+        let! briefHeader =
+          probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardStepBrief)))
+
         let briefHeader =
-          match
-            probeUi(fun () ->
-              buttonWithText(page, get(es, Keys.wizardStepBrief)))
-          with
-          | Some button -> button
-          | None -> failtest "the brief header did not render"
+          briefHeader
+          |> Option.defaultWith(fun () ->
+            failtest "the brief header did not render")
 
-        onUi(fun () -> click briefHeader)
-        settle()
+        do! runUi(fun () -> click briefHeader)
 
-        let panned = waitFor(2000, (fun () -> hub.Offset.X), fun x -> x > 10.0)
+        let! panned = waitFor(2000, (fun () -> hub.Offset.X), fun x -> x > 10.0)
 
         Expect.isTrue panned "the hub panned to the brief section"
 
         // a second activation resets the page: the hub returns to memories
-        onUi(fun () -> gate.MarkShown())
+        do! runUi(fun () -> gate.MarkShown())
 
-        let reset = waitFor(2000, (fun () -> hub.Offset.X), fun x -> x < 1.0)
+        let! reset = waitFor(2000, (fun () -> hub.Offset.X), fun x -> x < 1.0)
 
         Expect.isTrue reset "the wizard reset to the first section"
 
-        let noStepBack =
+        let! noStepBack =
           probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardBack)))
 
         Expect.isNone noStepBack "the wizard has no step-back button"
 
-        let noNext =
+        let! noNext =
           probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardNext)))
 
         Expect.isNone noNext "the old wizard step button is gone"
+    }
 
-    testCase "the page leaves the form when a run starts"
-    <| fun () ->
+    uiTest "the page leaves the form when a run starts"
+    <| fun () -> task {
       let db =
         Path.Combine(
           Path.GetTempPath(),
@@ -1711,41 +2196,35 @@ let wizardTests =
           fun _ _ -> async { return true }
         )
 
-      let page =
+      let! page =
         probeUi(fun () ->
-          let page =
-            Briple.Trainer.Views.Generate.WizardPage(
-              generateEnv stores agent culture,
-              {
-                Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
-                Athlete = athlete
-                Confirmed = []
-                Proposals = []
-                Previous = ValueNone
-                Gate = gate
-                Lifetime = testLifetime()
-              },
-              ignore
-            )
+          Briple.Trainer.Views.Generate.WizardPage(
+            generateEnv stores agent culture,
+            {
+              Lead = ValueSome(fun () -> TextBlock(Text = "back") :> Control)
+              Athlete = athlete
+              Confirmed = []
+              Proposals = []
+              Previous = ValueNone
+              Gate = gate
+              Lifetime = testLifetime()
+            },
+            ignore
+          ))
 
-          let window = Window(Content = page, Width = 900.0, Height = 700.0)
+      let! _ = mountWindowSized(page, 900.0, 700.0)
 
-          window.Show() |> ignore
-          page)
-
-      settle()
+      let! generate =
+        probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardGenerate)))
 
       let generate =
-        match
-          probeUi(fun () -> buttonWithText(page, get(es, Keys.wizardGenerate)))
-        with
-        | Some button -> button
-        | None -> failtest "the generate button did not render"
+        generate
+        |> Option.defaultWith(fun () ->
+          failtest "the generate button did not render")
 
-      onUi(fun () -> click generate)
-      settle()
+      do! runUi(fun () -> click generate)
 
-      let generating =
+      let! generating =
         waitFor(
           2000,
           (fun () -> page),
@@ -1768,7 +2247,7 @@ let wizardTests =
         }
       )
 
-      let finished =
+      let! finished =
         waitFor(
           2000,
           (fun () -> page),
@@ -1776,4 +2255,5 @@ let wizardTests =
         )
 
       Expect.isTrue finished "the page shows the plan when the run ends"
+    }
   ]

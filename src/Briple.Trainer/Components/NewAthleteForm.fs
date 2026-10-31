@@ -123,8 +123,6 @@ let view
   (model: IObservable<Model>)
   (dispatch: Dispatch<Msg>)
   : Control =
-  let initial, _ = init props
-
   let saveEnabled =
     model |> Observable.map(fun m -> isValid m && m.Phase = Filling)
 
@@ -142,12 +140,12 @@ let view
         |> dispatch)
 
   let genderRadios =
-    radioRowKeys(
-      [ Male, Keys.genderMale; Female, Keys.genderFemale ],
-      "new-athlete-gender",
-      initial.Gender,
-      PickGender >> dispatch
-    )
+    radioRowKeys {
+      Options = [ Male, Keys.genderMale; Female, Keys.genderFemale ]
+      Group = "new-athlete-gender"
+      Selected = model |> Observable.map _.Gender
+      OnPick = PickGender >> dispatch
+    }
 
   let goalChecks =
     let rows: Control array = [|
