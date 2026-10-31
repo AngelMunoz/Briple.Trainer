@@ -67,6 +67,32 @@ type PlanDraft = {
   Plan: Plan
 }
 
+/// The newest plan that is not archived.
+let lastActivePlan(plans: PlanEntity list) : PlanEntity voption =
+  plans
+  |> List.filter(fun plan -> plan.ArchivedAt.IsNone)
+  |> List.tryLast
+  |> ValueOption.ofOption
+
+/// The proposals that may travel to a new request: active proposals on
+/// active plans. An archived plan or memory is kept, but hidden.
+let activeProposals
+  (plans: PlanEntity list, memories: MemoryEntity list)
+  : MemoryEntity list =
+  let archivedPlans =
+    plans
+    |> List.choose(fun plan ->
+      if plan.ArchivedAt.IsSome then Some plan.Id else None)
+    |> Set.ofList
+
+  memories
+  |> List.filter(fun entity ->
+    entity.ArchivedAt.IsNone
+    && entity.Memory.Status = Proposed
+    && (match entity.PlanId with
+        | ValueSome planId -> not(Set.contains planId archivedPlans)
+        | ValueNone -> true))
+
 type IStore =
   abstract ListAthletes: unit -> Task<Result<AthleteEntity list, exn>>
   abstract AddAthlete: profile: Athlete -> Task<Result<AthleteEntity, exn>>

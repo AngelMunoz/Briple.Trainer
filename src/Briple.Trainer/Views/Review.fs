@@ -341,12 +341,27 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
     model,
     Cmd.ofAction(fun () -> ctx.Env.Logger.LogError(e, "plan reload failed"))
 
+/// The page header: the plan title with the review section below it.
+let reviewHeader(props: ReviewPageProps, model: IObservable<Model>) : Control =
+  StackPanel()
+    .Spacing(2.0)
+    .Children(
+      pageTitle props.Entity.Title,
+      TextBlock()
+        .Text(
+          model
+          |> Observable.map(fun current ->
+            get(current.Culture, Keys.reviewTitle))
+        )
+        .Classes("caption", "secondary")
+    )
+
 let invalidBody
   (props: ReviewPageProps, model: IObservable<Model>, failure: PlanFailure)
   : Control =
   fluentPage {
     Lead = props.Lead
-    Title = pageTitleKey Keys.reviewTitle
+    Title = reviewHeader(props, model)
     Commands = []
     Footer = noFooter
     Body =
@@ -517,7 +532,7 @@ let view
 
     fluentPage {
       Lead = props.Lead
-      Title = pageTitleKey Keys.reviewTitle
+      Title = reviewHeader(props, model)
       Commands = [ export; save ]
       Footer = noFooter
       Body =

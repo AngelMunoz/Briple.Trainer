@@ -181,6 +181,7 @@ let detailPage
       Archive = env.Stores.Athletes.Archive
       Restore = env.Stores.Athletes.Restore
       Delete = env.Stores.Athletes.Delete
+      DeletePlan = fun planId -> deletePlan(env.Stores, planId)
       Dialogs = env.Dialogs
       Toasts = env.Toasts
       Culture = env.Culture
@@ -218,19 +219,22 @@ let wizardPage
   let! plans = env.Store.ListPlans athleteId
 
   let entities = memories |> orEmpty "memory list"
+  let planEntities = plans |> orEmpty "plan list"
 
-  let proposals = entities |> List.filter(fun e -> e.Memory.Status = Proposed)
+  let activeMemories =
+    entities |> List.filter(fun entity -> entity.ArchivedAt.IsNone)
 
-  let previous =
-    plans |> orEmpty "plan list" |> List.tryLast |> ValueOption.ofOption
+  let proposals = activeProposals(planEntities, entities)
+  let previous = lastActivePlan planEntities
 
   let confirmed =
     relevantMemories(
-      entities |> List.map(fun entity -> entity.Memory, entity.PlanId),
+      activeMemories |> List.map(fun entity -> entity.Memory, entity.PlanId),
       previous |> ValueOption.map _.Id
     )
 
   match athlete with
+  | Ok(ValueSome athlete) when athlete.ArchivedAt.IsSome -> return notFound()
   | Ok(ValueSome athlete) ->
     let pageEnv: Generate.GenerateEnv = {
       Store = env.Store

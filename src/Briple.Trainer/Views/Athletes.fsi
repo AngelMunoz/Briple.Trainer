@@ -25,6 +25,8 @@ type AthleteDetailEnv = {
   Restore: Guid -> Task<Result<unit, exn>>
   /// Deletes the athlete aggregate and reloads the store.
   Delete: Guid -> Task<Result<unit, exn>>
+  /// Deletes one plan and its plan-scoped memories.
+  DeletePlan: Guid -> Task<Result<unit, exn>>
   Dialogs: IDialogs
   Toasts: IToasts
   Culture: CultureInfo

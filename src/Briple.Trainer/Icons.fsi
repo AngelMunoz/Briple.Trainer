@@ -75,6 +75,9 @@ val key: StreamGeometry
 /// Empty athletes list. MDI `account-search-outline` (no MDIL glyph).
 val accountSearchOutline: StreamGeometry
 
+/// A plan or plan list. MDI `file-document-outline` (no MDIL glyph).
+val documentText: StreamGeometry
+
 /// Minimize the window. MDI `window-minimize`.
 val minimize: StreamGeometry
 

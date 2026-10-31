@@ -228,6 +228,51 @@ module Keys =
   val plansOpen: string = "plans.open"
 
   [<Literal>]
+  val plansEmpty: string = "plans.empty"
+
+  [<Literal>]
+  val plansEmptyHint: string = "plans.emptyHint"
+
+  [<Literal>]
+  val plansEmptyActive: string = "plans.emptyActive"
+
+  [<Literal>]
+  val plansEmptyActiveHint: string = "plans.emptyActiveHint"
+
+  [<Literal>]
+  val plansShowArchived: string = "plans.showArchived"
+
+  [<Literal>]
+  val plansArchived: string = "plans.archived"
+
+  [<Literal>]
+  val planArchived: string = "plan.archived"
+
+  [<Literal>]
+  val planArchive: string = "plan.archive"
+
+  [<Literal>]
+  val planRestore: string = "plan.restore"
+
+  [<Literal>]
+  val planDelete: string = "plan.delete"
+
+  [<Literal>]
+  val planDeleteTitle: string = "plan.deleteTitle"
+
+  [<Literal>]
+  val planDeleteBody: string = "plan.deleteBody"
+
+  [<Literal>]
+  val plansKindNew: string = "plans.kind.new"
+
+  [<Literal>]
+  val plansKindAdjust: string = "plans.kind.adjust"
+
+  [<Literal>]
+  val plansKindImport: string = "plans.kind.import"
+
+  [<Literal>]
   val wizardTitle: string = "wizard.title"
 
   [<Literal>]

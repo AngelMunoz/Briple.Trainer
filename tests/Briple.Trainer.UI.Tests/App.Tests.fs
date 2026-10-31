@@ -98,18 +98,19 @@ let private menuAction(root: Control, labelKey: string) : MenuItem option =
 // default Serilog)
 let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
 
-let private planStore() =
+let private detailStores() : DataStores =
   let db =
     Path.Combine(Path.GetTempPath(), $"briple-detail-{Guid.NewGuid():N}.db")
 
   match Briple.Trainer.Persistence.migrate(testLogger, db) with
   | Ok() ->
-    (Briple.Trainer.Stores.createStores(
+    Briple.Trainer.Stores.createStores(
       Briple.Trainer.Persistence.sqliteStore db,
       ignore
-    ))
-      .Plans
+    )
   | Error e -> failtest $"detail store migration failed: {e}"
+
+let private planStore() = (detailStores()).Plans
 
 let private detailEnv
   (plans: PlanStore)
@@ -119,6 +120,7 @@ let private detailEnv
   Archive = fun _ -> okAction
   Restore = fun _ -> okAction
   Delete = fun _ -> okAction
+  DeletePlan = fun _ -> okAction
   Dialogs = acceptingDialogs
   Toasts = quietToasts
   Culture = culture.Current()
@@ -177,6 +179,20 @@ let private textBlockWith(root: Control, text: string) : TextBlock option =
     match visual with
     | :? TextBlock as block when block.Text = text -> Some block
     | _ -> None)
+
+let private textBlockContaining(root: Control, text: string) : bool =
+  root.GetVisualDescendants()
+  |> Seq.exists(fun visual ->
+    match visual with
+    | :? TextBlock as block ->
+      block.Text
+      |> Option.ofObj
+      |> Option.exists(fun value -> value.Contains text)
+    | _ -> false)
+
+let private visibleButtonWithText(root: Control, text: string) : Button option =
+  buttonWithText(root, text)
+  |> Option.filter(fun button -> button.IsEffectivelyVisible)
 
 /// Mounts the dialog overlay, asks one confirmation and answers through
 /// the buttons; the tuple is the reply cell, the overlay and its window.
@@ -1468,6 +1484,290 @@ let tests =
         Expect.isTrue isError "the toast is an error"
         Expect.isEmpty events "a failed action requested navigation"
       }
+      uiTest "plan rows localize, archive, filter and restore"
+      <| fun () -> task {
+        let stores = detailStores()
+        let _, culture = liveCulture es
+
+        let! athleteResult =
+          stores.Athletes.Add {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+
+        let athlete =
+          match athleteResult with
+          | Ok athlete -> athlete
+          | Error e -> failtest $"athlete add failed: {e}"
+
+        let plan: Plan = {
+          Version = 1
+          Title = "Mes 1"
+          Weeks = 1
+          Generated = "2026-10-15"
+          Origin = "trainer"
+          Blocks = []
+          Extras = []
+        }
+
+        let insert: PlanInsert = {
+          AthleteId = athlete.Id
+          Kind = "new"
+          Counts = [ "3dias", 1 ]
+          CreatedAt = ValueSome DateTime.UtcNow
+        }
+
+        let! planResult = stores.Plans.Add(insert, plan)
+
+        let planId =
+          match planResult with
+          | Ok entity -> entity.Id
+          | Error e -> failtest $"plan add failed: {e}"
+
+        let! page =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Athletes.AthleteDetailPage(
+              detailEnv stores.Plans culture,
+              {
+                Lead = ValueNone
+                Athlete = athlete
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount page
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> page),
+            fun root -> buttonWithText(root, "Mes 1") |> Option.isSome
+          )
+
+        Expect.isTrue rendered "the plan row did not render"
+
+        Expect.isTrue
+          (textBlockContaining(page, "Nuevo · 3 días por semana"))
+          "the plan row is not localized"
+
+        let! more =
+          probeUi(fun () -> buttonWithTooltip(page, get(es, Keys.commonMore)))
+
+        let more =
+          more
+          |> Option.defaultWith(fun () ->
+            failtest "the plan overflow button vanished")
+
+        let! archive =
+          probeUi(fun () -> menuItemWithText(more, get(es, Keys.planArchive)))
+
+        let archive =
+          archive
+          |> Option.defaultWith(fun () ->
+            failtest "the archive plan action vanished")
+
+        do! runUi(fun () -> clickMenuItem archive)
+
+        let! archived =
+          waitFor(
+            2000,
+            (fun () -> stores.Plans.SnapshotArchived(athlete.Id)),
+            fun plans -> plans |> List.exists(fun plan -> plan.Id = planId)
+          )
+
+        Expect.isTrue
+          archived
+          "archive did not move the plan to the archived slice"
+
+        let! toggle =
+          waitFor(
+            2000,
+            (fun () ->
+              visibleButtonWithText(page, get(es, Keys.plansShowArchived))),
+            Option.isSome
+          )
+
+        Expect.isTrue toggle "the archived filter did not appear"
+
+        let toggle =
+          visibleButtonWithText(page, get(es, Keys.plansShowArchived))
+          |> Option.defaultWith(fun () ->
+            failtest "the archived filter vanished")
+
+        do! runUi(fun () -> click toggle)
+
+        let! shown =
+          waitFor(
+            2000,
+            (fun () -> visibleButtonWithText(page, "Mes 1")),
+            Option.isSome
+          )
+
+        Expect.isTrue shown "the archived plan did not show"
+
+        Expect.isTrue
+          (textBlockContaining(page, get(es, Keys.planArchived)))
+          "the archived plan badge did not render"
+
+        let! moreArchived =
+          probeUi(fun () -> buttonWithTooltip(page, get(es, Keys.commonMore)))
+
+        let moreArchived =
+          moreArchived
+          |> Option.defaultWith(fun () ->
+            failtest "the archived plan overflow button vanished")
+
+        let! restore =
+          probeUi(fun () ->
+            menuItemWithText(moreArchived, get(es, Keys.planRestore)))
+
+        let restore =
+          restore
+          |> Option.defaultWith(fun () ->
+            failtest "the restore plan action vanished")
+
+        do! runUi(fun () -> clickMenuItem restore)
+
+        let! restored =
+          waitFor(
+            2000,
+            (fun () -> stores.Plans.Snapshot(athlete.Id)),
+            fun plans -> plans |> List.exists(fun plan -> plan.Id = planId)
+          )
+
+        Expect.isTrue
+          restored
+          "restore did not move the plan to the active slice"
+
+        let! toggleGone =
+          waitFor(
+            2000,
+            (fun () ->
+              visibleButtonWithText(page, get(es, Keys.plansShowArchived))),
+            Option.isNone
+          )
+
+        Expect.isTrue
+          toggleGone
+          "the archived filter stayed with no archived plans"
+      }
+
+      uiTest "plan delete asks and calls the aggregate delete"
+      <| fun () -> task {
+        let stores = detailStores()
+        let _, culture = liveCulture es
+        let toasts, seen = recordingToasts()
+        let deleted = ResizeArray<Guid>()
+        let events = ResizeArray<Briple.Trainer.Views.Athletes.Event>()
+
+        let! athleteResult =
+          stores.Athletes.Add {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+
+        let athlete =
+          match athleteResult with
+          | Ok athlete -> athlete
+          | Error e -> failtest $"athlete add failed: {e}"
+
+        let plan: Plan = {
+          Version = 1
+          Title = "Mes 1"
+          Weeks = 1
+          Generated = "2026-10-15"
+          Origin = "trainer"
+          Blocks = []
+          Extras = []
+        }
+
+        let insert: PlanInsert = {
+          AthleteId = athlete.Id
+          Kind = "new"
+          Counts = []
+          CreatedAt = ValueSome DateTime.UtcNow
+        }
+
+        let! planResult = stores.Plans.Add(insert, plan)
+
+        match planResult with
+        | Ok _ -> ()
+        | Error e -> failtest $"plan add failed: {e}"
+
+        let env = {
+          detailEnv stores.Plans culture with
+              DeletePlan =
+                fun id ->
+                  deleted.Add id
+                  okAction
+              Toasts = toasts
+        }
+
+        let! page =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Athletes.AthleteDetailPage(
+              env,
+              {
+                Lead = ValueNone
+                Athlete = athlete
+                Lifetime = testLifetime()
+              },
+              events.Add
+            ))
+
+        do! mount page
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> page),
+            fun root -> buttonWithText(root, "Mes 1") |> Option.isSome
+          )
+
+        Expect.isTrue rendered "the plan row did not render"
+
+        let! more =
+          probeUi(fun () -> buttonWithTooltip(page, get(es, Keys.commonMore)))
+
+        let more =
+          more
+          |> Option.defaultWith(fun () ->
+            failtest "the plan overflow button vanished")
+
+        let! delete =
+          probeUi(fun () -> menuItemWithText(more, get(es, Keys.planDelete)))
+
+        let delete =
+          delete
+          |> Option.defaultWith(fun () ->
+            failtest "the delete plan action vanished")
+
+        do! runUi(fun () -> clickMenuItem delete)
+
+        let! deletedCall =
+          waitFor(2000, (fun () -> deleted.Count), fun count -> count > 0)
+
+        Expect.isTrue
+          deletedCall
+          "the confirmed delete did not reach the aggregate"
+
+        Expect.isEmpty events "deleting a plan navigated away"
+
+        let! toast =
+          waitFor(2000, (fun () -> seen.Count), fun count -> count > 0)
+
+        Expect.isTrue toast "the delete did not show a toast"
+
+        let title, _, _ = seen[0]
+
+        Expect.equal
+          title
+          (get(es, Keys.planDelete))
+          "the toast names the action"
+      }
     ]
 
     uiTest "an archived athlete route restores and returns to the list"
@@ -1554,6 +1854,46 @@ let tests =
       Expect.isNone
         (buttonWithText(window, get(es, Keys.plansGenerate)))
         "the archived route shows generate"
+
+      do!
+        runUi(fun () ->
+          Briple.Trainer.Views.Routes.go(
+            router,
+            $"/athletes/{athlete.Id}/generate"
+          ))
+
+      let! blocked =
+        waitFor(
+          5000,
+          (fun () -> window),
+          fun current -> hasText(current, "not found")
+        )
+
+      Expect.isTrue blocked "the archived athlete reached the generate route"
+
+      do!
+        runUi(fun () ->
+          Briple.Trainer.Views.Routes.go(router, $"/athletes/{athlete.Id}"))
+
+      let! backAtDetail =
+        waitFor(
+          5000,
+          path,
+          fun current -> current = Some $"/athletes/{athlete.Id}"
+        )
+
+      Expect.isTrue backAtDetail "the detail route did not return"
+
+      let! restoreReady =
+        waitFor(
+          5000,
+          (fun () -> window),
+          fun current ->
+            buttonWithText(current, get(es, Keys.athleteRestore))
+            |> Option.isSome
+        )
+
+      Expect.isTrue restoreReady "the restored detail page did not render"
 
       let! restore =
         probeUi(fun () -> buttonWithText(window, get(es, Keys.athleteRestore)))

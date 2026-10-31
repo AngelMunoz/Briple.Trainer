@@ -189,6 +189,51 @@
   <data name="plans.open" xml:space="preserve">
     <value>Open</value>
   </data>
+  <data name="plans.empty" xml:space="preserve">
+    <value>No plans yet.</value>
+  </data>
+  <data name="plans.emptyHint" xml:space="preserve">
+    <value>Generate the first plan for this athlete.</value>
+  </data>
+  <data name="plans.emptyActive" xml:space="preserve">
+    <value>No active plans.</value>
+  </data>
+  <data name="plans.emptyActiveHint" xml:space="preserve">
+    <value>Show archived to see them.</value>
+  </data>
+  <data name="plans.showArchived" xml:space="preserve">
+    <value>Show archived</value>
+  </data>
+  <data name="plans.archived" xml:space="preserve">
+    <value>Archived</value>
+  </data>
+  <data name="plan.archived" xml:space="preserve">
+    <value>Archived</value>
+  </data>
+  <data name="plan.archive" xml:space="preserve">
+    <value>Archive</value>
+  </data>
+  <data name="plan.restore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="plan.delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="plan.deleteTitle" xml:space="preserve">
+    <value>Delete plan?</value>
+  </data>
+  <data name="plan.deleteBody" xml:space="preserve">
+    <value>This deletes the plan and its memories. This cannot be undone.</value>
+  </data>
+  <data name="plans.kind.new" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="plans.kind.adjust" xml:space="preserve">
+    <value>Adjustment</value>
+  </data>
+  <data name="plans.kind.import" xml:space="preserve">
+    <value>Imported</value>
+  </data>
   <data name="wizard.title" xml:space="preserve">
     <value>Generate plan</value>
   </data>

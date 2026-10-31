@@ -64,6 +64,14 @@ type PlanDraft = {
   Plan: Plan
 }
 
+/// The newest plan that is not archived.
+val lastActivePlan: plans: PlanEntity list -> PlanEntity voption
+
+/// The proposals that may travel to a new request: active proposals on
+/// active plans. An archived plan or memory is kept, but hidden.
+val activeProposals:
+  plans: PlanEntity list * memories: MemoryEntity list -> MemoryEntity list
+
 /// The store the UI reads and writes; every operation fails with Error.
 /// The list methods return active and archived rows; the observable
 /// layer splits the slices.

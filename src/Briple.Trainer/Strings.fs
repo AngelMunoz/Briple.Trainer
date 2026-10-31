@@ -236,6 +236,52 @@ module Keys =
   let plansOpen = "plans.open"
 
   [<Literal>]
+  let plansEmpty = "plans.empty"
+
+  [<Literal>]
+  let plansEmptyHint = "plans.emptyHint"
+
+  [<Literal>]
+  let plansEmptyActive = "plans.emptyActive"
+
+  [<Literal>]
+  let plansEmptyActiveHint = "plans.emptyActiveHint"
+
+  [<Literal>]
+  let plansShowArchived = "plans.showArchived"
+
+  [<Literal>]
+  let plansArchived = "plans.archived"
+
+  [<Literal>]
+  let planArchived = "plan.archived"
+
+  [<Literal>]
+  let planArchive = "plan.archive"
+
+  [<Literal>]
+  let planRestore = "plan.restore"
+
+  [<Literal>]
+  let planDelete = "plan.delete"
+
+  [<Literal>]
+  let planDeleteTitle = "plan.deleteTitle"
+
+  [<Literal>]
+  let planDeleteBody = "plan.deleteBody"
+
+  [<Literal>]
+  let plansKindNew = "plans.kind.new"
+
+  [<Literal>]
+  let plansKindAdjust = "plans.kind.adjust"
+
+  [<Literal>]
+  let plansKindImport = "plans.kind.import"
+
+
+  [<Literal>]
   let wizardTitle = "wizard.title"
 
   [<Literal>]

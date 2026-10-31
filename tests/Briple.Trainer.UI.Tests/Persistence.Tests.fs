@@ -107,6 +107,93 @@ let private draft(kind: string, createdAt: DateTime, plan: Plan) : PlanDraft = {
 
 let tests =
   testList "persistence" [
+    test "the plan selectors skip archived plans and memories" {
+      let athleteId = Guid.NewGuid()
+      let activePlanId = Guid.NewGuid()
+      let archivedPlanId = Guid.NewGuid()
+
+      let activePlan: PlanEntity = {
+        Id = activePlanId
+        AthleteId = athleteId
+        Title = "Active"
+        Kind = "new"
+        Weeks = 1
+        Counts = []
+        Raw = ""
+        CreatedAt = DateTime(2026, 10, 1)
+        ArchivedAt = ValueNone
+      }
+
+      let archivedPlan = {
+        activePlan with
+            Id = archivedPlanId
+            Title = "Archived"
+            ArchivedAt = ValueSome DateTime.UtcNow
+      }
+
+      Expect.equal
+        (lastActivePlan [ activePlan; archivedPlan ])
+        (ValueSome activePlan)
+        "the newest active plan wins"
+
+      Expect.equal
+        (lastActivePlan [ archivedPlan ])
+        ValueNone
+        "an archived-only list has no active plan"
+
+      let memoryEntity
+        (id: Guid)
+        (planId: Guid voption)
+        (status: MemoryStatus)
+        (archivedAt: DateTime voption)
+        : MemoryEntity = {
+        Id = id
+        AthleteId = athleteId
+        Memory = {
+          memoryFor Athlete with
+              Status = status
+        }
+        PlanId = planId
+        CreatedAt = DateTime.UtcNow
+        ArchivedAt = archivedAt
+      }
+
+      let visible =
+        memoryEntity
+          (Guid.NewGuid())
+          (ValueSome activePlanId)
+          Proposed
+          ValueNone
+
+      let archivedMemory =
+        memoryEntity
+          (Guid.NewGuid())
+          (ValueSome activePlanId)
+          Proposed
+          (ValueSome DateTime.UtcNow)
+
+      let onArchivedPlan =
+        memoryEntity
+          (Guid.NewGuid())
+          (ValueSome archivedPlanId)
+          Proposed
+          ValueNone
+
+      let athleteScoped =
+        memoryEntity (Guid.NewGuid()) ValueNone Proposed ValueNone
+
+      let proposals =
+        activeProposals(
+          [ activePlan; archivedPlan ],
+          [ visible; archivedMemory; onArchivedPlan; athleteScoped ]
+        )
+
+      Expect.equal
+        (proposals |> List.map _.Id)
+        [ visible.Id; athleteScoped.Id ]
+        "only active proposals on active plans travel"
+    }
+
     test "migrate creates the schema and the store round-trips an athlete" {
       let db = tempDb()
 

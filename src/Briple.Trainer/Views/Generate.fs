@@ -857,30 +857,9 @@ let briefColumn
       }
     )
 
-  let generate =
-    let button =
-      iconPrimaryButtonKey(
-        Keys.wizardGenerate,
-        Icons.play,
-        (fun () -> dispatch GenerateRequested)
-      )
-
-    button.IsEnabled(model |> Observable.map(fun m -> resolved(props, m)))
-
   StackPanel()
     .Spacing(8.0)
-    .Children(
-      stepCaption(model |> Observable.map _.Culture, 2),
-      brief,
-      generate.HorizontalAlignment(HorizontalAlignment.Left)
-    )
-
-let actionRow(actions: Control list) : Control =
-  StackPanel()
-    .Orientation(Orientation.Horizontal)
-    .Spacing(8.0)
-    .HorizontalAlignment(HorizontalAlignment.Right)
-    .Children(List.toArray actions)
+    .Children(stepCaption(model |> Observable.map _.Culture, 2), brief)
 
 let editingView
   (
@@ -893,6 +872,16 @@ let editingView
     Current = current.Culture
     Changed = model |> Observable.map _.Culture
   }
+
+  let generate =
+    let button =
+      iconPrimaryButtonKey(
+        Keys.wizardGenerate,
+        Icons.play,
+        (fun () -> dispatch GenerateRequested)
+      )
+
+    button.IsEnabled(model |> Observable.map(fun m -> resolved(props, m)))
 
   let hub =
     Hub.hub {
@@ -923,7 +912,10 @@ let editingView
     Lead = props.Lead
     Title = pageTitleKey Keys.wizardTitle
     Commands = []
-    Footer = noFooter
+    Footer = {
+      Secondary = []
+      Primary = [ generate :> Control ]
+    }
     Body = hub
   }
 
@@ -939,7 +931,10 @@ let generatingView(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
     Lead = props.Lead
     Title = pageTitleKey Keys.wizardTitle
     Commands = []
-    Footer = noFooter
+    Footer = {
+      Secondary = []
+      Primary = [ cancel :> Control ]
+    }
     Body =
       StackPanel()
         .Spacing(16.0)
@@ -952,8 +947,7 @@ let generatingView(props: WizardPageProps, dispatch: Dispatch<Msg>) : Control =
             HorizontalAlignment = HorizontalAlignment.Center
           ),
           statusLineKey(Keys.wizardGenerating, false)
-            .HorizontalAlignment(HorizontalAlignment.Center),
-          actionRow [ cancel ]
+            .HorizontalAlignment(HorizontalAlignment.Center)
         )
   }
 
@@ -1001,11 +995,11 @@ let failedView
     Lead = props.Lead
     Title = pageTitleKey Keys.errorTitle
     Commands = []
-    Footer = noFooter
-    Body =
-      StackPanel()
-        .Spacing(12.0)
-        .Children(reasonsPanel, actionRow [ exit; retry ])
+    Footer = {
+      Secondary = [ exit :> Control ]
+      Primary = [ retry :> Control ]
+    }
+    Body = reasonsPanel
   }
 
 let doneView
@@ -1063,11 +1057,11 @@ let doneView
     Lead = props.Lead
     Title = pageTitleKey Keys.wizardTitle
     Commands = []
-    Footer = noFooter
-    Body =
-      StackPanel()
-        .Spacing(8.0)
-        .Children(preview, advisoryPanel, actionRow [ discard; confirm ])
+    Footer = {
+      Secondary = [ discard :> Control ]
+      Primary = [ confirm :> Control ]
+    }
+    Body = StackPanel().Spacing(8.0).Children(preview, advisoryPanel)
   }
 
 let phaseKey(model: Model) =
