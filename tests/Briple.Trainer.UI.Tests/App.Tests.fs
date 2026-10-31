@@ -260,6 +260,7 @@ let tests =
             Gender = Female
             Goals = [ Strength ]
           }
+          ArchivedAt = ValueNone
         }
 
         let _, culture = liveCulture es
@@ -317,6 +318,7 @@ let tests =
             Gender = Female
             Goals = goals
           }
+          ArchivedAt = ValueNone
         }
 
         let ana = entity "Ana" [ Strength ]
@@ -445,6 +447,7 @@ let tests =
             Gender = Female
             Goals = [ Strength ]
           }
+          ArchivedAt = ValueNone
         }
 
         let ana = entity "Ana"
@@ -558,6 +561,7 @@ let tests =
             Gender = Female
             Goals = [ Strength ]
           }
+          ArchivedAt = ValueNone
         }
 
         let source = new BehaviorSubject<AthleteEntity list>([ entity "Ana" ])

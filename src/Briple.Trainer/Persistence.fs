@@ -1,6 +1,7 @@
 module Briple.Trainer.Persistence
 
 open System
+open System.Data
 open System.Data.Common
 open System.IO
 open System.Text.Json
@@ -17,7 +18,11 @@ open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
 
-type AthleteEntity = { Id: Guid; Profile: Athlete }
+type AthleteEntity = {
+  Id: Guid
+  Profile: Athlete
+  ArchivedAt: DateTime voption
+}
 
 type MemoryEntity = {
   Id: Guid
@@ -27,17 +32,22 @@ type MemoryEntity = {
   /// athlete-scoped memories.
   PlanId: Guid voption
   CreatedAt: DateTime
+  /// Separate from MemoryStatus.Discarded: an archived memory is kept
+  /// but hidden from the active slices.
+  ArchivedAt: DateTime voption
 }
 
 type PlanEntity = {
   Id: Guid
   AthleteId: Guid
   Title: string
+  /// "new", "adjust" or "import"
   Kind: string
   Weeks: int
   Counts: (string * int) list
   Raw: string
   CreatedAt: DateTime
+  ArchivedAt: DateTime voption
 }
 
 [<Struct>]
@@ -45,12 +55,30 @@ type PlanInsert = {
   AthleteId: Guid
   Kind: string
   Counts: (string * int) list
+  CreatedAt: DateTime voption
+}
+
+/// One plan in an import: its metadata and the tree to write.
+[<Struct>]
+type PlanDraft = {
+  Kind: string
+  Counts: (string * int) list
+  CreatedAt: DateTime voption
+  Plan: Plan
 }
 
 type IStore =
   abstract ListAthletes: unit -> Task<Result<AthleteEntity list, exn>>
   abstract AddAthlete: profile: Athlete -> Task<Result<AthleteEntity, exn>>
   abstract FindAthlete: id: Guid -> Task<Result<AthleteEntity voption, exn>>
+  abstract ArchiveAthlete: id: Guid -> Task<Result<unit, exn>>
+  abstract RestoreAthlete: id: Guid -> Task<Result<unit, exn>>
+  abstract DeleteAthlete: id: Guid -> Task<Result<unit, exn>>
+
+  abstract AddAthleteWithPlans:
+    profile: Athlete * drafts: PlanDraft list ->
+      Task<Result<AthleteEntity, exn>>
+
   abstract ListMemories: athleteId: Guid -> Task<Result<MemoryEntity list, exn>>
 
   abstract AddMemory:
@@ -58,13 +86,23 @@ type IStore =
       Task<Result<MemoryEntity, exn>>
 
   abstract UpdateMemory: entity: MemoryEntity -> Task<Result<unit, exn>>
+  abstract ArchiveMemory: id: Guid -> Task<Result<unit, exn>>
+  abstract RestoreMemory: id: Guid -> Task<Result<unit, exn>>
+  abstract DeleteMemory: id: Guid -> Task<Result<unit, exn>>
   abstract ListPlans: athleteId: Guid -> Task<Result<PlanEntity list, exn>>
 
   abstract AddPlan:
     insert: PlanInsert * plan: Plan -> Task<Result<PlanEntity, exn>>
 
+  abstract AddPlans:
+    athleteId: Guid * drafts: PlanDraft list ->
+      Task<Result<PlanEntity list, exn>>
+
   abstract FindPlan: id: Guid -> Task<Result<PlanEntity voption, exn>>
   abstract UpdatePlanRaw: id: Guid * raw: string -> Task<Result<unit, exn>>
+  abstract ArchivePlan: id: Guid -> Task<Result<unit, exn>>
+  abstract RestorePlan: id: Guid -> Task<Result<unit, exn>>
+  abstract DeletePlan: id: Guid -> Task<Result<unit, exn>>
 
   abstract AddRequest:
     athleteId: Guid * kind: string * payload: string -> Task<Result<unit, exn>>
@@ -378,6 +416,154 @@ type SqliteStore(dbPath: string) =
       return! op conn
     })
 
+  let readArchivedAt(rd: DbDataReader) : DateTime voption =
+    match rd.ReadString("archived_at") with
+    | null
+    | "" -> ValueNone
+    | token -> ValueSome(DateTime.Parse token)
+
+  let insertAthlete
+    (command: string -> DbUnit)
+    (profile: Athlete)
+    : Task<AthleteEntity> = task {
+    let entity = {
+      Id = Guid.NewGuid()
+      Profile = profile
+      ArchivedAt = ValueNone
+    }
+
+    do!
+      command
+        "INSERT INTO athletes (id, name, gender, goals, created_at) VALUES ($id, $name, $gender, $goals, $created_at)"
+      |> Db.setParams [
+        "$id", sqlString(string entity.Id)
+        "$name", sqlString profile.Name
+        "$gender", sqlString(Gender.toFileToken profile.Gender)
+        "$goals", sqlString(Codec.goals profile.Goals)
+        "$created_at", sqlString(timestamp())
+      ]
+      |> Db.Async.exec
+
+    return entity
+  }
+
+  let insertPlan
+    (command: string -> DbUnit)
+    (athleteId: Guid)
+    (draft: PlanDraft)
+    : Task<PlanEntity> = task {
+    let plan = Briple.Trainer.Core.Plan.Sanitize.normalize draft.Plan
+
+    let createdAt =
+      draft.CreatedAt |> ValueOption.defaultWith(fun () -> DateTime.UtcNow)
+
+    let entity = {
+      Id = Guid.NewGuid()
+      AthleteId = athleteId
+      Title = plan.Title
+      Kind = draft.Kind
+      Weeks = plan.Weeks
+      Counts = draft.Counts
+      Raw = Briple.Trainer.Core.Plan.Writer.write plan
+      CreatedAt = createdAt
+      ArchivedAt = ValueNone
+    }
+
+    do!
+      command
+        "INSERT INTO plans (id, athlete_id, title, kind, weeks, counts, raw, created_at) VALUES ($id, $athlete_id, $title, $kind, $weeks, $counts, $raw, $created_at)"
+      |> Db.setParams [
+        "$id", sqlString(string entity.Id)
+        "$athlete_id", sqlString(string athleteId)
+        "$title", sqlString entity.Title
+        "$kind", sqlString entity.Kind
+        "$weeks", sqlInt32 entity.Weeks
+        "$counts", sqlString(Codec.counts entity.Counts)
+        "$raw", sqlString entity.Raw
+        "$created_at", sqlString(entity.CreatedAt.ToString "O")
+      ]
+      |> Db.Async.exec
+
+    return entity
+  }
+
+  let setArchived
+    (table: string, id: Guid, archivedAt: DateTime voption)
+    : Task<Result<unit, exn>> =
+    withConn(fun conn -> task {
+      let archivedSql =
+        match archivedAt with
+        | ValueSome value -> sqlString(value.ToString "O")
+        | ValueNone -> SqlType.Null
+
+      do!
+        Db.newCommand
+          $"UPDATE {table} SET archived_at = $archived_at WHERE id = $id"
+          conn
+        |> Db.setParams [
+          "$archived_at", archivedSql
+          "$id", sqlString(string id)
+        ]
+        |> Db.Async.exec
+
+      return Ok()
+    })
+
+  let deleteOne(table: string, id: Guid) : Task<Result<unit, exn>> =
+    withConn(fun conn -> task {
+      do!
+        Db.newCommand $"DELETE FROM {table} WHERE id = $id" conn
+        |> Db.setParams(List.singleton("$id", sqlString(string id)))
+        |> Db.Async.exec
+
+      return Ok()
+    })
+
+  let deletePlan(id: Guid) : Task<Result<unit, exn>> =
+    withConn(fun conn -> task {
+      do!
+        conn
+        |> Db.Async.batch(fun tx -> task {
+          do!
+            Db.newCommandForTransaction
+              "DELETE FROM memories WHERE plan_id = $id"
+              tx
+            |> Db.setParams(List.singleton("$id", sqlString(string id)))
+            |> Db.Async.exec
+
+          do!
+            Db.newCommandForTransaction "DELETE FROM plans WHERE id = $id" tx
+            |> Db.setParams(List.singleton("$id", sqlString(string id)))
+            |> Db.Async.exec
+        })
+
+      return Ok()
+    })
+
+  let deleteAthlete(id: Guid) : Task<Result<unit, exn>> =
+    withConn(fun conn -> task {
+      do!
+        conn
+        |> Db.Async.batch(fun tx -> task {
+          for table in [ "memories"; "plans"; "requests" ] do
+            do!
+              Db.newCommandForTransaction
+                $"DELETE FROM {table} WHERE athlete_id = $id"
+                tx
+              |> Db.setParams(List.singleton("$id", sqlString(string id)))
+              |> Db.Async.exec
+
+          do!
+            Db.newCommandForTransaction
+              "DELETE FROM athletes WHERE id = $id"
+              tx
+            |> Db.setParams(List.singleton("$id", sqlString(string id)))
+            |> Db.Async.exec
+        })
+
+      return Ok()
+    })
+
   let mapAthlete(rd: DbDataReader) : AthleteEntity = {
     Id = rd.ReadString("id") |> Guid.Parse
     Profile = {
@@ -388,6 +574,7 @@ type SqliteStore(dbPath: string) =
         |> Option.defaultValue Male
       Goals = rd.ReadString("goals") |> Codec.tryGoals |> Result.defaultValue []
     }
+    ArchivedAt = readArchivedAt rd
   }
 
   let mapMemory(rd: DbDataReader) : MemoryEntity = {
@@ -428,6 +615,7 @@ type SqliteStore(dbPath: string) =
         | true, id -> ValueSome id
         | _ -> ValueNone
     CreatedAt = rd.ReadString("created_at") |> DateTime.Parse
+    ArchivedAt = readArchivedAt rd
   }
 
   let mapPlan(rd: DbDataReader) : PlanEntity = {
@@ -440,6 +628,7 @@ type SqliteStore(dbPath: string) =
       rd.ReadString("counts") |> Codec.tryCounts |> Result.defaultValue []
     Raw = rd.ReadString("raw")
     CreatedAt = rd.ReadString("created_at") |> DateTime.Parse
+    ArchivedAt = readArchivedAt rd
   }
 
   interface IStore with
@@ -448,7 +637,7 @@ type SqliteStore(dbPath: string) =
       withConn(fun conn -> task {
         let! athletes =
           conn
-          |> Db.newCommand "SELECT * FROM athletes ORDER BY created_at"
+          |> Db.newCommand "SELECT * FROM athletes ORDER BY created_at, rowid"
           |> Db.Async.query mapAthlete
 
         return Ok athletes
@@ -456,25 +645,34 @@ type SqliteStore(dbPath: string) =
 
     member _.AddAthlete(profile: Athlete) =
       withConn(fun conn -> task {
-        let entity = {
-          Id = Guid.NewGuid()
-          Profile = profile
-        }
+        let! entity = insertAthlete (fun sql -> Db.newCommand sql conn) profile
+        return Ok entity
+      })
+
+    member _.ArchiveAthlete(id: Guid) =
+      setArchived("athletes", id, ValueSome DateTime.UtcNow)
+
+    member _.RestoreAthlete(id: Guid) = setArchived("athletes", id, ValueNone)
+
+    member _.DeleteAthlete(id: Guid) = deleteAthlete id
+
+    member _.AddAthleteWithPlans(profile: Athlete, drafts: PlanDraft list) =
+      withConn(fun conn -> task {
+        let athlete = ref Unchecked.defaultof<AthleteEntity>
 
         do!
           conn
-          |> Db.newCommand
-            "INSERT INTO athletes (id, name, gender, goals, created_at) VALUES ($id, $name, $gender, $goals, $created_at)"
-          |> Db.setParams [
-            "$id", sqlString(string entity.Id)
-            "$name", sqlString profile.Name
-            "$gender", sqlString(Gender.toFileToken profile.Gender)
-            "$goals", sqlString(Codec.goals profile.Goals)
-            "$created_at", sqlString(timestamp())
-          ]
-          |> Db.Async.exec
+          |> Db.Async.batch(fun tx -> task {
+            let command sql = Db.newCommandForTransaction sql tx
+            let! entity = insertAthlete command profile
+            athlete.Value <- entity
 
-        return Ok entity
+            for draft in drafts do
+              let! _ = insertPlan command entity.Id draft
+              ()
+          })
+
+        return Ok athlete.Value
       })
 
     member _.FindAthlete(id: Guid) =
@@ -482,7 +680,7 @@ type SqliteStore(dbPath: string) =
         let! athlete =
           conn
           |> Db.newCommand "SELECT * FROM athletes WHERE id = $id"
-          |> Db.setParams [ "$id", sqlString(string id) ]
+          |> Db.setParams(List.singleton("$id", sqlString(string id)))
           |> Db.Async.querySingle mapAthlete
 
         return Ok(ValueOption.ofOption athlete)
@@ -493,8 +691,10 @@ type SqliteStore(dbPath: string) =
         let! memories =
           conn
           |> Db.newCommand
-            "SELECT * FROM memories WHERE athlete_id = $athlete_id ORDER BY created_at"
-          |> Db.setParams [ "$athlete_id", sqlString(string athleteId) ]
+            "SELECT * FROM memories WHERE athlete_id = $athlete_id ORDER BY created_at, rowid"
+          |> Db.setParams(
+            List.singleton("$athlete_id", sqlString(string athleteId))
+          )
           |> Db.Async.query mapMemory
 
         return Ok memories
@@ -502,12 +702,15 @@ type SqliteStore(dbPath: string) =
 
     member _.AddMemory(athleteId: Guid, memory: Memory, planId: Guid voption) =
       withConn(fun conn -> task {
+        let createdAt = DateTime.UtcNow
+
         let entity = {
           Id = Guid.NewGuid()
           AthleteId = athleteId
           Memory = memory
           PlanId = if memory.Scope = Athlete then ValueNone else planId
-          CreatedAt = DateTime.UtcNow
+          CreatedAt = createdAt
+          ArchivedAt = ValueNone
         }
 
         let planSql =
@@ -528,12 +731,19 @@ type SqliteStore(dbPath: string) =
             "$deltas", sqlString(Codec.deltas memory.Deltas)
             "$scope", sqlString(Codec.scopeToken memory.Scope)
             "$plan_id", planSql
-            "$created_at", sqlString(timestamp())
+            "$created_at", sqlString(entity.CreatedAt.ToString "O")
           ]
           |> Db.Async.exec
 
         return Ok entity
       })
+
+    member _.ArchiveMemory(id: Guid) =
+      setArchived("memories", id, ValueSome DateTime.UtcNow)
+
+    member _.RestoreMemory(id: Guid) = setArchived("memories", id, ValueNone)
+
+    member _.DeleteMemory(id: Guid) = deleteOne("memories", id)
 
     member _.UpdateMemory(entity: MemoryEntity) =
       withConn(fun conn -> task {
@@ -572,8 +782,10 @@ type SqliteStore(dbPath: string) =
         let! plans =
           conn
           |> Db.newCommand
-            "SELECT * FROM plans WHERE athlete_id = $athlete_id ORDER BY created_at"
-          |> Db.setParams [ "$athlete_id", sqlString(string athleteId) ]
+            "SELECT * FROM plans WHERE athlete_id = $athlete_id ORDER BY created_at, rowid"
+          |> Db.setParams(
+            List.singleton("$athlete_id", sqlString(string athleteId))
+          )
           |> Db.Async.query mapPlan
 
         return Ok plans
@@ -581,44 +793,49 @@ type SqliteStore(dbPath: string) =
 
     member _.AddPlan(insert: PlanInsert, plan: Plan) =
       withConn(fun conn -> task {
-        let plan = Briple.Trainer.Core.Plan.Sanitize.normalize plan
-
-        let entity = {
-          Id = Guid.NewGuid()
-          AthleteId = insert.AthleteId
-          Title = plan.Title
+        let draft = {
           Kind = insert.Kind
-          Weeks = plan.Weeks
           Counts = insert.Counts
-          Raw = Briple.Trainer.Core.Plan.Writer.write plan
-          CreatedAt = DateTime.UtcNow
+          CreatedAt = insert.CreatedAt
+          Plan = plan
         }
 
-        do!
-          conn
-          |> Db.newCommand
-            "INSERT INTO plans (id, athlete_id, title, kind, weeks, counts, raw, created_at) VALUES ($id, $athlete_id, $title, $kind, $weeks, $counts, $raw, $created_at)"
-          |> Db.setParams [
-            "$id", sqlString(string entity.Id)
-            "$athlete_id", sqlString(string insert.AthleteId)
-            "$title", sqlString entity.Title
-            "$kind", sqlString entity.Kind
-            "$weeks", sqlInt32 entity.Weeks
-            "$counts", sqlString(Codec.counts entity.Counts)
-            "$raw", sqlString entity.Raw
-            "$created_at", sqlString(timestamp())
-          ]
-          |> Db.Async.exec
+        let! entity =
+          insertPlan (fun sql -> Db.newCommand sql conn) insert.AthleteId draft
 
         return Ok entity
       })
+
+    member _.AddPlans(athleteId: Guid, drafts: PlanDraft list) =
+      withConn(fun conn -> task {
+        let plans = ResizeArray<PlanEntity>()
+
+        do!
+          conn
+          |> Db.Async.batch(fun tx -> task {
+            let command sql = Db.newCommandForTransaction sql tx
+
+            for draft in drafts do
+              let! entity = insertPlan command athleteId draft
+              plans.Add entity
+          })
+
+        return Ok(List.ofSeq plans)
+      })
+
+    member _.ArchivePlan(id: Guid) =
+      setArchived("plans", id, ValueSome DateTime.UtcNow)
+
+    member _.RestorePlan(id: Guid) = setArchived("plans", id, ValueNone)
+
+    member _.DeletePlan(id: Guid) = deletePlan id
 
     member _.FindPlan(id: Guid) =
       withConn(fun conn -> task {
         let! plan =
           conn
           |> Db.newCommand "SELECT * FROM plans WHERE id = $id"
-          |> Db.setParams [ "$id", sqlString(string id) ]
+          |> Db.setParams(List.singleton("$id", sqlString(string id)))
           |> Db.Async.querySingle mapPlan
 
         return Ok(ValueOption.ofOption plan)

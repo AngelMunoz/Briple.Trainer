@@ -8,6 +8,7 @@ open System.IO
 open System.Threading.Tasks
 
 open Expecto
+open Microsoft.Data.Sqlite
 
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
@@ -23,6 +24,20 @@ let private wait(task: Task<Result<'a, exn>>) : Result<'a, exn> =
 
 let private tempDb() : string =
   Path.Combine(Path.GetTempPath(), $"briple-ui-{Guid.NewGuid():N}.db")
+
+let private execSql(db: string, sql: string) : unit =
+  use conn = new SqliteConnection($"Data Source={db}")
+  conn.Open()
+  use command = conn.CreateCommand()
+  command.CommandText <- sql
+  command.ExecuteNonQuery() |> ignore
+
+let private countRows(db: string, table: string) : int64 =
+  use conn = new SqliteConnection($"Data Source={db}")
+  conn.Open()
+  use command = conn.CreateCommand()
+  command.CommandText <- $"SELECT COUNT(*) FROM {table}"
+  command.ExecuteScalar() :?> int64
 
 let private sampleAthlete: Athlete = {
   Name = "Pepe"
@@ -72,6 +87,22 @@ let private samplePlan: Plan = {
     }
   ]
   Extras = [ "Descanso 120s" ]
+}
+
+let private memoryFor(scope: MemoryScope) : Memory = {
+  consolidate {
+    Target = Exercise "Press de banca"
+    Label = Light
+    Date = DateOnly(2026, 10, 6)
+  } with
+      Scope = scope
+}
+
+let private draft(kind: string, createdAt: DateTime, plan: Plan) : PlanDraft = {
+  Kind = kind
+  Counts = []
+  CreatedAt = ValueSome createdAt
+  Plan = plan
 }
 
 let tests =
@@ -165,6 +196,7 @@ let tests =
               AthleteId = athleteId
               Kind = "new"
               Counts = [ "3dias", 1 ]
+              CreatedAt = ValueNone
             },
             samplePlan
           )
@@ -212,5 +244,361 @@ let tests =
       with
       | Error e -> failtest $"add request failed: {e}"
       | Ok() -> ()
+    }
+
+    test "archive and restore flag every aggregate" {
+      let db = tempDb()
+
+      migrate(testLogger, db) |> ignore
+
+      let store = sqliteStore db
+
+      let athlete =
+        match wait(store.AddAthlete sampleAthlete) with
+        | Ok entity -> entity
+        | Error e -> failtest $"add athlete failed: {e}"
+
+      let plan =
+        match
+          wait(
+            store.AddPlan(
+              {
+                AthleteId = athlete.Id
+                Kind = "new"
+                Counts = []
+                CreatedAt = ValueNone
+              },
+              samplePlan
+            )
+          )
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"add plan failed: {e}"
+
+      let planMemory =
+        match
+          wait(store.AddMemory(athlete.Id, memoryFor Plan, ValueSome plan.Id))
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"add memory failed: {e}"
+
+      let athleteMemory =
+        match
+          wait(store.AddMemory(athlete.Id, memoryFor Athlete, ValueNone))
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"add memory failed: {e}"
+
+      let step(result: Result<unit, exn>) =
+        match result with
+        | Ok() -> ()
+        | Error e -> failtest $"archive step failed: {e}"
+
+      step(wait(store.ArchiveAthlete athlete.Id))
+      step(wait(store.ArchivePlan plan.Id))
+      step(wait(store.ArchiveMemory planMemory.Id))
+      step(wait(store.ArchiveMemory athleteMemory.Id))
+
+      match wait(store.FindAthlete athlete.Id) with
+      | Ok(ValueSome saved) ->
+        Expect.isTrue
+          (ValueOption.isSome saved.ArchivedAt)
+          "the athlete carries archived_at"
+      | _ -> failtest "the archived athlete vanished"
+
+      match wait(store.FindPlan plan.Id) with
+      | Ok(ValueSome saved) ->
+        Expect.isTrue
+          (ValueOption.isSome saved.ArchivedAt)
+          "the plan carries archived_at"
+      | _ -> failtest "the archived plan vanished"
+
+      let memories =
+        match wait(store.ListMemories athlete.Id) with
+        | Ok entities -> entities
+        | Error e -> failtest $"list memories failed: {e}"
+
+      Expect.isTrue
+        (memories
+         |> List.forall(fun memory -> ValueOption.isSome memory.ArchivedAt))
+        "every memory carries archived_at"
+
+      step(wait(store.RestoreAthlete athlete.Id))
+      step(wait(store.RestorePlan plan.Id))
+      step(wait(store.RestoreMemory planMemory.Id))
+      step(wait(store.RestoreMemory athleteMemory.Id))
+
+      let athletes =
+        match wait(store.ListAthletes()) with
+        | Ok entities -> entities
+        | Error e -> failtest $"list athletes failed: {e}"
+
+      let plans =
+        match wait(store.ListPlans athlete.Id) with
+        | Ok entities -> entities
+        | Error e -> failtest $"list plans failed: {e}"
+
+      let memories =
+        match wait(store.ListMemories athlete.Id) with
+        | Ok entities -> entities
+        | Error e -> failtest $"list memories failed: {e}"
+
+      Expect.isTrue
+        (athletes
+         |> List.forall(fun entity -> ValueOption.isNone entity.ArchivedAt))
+        "restore clears every athlete flag"
+
+      Expect.isTrue
+        (plans
+         |> List.forall(fun entity -> ValueOption.isNone entity.ArchivedAt))
+        "restore clears every plan flag"
+
+      Expect.isTrue
+        (memories
+         |> List.forall(fun entity -> ValueOption.isNone entity.ArchivedAt))
+        "restore clears every memory flag"
+    }
+
+    test "deleting a plan keeps athlete-scoped memories" {
+      let db = tempDb()
+
+      migrate(testLogger, db) |> ignore
+
+      let store = sqliteStore db
+
+      let athlete =
+        match wait(store.AddAthlete sampleAthlete) with
+        | Ok entity -> entity
+        | Error e -> failtest $"add athlete failed: {e}"
+
+      let plan =
+        match
+          wait(
+            store.AddPlan(
+              {
+                AthleteId = athlete.Id
+                Kind = "new"
+                Counts = []
+                CreatedAt = ValueNone
+              },
+              samplePlan
+            )
+          )
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"add plan failed: {e}"
+
+      let planMemory =
+        match
+          wait(store.AddMemory(athlete.Id, memoryFor Plan, ValueSome plan.Id))
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"add memory failed: {e}"
+
+      let athleteMemory =
+        match
+          wait(store.AddMemory(athlete.Id, memoryFor Athlete, ValueNone))
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"add memory failed: {e}"
+
+      match wait(store.DeletePlan plan.Id) with
+      | Ok() -> ()
+      | Error e -> failtest $"delete plan failed: {e}"
+
+      match wait(store.ListPlans athlete.Id) with
+      | Ok [] -> ()
+      | Ok _ -> failtest "the plan survived the delete"
+      | Error e -> failtest $"list plans failed: {e}"
+
+      match wait(store.ListMemories athlete.Id) with
+      | Ok memories ->
+        Expect.equal
+          (memories |> List.map(fun entity -> entity.Id))
+          [ athleteMemory.Id ]
+          "the plan-scoped memory left, the athlete-scoped one stayed"
+
+        Expect.isFalse
+          (memories |> List.exists(fun entity -> entity.Id = planMemory.Id))
+          "the plan-scoped memory is gone"
+      | Error e -> failtest $"list memories failed: {e}"
+
+      match wait(store.FindPlan plan.Id) with
+      | Ok ValueNone -> ()
+      | Ok(ValueSome _) -> failtest "the plan is still findable"
+      | Error e -> failtest $"find plan failed: {e}"
+    }
+
+    test "deleting an athlete removes the whole aggregate" {
+      let db = tempDb()
+
+      migrate(testLogger, db) |> ignore
+
+      let store = sqliteStore db
+
+      let athlete =
+        match wait(store.AddAthlete sampleAthlete) with
+        | Ok entity -> entity
+        | Error e -> failtest $"add athlete failed: {e}"
+
+      let plan =
+        match
+          wait(
+            store.AddPlan(
+              {
+                AthleteId = athlete.Id
+                Kind = "new"
+                Counts = []
+                CreatedAt = ValueNone
+              },
+              samplePlan
+            )
+          )
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"add plan failed: {e}"
+
+      match
+        wait(store.AddMemory(athlete.Id, memoryFor Plan, ValueSome plan.Id))
+      with
+      | Ok _ -> ()
+      | Error e -> failtest $"add memory failed: {e}"
+
+      match wait(store.AddRequest(athlete.Id, "new", "payload")) with
+      | Ok() -> ()
+      | Error e -> failtest $"add request failed: {e}"
+
+      match wait(store.DeleteAthlete athlete.Id) with
+      | Ok() -> ()
+      | Error e -> failtest $"delete athlete failed: {e}"
+
+      match wait(store.ListAthletes()) with
+      | Ok [] -> ()
+      | Ok _ -> failtest "the athlete survived the delete"
+      | Error e -> failtest $"list athletes failed: {e}"
+
+      match wait(store.ListPlans athlete.Id) with
+      | Ok [] -> ()
+      | Ok _ -> failtest "the plans survived the athlete delete"
+      | Error e -> failtest $"list plans failed: {e}"
+
+      match wait(store.ListMemories athlete.Id) with
+      | Ok [] -> ()
+      | Ok _ -> failtest "the memories survived the athlete delete"
+      | Error e -> failtest $"list memories failed: {e}"
+
+      Expect.equal
+        (countRows(db, "requests"))
+        0L
+        "the requests left with the athlete"
+    }
+
+    test "imports keep the created order and append atomically" {
+      let db = tempDb()
+
+      migrate(testLogger, db) |> ignore
+
+      let store = sqliteStore db
+
+      let planA = { samplePlan with Title = "A" }
+      let planB = { samplePlan with Title = "B" }
+      let planC = { samplePlan with Title = "C" }
+      let planD = { samplePlan with Title = "D" }
+
+      let early = DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+      let late = DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc)
+
+      let athlete =
+        match
+          wait(
+            store.AddAthleteWithPlans(
+              sampleAthlete,
+              [
+                draft("import", late, planC)
+                draft("import", early, planA)
+                draft("import", early, planB)
+              ]
+            )
+          )
+        with
+        | Ok entity -> entity
+        | Error e -> failtest $"import athlete failed: {e}"
+
+      match wait(store.ListPlans athlete.Id) with
+      | Ok plans ->
+        Expect.equal
+          (plans |> List.map(fun entity -> entity.Title))
+          [ "A"; "B"; "C" ]
+          "created_at then rowid orders the import"
+      | Error e -> failtest $"list plans failed: {e}"
+
+      match
+        wait(store.AddPlans(athlete.Id, [ draft("import", early, planD) ]))
+      with
+      | Ok [ entity ] ->
+        Expect.equal entity.Title "D" "the appended plan came back"
+      | Ok _ -> failtest "the append returned the wrong plans"
+      | Error e -> failtest $"append plans failed: {e}"
+
+      match wait(store.ListPlans athlete.Id) with
+      | Ok plans ->
+        Expect.equal
+          (plans |> List.map(fun entity -> entity.Title))
+          [ "A"; "B"; "D"; "C" ]
+          "the appended row keeps the created order"
+      | Error e -> failtest $"list plans failed: {e}"
+    }
+
+    test "a failed import leaves no athlete and no plans" {
+      let db = tempDb()
+
+      migrate(testLogger, db) |> ignore
+
+      let store = sqliteStore db
+      let valid = draft("import", DateTime.UtcNow, samplePlan)
+
+      execSql(
+        db,
+        "CREATE TRIGGER fail_plans BEFORE INSERT ON plans BEGIN SELECT RAISE(ABORT, 'boom'); END;"
+      )
+
+      match
+        wait(store.AddAthleteWithPlans(sampleAthlete, [ valid; valid ]))
+      with
+      | Ok _ -> failtest "the import should have failed"
+      | Error _ -> ()
+
+      match wait(store.ListAthletes()) with
+      | Ok [] -> ()
+      | Ok _ -> failtest "the failed import left an athlete"
+      | Error e -> failtest $"list athletes failed: {e}"
+
+      Expect.equal (countRows(db, "plans")) 0L "the failed import left no plans"
+    }
+
+    test "the migration applies to a copy of the real database" {
+      let real = defaultDbPath()
+
+      if File.Exists real then
+        let copy = tempDb()
+        File.Copy(real, copy)
+        let before = File.GetLastWriteTimeUtc real
+
+        match migrate(testLogger, copy) with
+        | Error e -> failtest $"migration on the copy failed: {e}"
+        | Ok() ->
+          let store = sqliteStore copy
+
+          match wait(store.ListAthletes()) with
+          | Ok _ -> ()
+          | Error e -> failtest $"the migrated copy is unreadable: {e}"
+
+        SqliteConnection.ClearAllPools()
+        File.Delete copy
+
+        Expect.equal
+          (File.GetLastWriteTimeUtc real)
+          before
+          "the real database stays untouched"
     }
   ]

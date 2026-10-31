@@ -1741,6 +1741,7 @@ let private reviewSetup() =
             AthleteId = athleteId
             Kind = "new"
             Counts = planCounts sampleAthlete plan
+            CreatedAt = ValueNone
           },
           plan
         )
@@ -2018,6 +2019,7 @@ let wizardTests =
         Memory = proposalMemory
         PlanId = ValueSome(Guid.NewGuid())
         CreatedAt = DateTime.UtcNow
+        ArchivedAt = ValueNone
       }
 
       let! page =

@@ -54,6 +54,7 @@ let tests =
           Gender = Female
           Goals = [ Strength ]
         }
+        ArchivedAt = ValueNone
       }
 
       let source = new BehaviorSubject<AthleteEntity list>([ athlete ])

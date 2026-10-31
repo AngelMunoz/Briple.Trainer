@@ -14,7 +14,11 @@ open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Memories
 open Briple.Trainer.Core.Plan.Types
 
-type AthleteEntity = { Id: Guid; Profile: Athlete }
+type AthleteEntity = {
+  Id: Guid
+  Profile: Athlete
+  ArchivedAt: DateTime voption
+}
 
 type MemoryEntity = {
   Id: Guid
@@ -24,18 +28,22 @@ type MemoryEntity = {
   /// athlete-scoped memories.
   PlanId: Guid voption
   CreatedAt: DateTime
+  /// Separate from MemoryStatus.Discarded: an archived memory is kept
+  /// but hidden from the active slices.
+  ArchivedAt: DateTime voption
 }
 
 type PlanEntity = {
   Id: Guid
   AthleteId: Guid
   Title: string
-  /// "new" or "adjust"
+  /// "new", "adjust" or "import"
   Kind: string
   Weeks: int
   Counts: (string * int) list
   Raw: string
   CreatedAt: DateTime
+  ArchivedAt: DateTime voption
 }
 
 /// The owner and metadata of a plan insert.
@@ -44,13 +52,33 @@ type PlanInsert = {
   AthleteId: Guid
   Kind: string
   Counts: (string * int) list
+  CreatedAt: DateTime voption
+}
+
+/// One plan in an import: its metadata and the tree to write.
+[<Struct>]
+type PlanDraft = {
+  Kind: string
+  Counts: (string * int) list
+  CreatedAt: DateTime voption
+  Plan: Plan
 }
 
 /// The store the UI reads and writes; every operation fails with Error.
+/// The list methods return active and archived rows; the observable
+/// layer splits the slices.
 type IStore =
   abstract ListAthletes: unit -> Task<Result<AthleteEntity list, exn>>
   abstract AddAthlete: profile: Athlete -> Task<Result<AthleteEntity, exn>>
   abstract FindAthlete: id: Guid -> Task<Result<AthleteEntity voption, exn>>
+  abstract ArchiveAthlete: id: Guid -> Task<Result<unit, exn>>
+  abstract RestoreAthlete: id: Guid -> Task<Result<unit, exn>>
+  abstract DeleteAthlete: id: Guid -> Task<Result<unit, exn>>
+
+  abstract AddAthleteWithPlans:
+    profile: Athlete * drafts: PlanDraft list ->
+      Task<Result<AthleteEntity, exn>>
+
   abstract ListMemories: athleteId: Guid -> Task<Result<MemoryEntity list, exn>>
 
   abstract AddMemory:
@@ -58,13 +86,23 @@ type IStore =
       Task<Result<MemoryEntity, exn>>
 
   abstract UpdateMemory: entity: MemoryEntity -> Task<Result<unit, exn>>
+  abstract ArchiveMemory: id: Guid -> Task<Result<unit, exn>>
+  abstract RestoreMemory: id: Guid -> Task<Result<unit, exn>>
+  abstract DeleteMemory: id: Guid -> Task<Result<unit, exn>>
   abstract ListPlans: athleteId: Guid -> Task<Result<PlanEntity list, exn>>
 
   abstract AddPlan:
     insert: PlanInsert * plan: Plan -> Task<Result<PlanEntity, exn>>
 
+  abstract AddPlans:
+    athleteId: Guid * drafts: PlanDraft list ->
+      Task<Result<PlanEntity list, exn>>
+
   abstract FindPlan: id: Guid -> Task<Result<PlanEntity voption, exn>>
   abstract UpdatePlanRaw: id: Guid * raw: string -> Task<Result<unit, exn>>
+  abstract ArchivePlan: id: Guid -> Task<Result<unit, exn>>
+  abstract RestorePlan: id: Guid -> Task<Result<unit, exn>>
+  abstract DeletePlan: id: Guid -> Task<Result<unit, exn>>
 
   abstract AddRequest:
     athleteId: Guid * kind: string * payload: string -> Task<Result<unit, exn>>

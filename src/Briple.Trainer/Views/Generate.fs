@@ -616,6 +616,7 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
         AthleteId = props.Athlete.Id
         Kind = kind
         Counts = planCounts props.Athlete.Profile plan
+        CreatedAt = ValueNone
       }
 
       model, Cmd.OfTask.perform env.Plans.Add (insert, plan) PlanSaved
