@@ -84,5 +84,17 @@ val maximize: StreamGeometry
 /// Restore the window. MDI `window-restore`.
 val restore: StreamGeometry
 
+/// Archive an item. MDI `archive-arrow-down`.
+val archive: StreamGeometry
+
+/// Restore an archived item. MDI `archive-arrow-up`.
+val unarchive: StreamGeometry
+
+/// Open the row action menu. MDI `dots-horizontal`.
+val more: StreamGeometry
+
+/// Filter the list. MDI `filter-variant`.
+val filter: StreamGeometry
+
 /// Close the window. MDI `close`.
 val close: StreamGeometry

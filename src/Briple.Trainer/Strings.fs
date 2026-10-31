@@ -83,6 +83,9 @@ module Keys =
   let commonCancel = "common.cancel"
 
   [<Literal>]
+  let commonMore = "common.more"
+
+  [<Literal>]
   let errorFriendly = "error.friendly"
 
   [<Literal>]
@@ -93,6 +96,27 @@ module Keys =
 
   [<Literal>]
   let athletesNew = "athletes.new"
+
+  [<Literal>]
+  let athletesShowArchived = "athletes.showArchived"
+
+  [<Literal>]
+  let athleteArchived = "athlete.archived"
+
+  [<Literal>]
+  let athleteArchive = "athlete.archive"
+
+  [<Literal>]
+  let athleteRestore = "athlete.restore"
+
+  [<Literal>]
+  let athleteDelete = "athlete.delete"
+
+  [<Literal>]
+  let athleteDeleteTitle = "athlete.deleteTitle"
+
+  [<Literal>]
+  let athleteDeleteBody = "athlete.deleteBody"
 
   [<Literal>]
   let athleteName = "athlete.name"

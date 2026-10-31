@@ -660,6 +660,7 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
           Body = get(culture, Keys.wizardDiscardBody)
           Accept = get(culture, Keys.wizardDiscard)
           Cancel = get(culture, Keys.commonCancel)
+          Danger = true
         }
 
       model,

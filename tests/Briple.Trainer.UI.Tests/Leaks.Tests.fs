@@ -9,6 +9,8 @@ open System
 open System.Reactive.Subjects
 open System.Threading.Tasks
 
+open FSharp.Control.Reactive
+
 open Avalonia.Controls
 open Avalonia.VisualTree
 open NXUI.Extensions
@@ -20,18 +22,38 @@ open Briple.Trainer.Components.AthleteList
 open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Env
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
 open Briple.Trainer.UI.Tests.Harness
 
 let private es = Language.toCulture Es
 
+let private quietToasts = {
+  new IToasts with
+    member _.Show(_, _, _) = ()
+}
+
+let private acceptingDialogs = {
+  new IDialogs with
+    member _.ConfirmAsync(_) = async { return true }
+}
+
+let private okAction: Task<Result<unit, exn>> = Task.FromResult(Ok())
+
 let private listEnv
   (athletes: BehaviorSubject<AthleteEntity list>)
   (culture: PageCulture)
   : AthleteListEnv = {
   Observe = fun () -> athletes :> IObservable<_>
+  ObserveArchived = fun () -> Observable.empty<AthleteEntity list>
   Snapshot = fun () -> athletes.Value
+  SnapshotArchived = fun () -> []
+  Archive = fun _ -> okAction
+  Restore = fun _ -> okAction
+  Delete = fun _ -> okAction
+  Dialogs = acceptingDialogs
+  Toasts = quietToasts
   Culture = culture.Current()
   CultureChanged = culture.Changed
 }

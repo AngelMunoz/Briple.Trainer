@@ -575,6 +575,57 @@ let tests =
       Expect.isTrue appended "the appended import filled the slice"
     }
 
+    uiTest "archiving an athlete keeps its plans and memories"
+    <| fun () -> task {
+      let db = tempDb()
+      migrate(testLogger, db) |> ignore
+
+      let stores = createStores(sqliteStore db, ignore)
+
+      let! athleteResult = stores.Athletes.Add sampleAthlete
+      let athlete = ok athleteResult
+
+      let! planResult =
+        stores.Plans.Add(
+          {
+            AthleteId = athlete.Id
+            Kind = "new"
+            Counts = []
+            CreatedAt = ValueNone
+          },
+          samplePlan
+        )
+
+      let plan = ok planResult
+
+      let! memoryResult =
+        stores.Memories.Add(athlete.Id, memoryFor Plan, ValueSome plan.Id)
+
+      let memory = ok memoryResult
+
+      let! archiveResult = stores.Athletes.Archive athlete.Id
+      unitOk archiveResult
+
+      let! plansKept =
+        waitFor(
+          2000,
+          (fun () -> stores.Plans.Snapshot athlete.Id),
+          fun plans -> plans |> List.exists(fun entity -> entity.Id = plan.Id)
+        )
+
+      Expect.isTrue plansKept "archiving the athlete removed a plan"
+
+      let! memoriesKept =
+        waitFor(
+          2000,
+          (fun () -> stores.Memories.Snapshot athlete.Id),
+          fun memories ->
+            memories |> List.exists(fun entity -> entity.Id = memory.Id)
+        )
+
+      Expect.isTrue memoriesKept "archiving the athlete removed a memory"
+    }
+
     uiTest "Refresh reloads a slice and Forget drops it"
     <| fun () -> task {
       let db = tempDb()

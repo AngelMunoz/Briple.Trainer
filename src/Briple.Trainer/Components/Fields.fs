@@ -10,6 +10,8 @@ open Avalonia.Media
 open Avalonia.Styling
 open NXUI.Extensions
 
+open FSharp.Control.Reactive
+
 open Briple.Trainer
 open Briple.Trainer.Localization
 open Briple.Trainer.Theme
@@ -246,6 +248,109 @@ let inline contentRow
   (title: string, detail: string, [<InlineIfLambda>] trailing: unit -> Control)
   : Control =
   contentRowObs(title, System.Reactive.Linq.Observable.Return detail, trailing)
+
+/// One action in a row overflow menu. The label follows the culture.
+[<Struct>]
+type RowAction = {
+  Glyph: StreamGeometry
+  Label: IObservable<string>
+  /// Marks a destructive item and puts a separator before it.
+  Danger: bool
+  OnClick: unit -> unit
+}
+
+/// One row with a main open button and a trailing overflow menu.
+[<Struct>]
+type ActionRow = {
+  Title: Control
+  Detail: IObservable<string>
+  /// The tooltip of the overflow button.
+  MoreLabel: IObservable<string>
+  OnOpen: unit -> unit
+  Actions: RowAction list
+}
+
+/// A two-line content row with a main open button and an overflow menu.
+let inline actionRow(row: ActionRow) : Control =
+  let content =
+    StackPanel()
+      .Spacing(2.0)
+      .VerticalAlignment(VerticalAlignment.Center)
+      .Children(
+        row.Title,
+        TextBlock()
+          .Text(row.Detail)
+          .Classes("caption", "secondary")
+          .TextTrimming(TextTrimming.CharacterEllipsis)
+      )
+
+  let moreButton =
+    let flyout = MenuFlyout()
+
+    for action in row.Actions do
+      if action.Danger then
+        flyout.Items.Add(Separator()) |> ignore
+
+      let header = TextBlock().Text(action.Label)
+
+      let item = MenuItem(Header = header, Icon = PathIcon(Data = action.Glyph))
+
+      item.Click.Add(fun _ -> action.OnClick())
+      flyout.Items.Add item |> ignore
+
+    let button =
+      Button()
+        .Content(icon Icons.more)
+        .Classes("chrome")
+        .Width(32.0)
+        .Height(32.0)
+
+    ToolTip.SetTip(button, TextBlock().Text(row.MoreLabel))
+    button.Flyout <- flyout
+    button
+
+  let openButton =
+    Button()
+      .Content(content)
+      .OnClickHandler(fun _ _ -> row.OnOpen())
+      .Classes("row")
+      .HorizontalAlignment(HorizontalAlignment.Stretch)
+      .HorizontalContentAlignment(HorizontalAlignment.Stretch)
+
+  let grid =
+    Grid()
+      .HorizontalAlignment(HorizontalAlignment.Stretch)
+      .Margin(0.0, 0.0, 0.0, 4.0)
+
+  grid.ColumnDefinitions <- ColumnDefinitions("*,Auto")
+
+  grid.Children(openButton.Column(0), moreButton.Column(1)) |> ignore
+
+  grid
+
+/// A small neutral label, used for the archived badge.
+let inline badgeObs(text: IObservable<string>) : Control =
+  Border()
+    .Classes("badge")
+    .Child(TextBlock().Text(text).Classes("caption-strong", "secondary"))
+
+/// One toggle command for a page command row.
+[<Struct>]
+type ToggleCommand = {
+  Key: string
+  Glyph: StreamGeometry
+  IsOn: IObservable<bool>
+  OnToggle: unit -> unit
+}
+
+/// A labeled Fluent toggle command, with the checked state on the model.
+let inline toggleCommand(command: ToggleCommand) : ToggleButton =
+  ToggleButton()
+    .Content(glyphLabelKey(command.Glyph, command.Key))
+    .IsChecked(command.IsOn |> Observable.map(fun on -> Nullable on))
+    .OnClickHandler(fun _ _ -> command.OnToggle())
+    .Padding(12.0, 8.0)
+    .MinHeight(40.0)
 
 /// Makes every item container fill the items control's width, so rows of
 /// different lengths share one left edge and one trailing edge.

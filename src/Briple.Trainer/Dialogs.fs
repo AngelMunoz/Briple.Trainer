@@ -21,6 +21,8 @@ type ConfirmRequest = {
   Body: string
   Accept: string
   Cancel: string
+  /// Styles the accept button as a destructive action.
+  Danger: bool
 }
 
 // the pending request and its reply; one at a time
@@ -44,6 +46,15 @@ let cardBackground() : IBrush =
       Brushes.White
 
 let dialogView(request: ConfirmRequest) : Control =
+  let acceptButton =
+    let button =
+      Button(Content = request.Accept).OnClickHandler(fun _ _ -> answer true)
+
+    if request.Danger then
+      button.Classes.Add("danger")
+
+    button
+
   Border()
     .Background(SolidColorBrush(Color.FromArgb(153uy, 0uy, 0uy, 0uy)))
     .Child(
@@ -67,15 +78,14 @@ let dialogView(request: ConfirmRequest) : Control =
                 .Children(
                   Button(Content = request.Cancel)
                     .OnClickHandler(fun _ _ -> answer false),
-                  Button(Content = request.Accept)
-                    .OnClickHandler(fun _ _ -> answer true)
+                  acceptButton
                 )
             )
         )
     )
 
 /// Asks the user: true accepts, false cancels — or Escape.
-let inline confirmAsync(request: ConfirmRequest) : Async<bool> =
+let confirmAsync(request: ConfirmRequest) : Async<bool> =
   Async.FromContinuations(fun (onOk, _, _) ->
     pending.OnNext(ValueSome(request, onOk)))
 

@@ -67,6 +67,9 @@ module Keys =
   val commonCancel: string = "common.cancel"
 
   [<Literal>]
+  val commonMore: string = "common.more"
+
+  [<Literal>]
   val errorFriendly: string = "error.friendly"
 
   [<Literal>]
@@ -77,6 +80,27 @@ module Keys =
 
   [<Literal>]
   val athletesNew: string = "athletes.new"
+
+  [<Literal>]
+  val athletesShowArchived: string = "athletes.showArchived"
+
+  [<Literal>]
+  val athleteArchived: string = "athlete.archived"
+
+  [<Literal>]
+  val athleteArchive: string = "athlete.archive"
+
+  [<Literal>]
+  val athleteRestore: string = "athlete.restore"
+
+  [<Literal>]
+  val athleteDelete: string = "athlete.delete"
+
+  [<Literal>]
+  val athleteDeleteTitle: string = "athlete.deleteTitle"
+
+  [<Literal>]
+  val athleteDeleteBody: string = "athlete.deleteBody"
 
   [<Literal>]
   val athleteName: string = "athlete.name"

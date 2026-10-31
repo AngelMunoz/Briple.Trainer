@@ -97,13 +97,20 @@ type DetailRoute = {
 
 let athletesPage
   (
-    env: #IProvideStores & #IProvideCulture,
+    env: #IProvideStores & #IProvideCulture & #IProvideDialogs & #IProvideToasts,
     route: PlainRoute,
     lead: unit -> Control
   ) : Control =
   let pageEnv: AthleteList.AthleteListEnv = {
     Observe = env.Stores.Athletes.Observe
+    ObserveArchived = env.Stores.Athletes.ObserveArchived
     Snapshot = env.Stores.Athletes.Snapshot
+    SnapshotArchived = env.Stores.Athletes.SnapshotArchived
+    Archive = env.Stores.Athletes.Archive
+    Restore = env.Stores.Athletes.Restore
+    Delete = env.Stores.Athletes.Delete
+    Dialogs = env.Dialogs
+    Toasts = env.Toasts
     Culture = env.Culture
     CultureChanged = env.CultureChanged
   }
@@ -155,7 +162,8 @@ let newAthletePage
 
 let detailPage
   (
-    env: #IProvideStore & #IProvideStores & #IProvideCulture,
+    env:
+      #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideDialogs & #IProvideToasts,
     route: DetailRoute,
     lead: unit -> Control
   ) : Async<Control> = asyncEx {
@@ -170,6 +178,11 @@ let detailPage
   | Ok(ValueSome athlete) ->
     let pageEnv: Athletes.AthleteDetailEnv = {
       Plans = env.Stores.Plans
+      Archive = env.Stores.Athletes.Archive
+      Restore = env.Stores.Athletes.Restore
+      Delete = env.Stores.Athletes.Delete
+      Dialogs = env.Dialogs
+      Toasts = env.Toasts
       Culture = env.Culture
       CultureChanged = env.CultureChanged
     }
@@ -188,6 +201,7 @@ let detailPage
             go(route.Nav, $"/athletes/{athleteId}/generate")
           | Athletes.Event.ReviewRequested planId ->
             go(route.Nav, $"/athletes/{athleteId}/review/{planId}")
+          | Athletes.Event.BackRequested -> go(route.Nav, "/")
       )
 }
 
@@ -397,6 +411,7 @@ let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
             Body = body
             Accept = get(culture, Keys.guardLeave)
             Cancel = get(culture, Keys.commonCancel)
+            Danger = true
           }
 
         if not sure then

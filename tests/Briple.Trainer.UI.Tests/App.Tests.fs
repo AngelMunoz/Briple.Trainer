@@ -7,6 +7,7 @@ open System
 open System.Globalization
 open System.IO
 open System.Reactive.Subjects
+open System.Threading.Tasks
 
 open Avalonia
 open Avalonia.Controls
@@ -24,26 +25,116 @@ open Briple.Trainer.Components.NewAthleteForm
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Dialogs
+open Briple.Trainer.Env
 open Briple.Trainer.Navigation
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
+open Briple.Trainer.Stores
 open Briple.Trainer.UI.Tests.Harness
 
 let private es = Language.toCulture Es
 
-let private athleteListEnv
+let private acceptingDialogs = {
+  new IDialogs with
+    member _.ConfirmAsync(_) = async { return true }
+}
+
+let private quietToasts = {
+  new IToasts with
+    member _.Show(_, _, _) = ()
+}
+
+let private rejectingDialogs = {
+  new IDialogs with
+    member _.ConfirmAsync(_) = async { return false }
+}
+
+let private recordingToasts() =
+  let seen = ResizeArray<string * string * bool>()
+
+  {
+    new IToasts with
+      member _.Show(title, body, isError) = seen.Add(title, body, isError)
+  },
+  seen
+
+let private okAction: Task<Result<unit, exn>> = Task.FromResult(Ok())
+
+let private athleteListEnvWith
   (athletes: BehaviorSubject<AthleteEntity list>)
+  (archived: BehaviorSubject<AthleteEntity list>)
   (culture: Briple.Trainer.Components.Page.PageCulture)
   : AthleteListEnv = {
   Observe = fun () -> athletes :> IObservable<_>
+  ObserveArchived = fun () -> archived :> IObservable<_>
   Snapshot = fun () -> athletes.Value
+  SnapshotArchived = fun () -> archived.Value
+  Archive = fun _ -> okAction
+  Restore = fun _ -> okAction
+  Delete = fun _ -> okAction
+  Dialogs = acceptingDialogs
+  Toasts = quietToasts
   Culture = culture.Current()
   CultureChanged = culture.Changed
 }
 
+let private athleteListEnv
+  (athletes: BehaviorSubject<AthleteEntity list>)
+  (culture: Briple.Trainer.Components.Page.PageCulture)
+  : AthleteListEnv =
+  athleteListEnvWith
+    athletes
+    (new BehaviorSubject<AthleteEntity list>([]))
+    culture
+
+let private moreButton(root: Control) : Button option =
+  buttonWithTooltip(root, get(es, Keys.commonMore))
+
+let private menuAction(root: Control, labelKey: string) : MenuItem option =
+  moreButton root
+  |> Option.bind(fun button -> menuItemWithText(button, get(es, labelKey)))
+
 // migrations under test log through the app's pipeline (silent under the
 // default Serilog)
 let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
+
+let private planStore() =
+  let db =
+    Path.Combine(Path.GetTempPath(), $"briple-detail-{Guid.NewGuid():N}.db")
+
+  match Briple.Trainer.Persistence.migrate(testLogger, db) with
+  | Ok() ->
+    (Briple.Trainer.Stores.createStores(
+      Briple.Trainer.Persistence.sqliteStore db,
+      ignore
+    ))
+      .Plans
+  | Error e -> failtest $"detail store migration failed: {e}"
+
+let private detailEnv
+  (plans: PlanStore)
+  (culture: Briple.Trainer.Components.Page.PageCulture)
+  : Briple.Trainer.Views.Athletes.AthleteDetailEnv = {
+  Plans = plans
+  Archive = fun _ -> okAction
+  Restore = fun _ -> okAction
+  Delete = fun _ -> okAction
+  Dialogs = acceptingDialogs
+  Toasts = quietToasts
+  Culture = culture.Current()
+  CultureChanged = culture.Changed
+}
+
+[<Struct>]
+type private RowMeasure = {
+  Left: float
+  OpenRight: float
+  ActionRight: float
+  ActionTop: float
+  ActionHeight: float
+  RowTop: float
+  RowHeight: float
+}
 
 // the route table only needs a back-control factory; the tests render a
 // plain placeholder in place of the shell's button
@@ -105,6 +196,7 @@ let private askDialog() = task {
             Body = "Se pierde el plan"
             Accept = "Descartar"
             Cancel = "Cancelar"
+            Danger = false
           }
         ),
         (fun value -> replied.Value <- Some value),
@@ -137,6 +229,23 @@ let tests =
         let en = Language.toCulture En
 
         Expect.equal (get(en, Keys.athletesTitle)) "Athletes" "en satellite"
+      }
+
+      test "the athlete action strings exist in both languages" {
+        let en = Language.toCulture En
+
+        Expect.equal (get(es, Keys.athleteArchive)) "Archivar" "es archive"
+        Expect.equal (get(en, Keys.athleteArchive)) "Archive" "en archive"
+
+        Expect.equal
+          (get(es, Keys.athletesShowArchived))
+          "Mostrar archivados"
+          "es filter"
+
+        Expect.equal
+          (get(en, Keys.athletesShowArchived))
+          "Show archived"
+          "en filter"
       }
 
       test "an unknown culture falls back to the neutral" {
@@ -216,6 +325,25 @@ let tests =
 
         do!
           runUi(fun () -> Briple.Trainer.Theme.applyVariant ThemeVariant.Light)
+      }
+
+      uiTest "the danger button uses the error fill"
+      <| fun () -> task {
+        let! button =
+          probeUi(fun () ->
+            let button = Button(Content = "Eliminar")
+            button.Classes.Add("danger")
+            button)
+
+        do! mount button
+
+        let! color =
+          probeUi(fun () ->
+            match button.Background with
+            | :? SolidColorBrush as brush -> brush.Color
+            | _ -> failwith "the danger button has no solid background")
+
+        Expect.equal color (Color.Parse "#C0392B") "the danger fill"
       }
     ]
 
@@ -309,7 +437,492 @@ let tests =
           "the open event carries the id"
       }
 
-      uiTest "rows of different lengths share one chevron edge"
+      uiTest "archived rows stay hidden until the toggle shows them"
+      <| fun () -> task {
+        let active = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueNone
+        }
+
+        let archived = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Beto"
+            Gender = Male
+            Goals = [ Hypertrophy ]
+          }
+          ArchivedAt = ValueSome DateTime.UtcNow
+        }
+
+        let current = new BehaviorSubject<AthleteEntity list>([ active ])
+        let older = new BehaviorSubject<AthleteEntity list>([ archived ])
+        let _, culture = liveCulture es
+
+        let! control =
+          probeUi(fun () ->
+            AthleteList(
+              athleteListEnvWith current older culture,
+              {
+                Lead = ValueNone
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount control
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun root -> buttonWithText(root, "Ana") |> Option.isSome)
+          )
+
+        Expect.isTrue rendered "the active row did not render"
+
+        let! hidden =
+          probeUi(fun () ->
+            match buttonWithText(control, "Beto") with
+            | Some row -> not row.IsEffectivelyVisible
+            | None -> true)
+
+        Expect.isTrue hidden "the archived row is hidden by default"
+
+        let! toggle =
+          probeUi(fun () ->
+            buttonWithText(control, get(es, Keys.athletesShowArchived)))
+
+        let toggle =
+          toggle
+          |> Option.defaultWith(fun () ->
+            failtest "the show-archived toggle did not render")
+
+        do! runUi(fun () -> click toggle)
+
+        let! shown =
+          waitFor(
+            2000,
+            (fun () -> buttonWithText(control, "Beto")),
+            fun row ->
+              row |> Option.exists(fun button -> button.IsEffectivelyVisible)
+          )
+
+        Expect.isTrue shown "the toggle did not show the archived row"
+
+        let! badge =
+          waitFor(
+            2000,
+            (fun () -> control),
+            fun root -> hasText(root, get(es, Keys.athleteArchived))
+          )
+
+        Expect.isTrue badge "the archived row has no badge"
+      }
+
+      uiTest "archiving and restoring move the row between the lists"
+      <| fun () -> task {
+        let db =
+          Path.Combine(Path.GetTempPath(), $"briple-list-{Guid.NewGuid():N}.db")
+
+        match Briple.Trainer.Persistence.migrate(testLogger, db) with
+        | Error e -> failtest $"migrate failed: {e}"
+        | Ok() -> ()
+
+        let stores = Briple.Trainer.Stores.createStores(sqliteStore db, ignore)
+
+        let! athleteResult =
+          stores.Athletes.Add {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+
+        let athlete =
+          athleteResult
+          |> Result.defaultWith(fun e -> failtest $"athlete add failed: {e}")
+
+        let _, culture = liveCulture es
+
+        let env: AthleteListEnv = {
+          Observe = stores.Athletes.Observe
+          ObserveArchived = stores.Athletes.ObserveArchived
+          Snapshot = stores.Athletes.Snapshot
+          SnapshotArchived = stores.Athletes.SnapshotArchived
+          Archive = stores.Athletes.Archive
+          Restore = stores.Athletes.Restore
+          Delete = stores.Athletes.Delete
+          Dialogs = acceptingDialogs
+          Toasts = quietToasts
+          Culture = culture.Current()
+          CultureChanged = culture.Changed
+        }
+
+        let! control =
+          probeUi(fun () ->
+            AthleteList(
+              env,
+              {
+                Lead = ValueNone
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount control
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun root ->
+              buttonWithText(root, "Ana")
+              |> Option.exists(fun button -> button.IsEffectivelyVisible))
+          )
+
+        Expect.isTrue rendered "the active row did not render"
+
+        let! archive =
+          probeUi(fun () -> menuAction(control, Keys.athleteArchive))
+
+        let archive =
+          archive
+          |> Option.defaultWith(fun () ->
+            failtest "the archive menu item did not render")
+
+        do! runUi(fun () -> clickMenuItem archive)
+
+        let! moved =
+          waitFor(
+            2000,
+            (fun () -> stores.Athletes.SnapshotArchived()),
+            fun athletes ->
+              athletes |> List.exists(fun entity -> entity.Id = athlete.Id)
+          )
+
+        Expect.isTrue moved "the athlete did not move to the archived list"
+
+        let! toggle =
+          probeUi(fun () ->
+            buttonWithText(control, get(es, Keys.athletesShowArchived)))
+
+        let toggle =
+          toggle
+          |> Option.defaultWith(fun () ->
+            failtest "the show-archived toggle did not render")
+
+        do! runUi(fun () -> click toggle)
+
+        let! archivedRow =
+          waitFor(
+            2000,
+            (fun () -> buttonWithText(control, "Ana")),
+            fun row ->
+              row |> Option.exists(fun button -> button.IsEffectivelyVisible)
+              && (menuAction(control, Keys.athleteRestore) |> Option.isSome)
+          )
+
+        Expect.isTrue archivedRow "the archived row did not appear"
+
+        let! restore =
+          probeUi(fun () -> menuAction(control, Keys.athleteRestore))
+
+        let restore =
+          restore
+          |> Option.defaultWith(fun () ->
+            failtest "the restore menu item did not render")
+
+        do! runUi(fun () -> clickMenuItem restore)
+
+        let! restored =
+          waitFor(
+            2000,
+            (fun () -> stores.Athletes.Snapshot()),
+            fun athletes ->
+              athletes |> List.exists(fun entity -> entity.Id = athlete.Id)
+          )
+
+        Expect.isTrue restored "the athlete did not return to the active list"
+      }
+
+      uiTest "an action click does not open the row"
+      <| fun () -> task {
+        let entity = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueNone
+        }
+
+        let current = new BehaviorSubject<AthleteEntity list>([ entity ])
+        let archived = new BehaviorSubject<AthleteEntity list>([])
+        let calls = ResizeArray<Guid>()
+        let opened = ref None
+        let _, culture = liveCulture es
+
+        let env = {
+          athleteListEnvWith current archived culture with
+              Archive =
+                fun id ->
+                  calls.Add id
+                  okAction
+        }
+
+        let! control =
+          probeUi(fun () ->
+            AthleteList(
+              env,
+              {
+                Lead = ValueNone
+                Lifetime = testLifetime()
+              },
+              fun event ->
+                match event with
+                | OpenRequested id -> opened.Value <- Some id
+                | NewRequested -> ()
+            ))
+
+        do! mount control
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun root -> buttonWithText(root, "Ana") |> Option.isSome)
+          )
+
+        Expect.isTrue rendered "the athlete row did not render"
+
+        let! action =
+          probeUi(fun () -> menuAction(control, Keys.athleteArchive))
+
+        let action =
+          action
+          |> Option.defaultWith(fun () ->
+            failtest "the archive menu item did not render")
+
+        do! runUi(fun () -> clickMenuItem action)
+
+        let! archivedCall =
+          waitFor(2000, (fun () -> calls.Count), fun count -> count > 0)
+
+        Expect.isTrue archivedCall "the archive action did not reach the store"
+        Expect.equal calls[0] entity.Id "the archive action carries the id"
+        Expect.isTrue opened.Value.IsNone "the action opened the row"
+      }
+
+      uiTest "delete asks before it removes the athlete"
+      <| fun () -> task {
+        let entity = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueNone
+        }
+
+        let current = new BehaviorSubject<AthleteEntity list>([ entity ])
+        let archived = new BehaviorSubject<AthleteEntity list>([])
+        let deleted = ResizeArray<Guid>()
+        let _, culture = liveCulture es
+
+        let env = {
+          athleteListEnvWith current archived culture with
+              Delete =
+                fun id ->
+                  deleted.Add id
+                  okAction
+        }
+
+        let! control =
+          probeUi(fun () ->
+            AthleteList(
+              env,
+              {
+                Lead = ValueNone
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount control
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun root -> buttonWithText(root, "Ana") |> Option.isSome)
+          )
+
+        Expect.isTrue rendered "the athlete row did not render"
+
+        let! action = probeUi(fun () -> menuAction(control, Keys.athleteDelete))
+
+        let action =
+          action
+          |> Option.defaultWith(fun () ->
+            failtest "the delete menu item did not render")
+
+        do! runUi(fun () -> clickMenuItem action)
+
+        let! deletedCall =
+          waitFor(2000, (fun () -> deleted.Count), fun count -> count > 0)
+
+        Expect.isTrue deletedCall "the confirmed delete did not reach the store"
+        Expect.equal deleted[0] entity.Id "the delete action carries the id"
+      }
+
+      uiTest "cancelling delete keeps the athlete"
+      <| fun () -> task {
+        let entity = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueNone
+        }
+
+        let current = new BehaviorSubject<AthleteEntity list>([ entity ])
+        let archived = new BehaviorSubject<AthleteEntity list>([])
+        let deleted = ResizeArray<Guid>()
+        let _, culture = liveCulture es
+
+        let env = {
+          athleteListEnvWith current archived culture with
+              Dialogs = rejectingDialogs
+              Delete =
+                fun id ->
+                  deleted.Add id
+                  okAction
+        }
+
+        let! control =
+          probeUi(fun () ->
+            AthleteList(
+              env,
+              {
+                Lead = ValueNone
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount control
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun root -> buttonWithText(root, "Ana") |> Option.isSome)
+          )
+
+        Expect.isTrue rendered "the athlete row did not render"
+
+        let! action = probeUi(fun () -> menuAction(control, Keys.athleteDelete))
+
+        let action =
+          action
+          |> Option.defaultWith(fun () ->
+            failtest "the delete menu item did not render")
+
+        do! runUi(fun () -> clickMenuItem action)
+        do! Task.Delay 100
+
+        Expect.isEmpty deleted "cancel must not delete the athlete"
+
+        let! stillThere =
+          probeUi(fun () -> buttonWithText(control, "Ana") |> Option.isSome)
+
+        Expect.isTrue stillThere "cancel removed the athlete row"
+      }
+
+      uiTest "a failed action shows an error toast and keeps the row"
+      <| fun () -> task {
+        let entity = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueNone
+        }
+
+        let current = new BehaviorSubject<AthleteEntity list>([ entity ])
+        let archived = new BehaviorSubject<AthleteEntity list>([])
+        let toasts, seen = recordingToasts()
+        let _, culture = liveCulture es
+
+        let env = {
+          athleteListEnvWith current archived culture with
+              Archive = fun _ -> Task.FromResult(Error(System.Exception "boom"))
+              Toasts = toasts
+        }
+
+        let! control =
+          probeUi(fun () ->
+            AthleteList(
+              env,
+              {
+                Lead = ValueNone
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount control
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> control),
+            (fun root -> buttonWithText(root, "Ana") |> Option.isSome)
+          )
+
+        Expect.isTrue rendered "the athlete row did not render"
+
+        let! action =
+          probeUi(fun () -> menuAction(control, Keys.athleteArchive))
+
+        let action =
+          action
+          |> Option.defaultWith(fun () ->
+            failtest "the archive menu item did not render")
+
+        do! runUi(fun () -> clickMenuItem action)
+
+        let! toast =
+          waitFor(2000, (fun () -> seen.Count), fun count -> count > 0)
+
+        Expect.isTrue toast "the failed action did not show a toast"
+
+        let title, _, isError = seen[0]
+
+        Expect.equal
+          title
+          (get(es, Keys.athleteArchive))
+          "the toast names the action"
+
+        Expect.isTrue isError "the toast is an error"
+
+        let! stillThere =
+          probeUi(fun () -> buttonWithText(control, "Ana") |> Option.isSome)
+
+        Expect.isTrue stillThere "the failed action removed the row"
+      }
+
+      uiTest "rows of different lengths share one action edge"
       <| fun () -> task {
         let entity name goals = {
           Id = Guid.NewGuid()
@@ -362,80 +975,76 @@ let tests =
 
         let measure name =
           probeUi(fun () ->
-            let row =
+            let openRow =
               buttonWithText(control, name)
               |> Option.defaultWith(fun () ->
                 failtest $"the {name} row vanished")
 
-            let icon =
-              row.GetVisualDescendants()
-              |> Seq.choose(fun visual ->
-                match visual with
-                | :? PathIcon as icon -> Some icon
-                | _ -> None)
-              |> Seq.tryHead
-              |> Option.defaultWith(fun () -> failtest "the chevron vanished")
+            let row =
+              match openRow.Parent with
+              | :? Control as parent -> parent
+              | _ -> failtest $"the {name} row grid vanished"
 
-            let left = row.TranslatePoint(Point(0.0, 0.0), window)
-            let iconLeft = icon.TranslatePoint(Point(0.0, 0.0), window)
+            let more =
+              buttonWithTooltip(row, get(es, Keys.commonMore))
+              |> Option.defaultWith(fun () ->
+                failtest $"the {name} overflow button vanished")
 
-            left.Value.X,
-            left.Value.X + row.Bounds.Width,
-            iconLeft.Value.X,
-            left.Value.Y,
-            row.Bounds.Height,
-            iconLeft.Value.Y,
-            icon.Bounds.Height)
+            let left = openRow.TranslatePoint(Point(0.0, 0.0), window)
+            let actionRight = more.TranslatePoint(Point(0.0, 0.0), window)
 
-        let! (anaLeft,
-              anaRight,
-              anaChevron,
-              anaTop,
-              anaHeight,
-              anaIconTop,
-              anaIconHeight) =
-          measure "Ana"
+            {
+              Left = left.Value.X
+              OpenRight = left.Value.X + openRow.Bounds.Width
+              ActionRight = actionRight.Value.X + more.Bounds.Width
+              ActionTop = actionRight.Value.Y
+              ActionHeight = more.Bounds.Height
+              RowTop = left.Value.Y
+              RowHeight = openRow.Bounds.Height
+            })
 
-        let! (betoLeft,
-              betoRight,
-              betoChevron,
-              betoTop,
-              betoHeight,
-              betoIconTop,
-              betoIconHeight) =
-          measure "Beto"
+        let! ana = measure "Ana"
+        let! beto = measure "Beto"
 
-        Expect.equal anaLeft betoLeft "both rows share the left edge"
+        Expect.equal ana.Left beto.Left "both rows share the left edge"
 
-        Expect.isLessThan anaLeft 100.0 "the rows start at the page margin"
-
-        Expect.equal anaRight betoRight "both rows share the right edge"
+        Expect.isLessThan ana.Left 100.0 "the rows start at the page margin"
 
         Expect.equal
-          anaChevron
-          betoChevron
-          "a longer summary must not push the chevron"
+          ana.OpenRight
+          beto.OpenRight
+          "both open buttons share the right edge"
+
+        Expect.equal
+          ana.ActionRight
+          beto.ActionRight
+          "a longer summary must not push the actions"
 
         Expect.isGreaterThan
-          anaChevron
-          (anaRight - 40.0)
-          "the chevron sits at the row's trailing edge"
+          ana.ActionRight
+          ana.OpenRight
+          "the actions sit after the open button"
 
-        let anaIconCenter = anaIconTop + anaIconHeight / 2.0
-        let anaRowCenter = anaTop + anaHeight / 2.0
+        Expect.isGreaterThan
+          ana.ActionRight
+          900.0
+          "the actions sit at the row's trailing edge"
 
-        Expect.isLessThan
-          (abs(anaIconCenter - anaRowCenter))
-          1.5
-          "the chevron centers on the row's full height"
-
-        let betoIconCenter = betoIconTop + betoIconHeight / 2.0
-        let betoRowCenter = betoTop + betoHeight / 2.0
+        let anaActionCenter = ana.ActionTop + ana.ActionHeight / 2.0
+        let anaRowCenter = ana.RowTop + ana.RowHeight / 2.0
 
         Expect.isLessThan
-          (abs(betoIconCenter - betoRowCenter))
+          (abs(anaActionCenter - anaRowCenter))
           1.5
-          "the longer row centers its chevron too"
+          "the delete action centers on the row's full height"
+
+        let betoActionCenter = beto.ActionTop + beto.ActionHeight / 2.0
+        let betoRowCenter = beto.RowTop + beto.RowHeight / 2.0
+
+        Expect.isLessThan
+          (abs(betoActionCenter - betoRowCenter))
+          1.5
+          "the longer row centers its actions too"
       }
 
       uiTest "the page fills a wide window to its edge"
@@ -479,13 +1088,14 @@ let tests =
 
         let! right =
           probeUi(fun () ->
-            let row =
-              buttonWithText(control, "Ana")
-              |> Option.defaultWith(fun () -> failtest "the row vanished")
+            let action =
+              buttonWithTooltip(control, get(es, Keys.commonMore))
+              |> Option.defaultWith(fun () ->
+                failtest "the row overflow button vanished")
 
-            let left = row.TranslatePoint(Point(0.0, 0.0), window)
+            let left = action.TranslatePoint(Point(0.0, 0.0), window)
 
-            left.Value.X + row.Bounds.Width)
+            left.Value.X + action.Bounds.Width)
 
         Expect.isGreaterThan
           right
@@ -617,6 +1227,360 @@ let tests =
         Expect.isFalse beto "the disposed page did not resume on reattach"
       }
     ]
+
+    testList "athlete detail" [
+      uiTest "the detail page shows the actions for the athlete state"
+      <| fun () -> task {
+        let plans = planStore()
+        let _, culture = liveCulture es
+
+        let active = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueNone
+        }
+
+        let archived = {
+          active with
+              Id = Guid.NewGuid()
+              ArchivedAt = ValueSome DateTime.UtcNow
+        }
+
+        let! activePage =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Athletes.AthleteDetailPage(
+              detailEnv plans culture,
+              {
+                Lead = ValueNone
+                Athlete = active
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount activePage
+
+        let! activeRendered =
+          waitFor(
+            2000,
+            (fun () -> activePage),
+            fun page ->
+              buttonWithText(page, get(es, Keys.plansGenerate)) |> Option.isSome
+          )
+
+        Expect.isTrue activeRendered "the active detail page did not render"
+
+        Expect.isSome
+          (buttonWithText(activePage, get(es, Keys.athleteArchive)))
+          "the active page has no archive action"
+
+        Expect.isNone
+          (buttonWithText(activePage, get(es, Keys.athleteRestore)))
+          "the active page shows restore"
+
+        let! archivedPage =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Athletes.AthleteDetailPage(
+              detailEnv plans culture,
+              {
+                Lead = ValueNone
+                Athlete = archived
+                Lifetime = testLifetime()
+              },
+              ignore
+            ))
+
+        do! mount archivedPage
+
+        let! archivedRendered =
+          waitFor(
+            2000,
+            (fun () -> archivedPage),
+            fun page -> hasText(page, get(es, Keys.athleteArchived))
+          )
+
+        Expect.isTrue archivedRendered "the archived badge did not render"
+
+        Expect.isNone
+          (buttonWithText(archivedPage, get(es, Keys.plansGenerate)))
+          "the archived page shows generate"
+
+        Expect.isSome
+          (buttonWithText(archivedPage, get(es, Keys.athleteRestore)))
+          "the archived page has no restore action"
+
+        Expect.isSome
+          (buttonWithText(archivedPage, get(es, Keys.athleteDelete)))
+          "the archived page has no delete action"
+      }
+
+      uiTest "the detail delete asks and then navigates back"
+      <| fun () -> task {
+        let plans = planStore()
+        let _, culture = liveCulture es
+        let deleted = ResizeArray<Guid>()
+        let events = ResizeArray<Briple.Trainer.Views.Athletes.Event>()
+
+        let athlete = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueNone
+        }
+
+        let env = {
+          detailEnv plans culture with
+              Delete =
+                fun id ->
+                  deleted.Add id
+                  okAction
+        }
+
+        let! page =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Athletes.AthleteDetailPage(
+              env,
+              {
+                Lead = ValueNone
+                Athlete = athlete
+                Lifetime = testLifetime()
+              },
+              events.Add
+            ))
+
+        do! mount page
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> page),
+            (fun current ->
+              buttonWithText(current, get(es, Keys.athleteDelete))
+              |> Option.isSome)
+          )
+
+        Expect.isTrue rendered "the delete action did not render"
+
+        let! action =
+          probeUi(fun () -> buttonWithText(page, get(es, Keys.athleteDelete)))
+
+        let action =
+          action
+          |> Option.defaultWith(fun () -> failtest "the delete action vanished")
+
+        do! runUi(fun () -> click action)
+
+        let! deletedCall =
+          waitFor(2000, (fun () -> deleted.Count), fun count -> count > 0)
+
+        Expect.isTrue deletedCall "the confirmed delete did not reach the store"
+
+        let! navigated =
+          waitFor(
+            2000,
+            (fun () -> events),
+            fun seen ->
+              seen
+              |> Seq.exists(fun event ->
+                event = Briple.Trainer.Views.Athletes.Event.BackRequested)
+          )
+
+        Expect.isTrue navigated "the delete did not request navigation"
+      }
+
+      uiTest "a failed detail action shows an error toast and stays"
+      <| fun () -> task {
+        let plans = planStore()
+        let _, culture = liveCulture es
+        let toasts, seen = recordingToasts()
+        let events = ResizeArray<Briple.Trainer.Views.Athletes.Event>()
+
+        let athlete = {
+          Id = Guid.NewGuid()
+          Profile = {
+            Name = "Ana"
+            Gender = Female
+            Goals = [ Strength ]
+          }
+          ArchivedAt = ValueSome DateTime.UtcNow
+        }
+
+        let env = {
+          detailEnv plans culture with
+              Restore = fun _ -> Task.FromResult(Error(System.Exception "boom"))
+              Toasts = toasts
+        }
+
+        let! page =
+          probeUi(fun () ->
+            Briple.Trainer.Views.Athletes.AthleteDetailPage(
+              env,
+              {
+                Lead = ValueNone
+                Athlete = athlete
+                Lifetime = testLifetime()
+              },
+              events.Add
+            ))
+
+        do! mount page
+
+        let! rendered =
+          waitFor(
+            2000,
+            (fun () -> page),
+            (fun current ->
+              buttonWithText(current, get(es, Keys.athleteRestore))
+              |> Option.isSome)
+          )
+
+        Expect.isTrue rendered "the restore action did not render"
+
+        let! action =
+          probeUi(fun () -> buttonWithText(page, get(es, Keys.athleteRestore)))
+
+        let action =
+          action
+          |> Option.defaultWith(fun () ->
+            failtest "the restore action vanished")
+
+        do! runUi(fun () -> click action)
+
+        let! toast =
+          waitFor(2000, (fun () -> seen.Count), fun count -> count > 0)
+
+        Expect.isTrue toast "the failed action did not show a toast"
+
+        let title, _, isError = seen[0]
+
+        Expect.equal
+          title
+          (get(es, Keys.athleteRestore))
+          "the toast names the action"
+
+        Expect.isTrue isError "the toast is an error"
+        Expect.isEmpty events "a failed action requested navigation"
+      }
+    ]
+
+    uiTest "an archived athlete route restores and returns to the list"
+    <| fun () -> task {
+      let db =
+        Path.Combine(
+          Path.GetTempPath(),
+          $"briple-archived-{Guid.NewGuid():N}.db"
+        )
+
+      match Briple.Trainer.Persistence.migrate(testLogger, db) with
+      | Error e -> failtest $"migrate failed: {e}"
+      | Ok() -> ()
+
+      let! env =
+        probeUi(fun () ->
+          Briple.Trainer.Env.AppEnv(
+            Briple.Trainer.Stores.createStores(sqliteStore db, ignore),
+            Briple.Trainer.Secrets.create(),
+            ValueSome {
+              Briple.Trainer.Env.defaultSettings with
+                  Key = "token"
+            }
+          ))
+
+      let! athleteResult =
+        env.Stores.Athletes.Add {
+          Name = "Ana"
+          Gender = Female
+          Goals = [ Strength ]
+        }
+
+      let athlete =
+        athleteResult
+        |> Result.defaultWith(fun e -> failtest $"athlete add failed: {e}")
+
+      let! archived = env.Stores.Athletes.Archive athlete.Id
+
+      match archived with
+      | Ok() -> ()
+      | Error e -> failtest $"athlete archive failed: {e}"
+
+      let! shell =
+        probeUi(fun () -> Briple.Trainer.Views.Routes.build(env, stubLeadOf))
+
+      let router = shell.Router
+
+      let path() =
+        router.Snapshot.Route |> ValueOption.map _.Path |> ValueOption.toOption
+
+      let! window =
+        probeUi(fun () ->
+          let outlet = RouterOutlet()
+          outlet.Router <- Some router
+
+          let window = Window(Content = outlet)
+          window.Show() |> ignore
+          window)
+
+      trackWindowForTest window
+
+      do!
+        runUi(fun () ->
+          Briple.Trainer.Views.Routes.go(router, $"/athletes/{athlete.Id}"))
+
+      let! atDetail =
+        waitFor(
+          5000,
+          path,
+          fun current -> current = Some $"/athletes/{athlete.Id}"
+        )
+
+      Expect.isTrue atDetail "the archived detail route did not open"
+
+      let! rendered =
+        waitFor(
+          5000,
+          (fun () -> window),
+          fun current -> hasText(current, get(es, Keys.athleteArchived))
+        )
+
+      Expect.isTrue rendered "the archived detail page did not render"
+
+      Expect.isNone
+        (buttonWithText(window, get(es, Keys.plansGenerate)))
+        "the archived route shows generate"
+
+      let! restore =
+        probeUi(fun () -> buttonWithText(window, get(es, Keys.athleteRestore)))
+
+      let restore =
+        restore
+        |> Option.defaultWith(fun () ->
+          failtest "the restore action did not render")
+
+      do! runUi(fun () -> click restore)
+
+      let! returned = waitFor(5000, path, fun current -> current = Some "/")
+
+      Expect.isTrue returned "restore did not return to the athletes list"
+
+      let! active =
+        waitFor(
+          5000,
+          (fun () -> env.Stores.Athletes.Snapshot()),
+          fun athletes ->
+            athletes |> List.exists(fun entity -> entity.Id = athlete.Id)
+        )
+
+      Expect.isTrue
+        active
+        "the restored athlete did not return to the active list"
+    }
 
     testList "new athlete form" [
       uiTest "a name is enough to save and the default gender rides"
@@ -1087,6 +2051,7 @@ let tests =
                   Body = "Se pierde el plan"
                   Accept = "Descartar"
                   Cancel = "Cancelar"
+                  Danger = false
                 }
               ),
               (fun value -> replied.Value <- Some value),
@@ -1122,6 +2087,66 @@ let tests =
         Expect.isTrue cancelled "cancelled"
 
         // release the singleton host so the shell can mount it next
+        do!
+          runUi(fun () ->
+            window.Content <- null
+            window.Close())
+      }
+
+      uiTest "a danger confirmation marks its accept button"
+      <| fun () -> task {
+        let! overlay = probeUi(fun () -> Briple.Trainer.Dialogs.host())
+        let! window = mountWindow overlay
+        let replied = ref None
+
+        do!
+          runUi(fun () ->
+            Async.StartWithContinuations(
+              Briple.Trainer.Dialogs.confirmAsync(
+                {
+                  Title = "¿Eliminar atleta?"
+                  Body = "Se pierden sus planes y memorias"
+                  Accept = "Eliminar"
+                  Cancel = "Cancelar"
+                  Danger = true
+                }
+              ),
+              (fun value -> replied.Value <- Some value),
+              ignore,
+              ignore
+            ))
+
+        let! shown =
+          waitFor(
+            2000,
+            (fun () -> overlay),
+            (fun current -> hasText(current, "¿Eliminar atleta?"))
+          )
+
+        Expect.isTrue shown "the danger dialog did not render"
+
+        let! accept = probeUi(fun () -> buttonWithText(overlay, "Eliminar"))
+
+        let accept =
+          accept
+          |> Option.defaultWith(fun () ->
+            failtest "the danger accept button did not render")
+
+        Expect.isTrue
+          (accept.Classes.Contains "danger")
+          "the accept button does not carry the danger class"
+
+        do! runUi(fun () -> click accept)
+
+        let! accepted =
+          waitFor(
+            2000,
+            (fun () -> replied.Value),
+            fun value -> value = Some true
+          )
+
+        Expect.isTrue accepted "the danger dialog did not accept"
+
         do!
           runUi(fun () ->
             window.Content <- null

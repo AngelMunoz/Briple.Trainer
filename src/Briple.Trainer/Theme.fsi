@@ -4,9 +4,10 @@ module Briple.Trainer.Theme
 // FluentTheme as shipped. Classes: the type ramp (`title`, `subtitle`,
 // `body-strong`, `body`, `caption`, `caption-strong`),
 // the tone classes (`secondary`, `danger`, `accent-text`), `accent`
-// (primary action), `chrome` (flat in-bar buttons), `back` (the shell's
-// 40x40 header lead), `row` (tappable content rows), `nav-item` (pane
-// rows), `card` (content surface). Views assign classes; a reactive
+// (primary action), `danger` (destructive action), `chrome` (flat in-bar
+// buttons), `back` (the shell's 40x40 header lead), `row` (tappable
+// content rows), `nav-item` (pane rows), `card` (content surface),
+// `badge` (compact status label). Views assign classes; a reactive
 // foreground or weight stays a binding. Precedence: these setters
 // outrank the ControlTheme, so every property the theme animates by
 // pseudo-class carries all its states here.

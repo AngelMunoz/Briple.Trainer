@@ -8,6 +8,7 @@ module Briple.Trainer.Components.Fields
 
 open System
 open Avalonia.Controls
+open Avalonia.Controls.Primitives
 open Avalonia.Media
 
 /// Flow actions of a page footer: secondaries keep to the left,
@@ -164,6 +165,45 @@ val inline contentRowObs:
   detail: IObservable<string> *
   [<InlineIfLambda>] trailing: (unit -> Control) ->
     Control
+
+/// One action in a row overflow menu.
+[<Struct>]
+type RowAction = {
+  Glyph: StreamGeometry
+  Label: IObservable<string>
+  /// Marks a destructive item and puts a separator before it.
+  Danger: bool
+  OnClick: unit -> unit
+}
+
+/// One row with a main open button and a trailing overflow menu.
+[<Struct>]
+type ActionRow = {
+  Title: Control
+  Detail: IObservable<string>
+  /// The tooltip of the overflow button.
+  MoreLabel: IObservable<string>
+  OnOpen: unit -> unit
+  Actions: RowAction list
+}
+
+/// A two-line content row with a main open button and an overflow menu.
+val inline actionRow: row: ActionRow -> Control
+
+/// A small neutral label, used for the archived badge.
+val inline badgeObs: text: IObservable<string> -> Control
+
+/// One toggle command for a page command row.
+[<Struct>]
+type ToggleCommand = {
+  Key: string
+  Glyph: StreamGeometry
+  IsOn: IObservable<bool>
+  OnToggle: unit -> unit
+}
+
+/// A labeled Fluent toggle command, with the checked state on the model.
+val inline toggleCommand: command: ToggleCommand -> ToggleButton
 
 /// Makes every item container fill the items control's width, so rows of
 /// different lengths share one left edge and one trailing edge.

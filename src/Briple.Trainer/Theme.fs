@@ -412,6 +412,34 @@ let appStyles: Styles =
     )
   )
 
+  // destructive actions: the error fill, with every pointer state kept
+  styles.Add(
+    styleOf(
+      (fun selector -> selector.OfType<Button>().Class("danger")),
+      [|
+        Button.BackgroundProperty, errorBrush
+        Button.ForegroundProperty, Brushes.White
+        Button.BorderThicknessProperty, Thickness(0.0)
+      |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector ->
+        selector.OfType<Button>().Class("danger").Class(":pointerover")),
+      [| Button.BackgroundProperty, errorBrush |]
+    )
+  )
+
+  styles.Add(
+    styleOf(
+      (fun selector ->
+        selector.OfType<Button>().Class("danger").Class(":pressed")),
+      [| Button.BackgroundProperty, errorBrush |]
+    )
+  )
+
   // pane navigation rows: taller than content rows, same flat language
   styles.Add(
     styleOf(
@@ -449,6 +477,19 @@ let appStyles: Styles =
         Border.BackgroundProperty, cardFill
         Border.CornerRadiusProperty, CornerRadius(4.0)
         Border.PaddingProperty, Thickness(16.0)
+      |]
+    )
+  )
+
+  // compact status label, such as the archived badge
+  styles.Add(
+    styleOf(
+      (fun selector -> selector.OfType<Border>().Class("badge")),
+      [|
+        Border.BackgroundProperty, hoverFill
+        Border.CornerRadiusProperty, CornerRadius(4.0)
+        Border.PaddingProperty, Thickness(6.0, 2.0, 6.0, 2.0)
+        Border.VerticalAlignmentProperty, VerticalAlignment.Center
       |]
     )
   )

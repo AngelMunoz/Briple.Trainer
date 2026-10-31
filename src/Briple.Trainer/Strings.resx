@@ -36,6 +36,9 @@
   <data name="common.cancel" xml:space="preserve">
     <value>Cancelar</value>
   </data>
+  <data name="common.more" xml:space="preserve">
+    <value>Más acciones</value>
+  </data>
   <data name="error.friendly" xml:space="preserve">
     <value>{0} falló: {1}</value>
   </data>
@@ -47,6 +50,27 @@
   </data>
   <data name="athletes.new" xml:space="preserve">
     <value>Nuevo atleta</value>
+  </data>
+  <data name="athletes.showArchived" xml:space="preserve">
+    <value>Mostrar archivados</value>
+  </data>
+  <data name="athlete.archived" xml:space="preserve">
+    <value>Archivado</value>
+  </data>
+  <data name="athlete.archive" xml:space="preserve">
+    <value>Archivar</value>
+  </data>
+  <data name="athlete.restore" xml:space="preserve">
+    <value>Restaurar</value>
+  </data>
+  <data name="athlete.delete" xml:space="preserve">
+    <value>Eliminar</value>
+  </data>
+  <data name="athlete.deleteTitle" xml:space="preserve">
+    <value>¿Eliminar atleta?</value>
+  </data>
+  <data name="athlete.deleteBody" xml:space="preserve">
+    <value>Se eliminan el atleta, sus planes y sus memorias. Esta acción no se puede deshacer.</value>
   </data>
   <data name="athlete.name" xml:space="preserve">
     <value>Nombre</value>

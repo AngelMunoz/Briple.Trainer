@@ -23,6 +23,7 @@ open NXUI.Extensions
 
 open Expecto
 
+open Briple.Trainer.Components.Fields
 open Briple.Trainer.Strings
 
 open Briple.Trainer.Core.Agent
@@ -1345,6 +1346,66 @@ let tests =
         scrolledBack
         scrolledDown
         "the page scrolls back once the hub reaches its start"
+    }
+
+    uiTest "an action row keeps its actions out of the open button"
+    <| fun () -> task {
+      let opened = ref false
+      let acted = ref false
+
+      let row =
+        actionRow {
+          Title = TextBlock(Text = "Ana").Classes("body-strong")
+          Detail = System.Reactive.Linq.Observable.Return "Strength"
+          MoreLabel =
+            System.Reactive.Linq.Observable.Return(get(es, Keys.commonMore))
+          OnOpen = fun () -> opened.Value <- true
+          Actions = [
+            {
+              Glyph = Briple.Trainer.Icons.archive
+              Label =
+                System.Reactive.Linq.Observable.Return(
+                  get(es, Keys.athleteArchive)
+                )
+              Danger = false
+              OnClick = fun () -> acted.Value <- true
+            }
+          ]
+        }
+
+      do! mount row
+
+      let! more =
+        probeUi(fun () -> buttonWithTooltip(row, get(es, Keys.commonMore)))
+
+      let more =
+        more
+        |> Option.defaultWith(fun () ->
+          failtest "the overflow button did not render")
+
+      let! action =
+        probeUi(fun () -> menuItemWithText(more, get(es, Keys.athleteArchive)))
+
+      let action =
+        action
+        |> Option.defaultWith(fun () ->
+          failtest "the action menu item did not render")
+
+      do! runUi(fun () -> clickMenuItem action)
+
+      Expect.isTrue acted.Value "the action did not run"
+      Expect.isFalse opened.Value "the action opened the row"
+
+      let! openButton = probeUi(fun () -> buttonWithText(row, "Ana"))
+
+      let openButton =
+        openButton
+        |> Option.defaultWith(fun () ->
+          failtest "the open button did not render")
+
+      do! runUi(fun () -> click openButton)
+
+      Expect.isTrue opened.Value "the open button did not open the row"
     }
   ]
 

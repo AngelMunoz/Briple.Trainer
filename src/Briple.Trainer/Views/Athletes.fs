@@ -2,9 +2,11 @@ module Briple.Trainer.Views.Athletes
 
 open System
 open System.Globalization
+open System.Threading.Tasks
 
 open Avalonia.Controls
 open Avalonia.Controls.Templates
+open Avalonia.Layout
 open Avalonia.Media
 open NXUI.Extensions
 
@@ -18,6 +20,7 @@ open Briple.Trainer.Components.Fields
 open Briple.Trainer.Components.Page
 open Briple.Trainer.Core.Athletes
 open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Env
 open Briple.Trainer.Persistence
 open Briple.Trainer.Strings
 open Briple.Trainer.Stores
@@ -26,6 +29,11 @@ open Briple.Trainer.Theme
 [<Struct>]
 type AthleteDetailEnv = {
   Plans: PlanStore
+  Archive: Guid -> Task<Result<unit, exn>>
+  Restore: Guid -> Task<Result<unit, exn>>
+  Delete: Guid -> Task<Result<unit, exn>>
+  Dialogs: IDialogs
+  Toasts: IToasts
   Culture: CultureInfo
   CultureChanged: IObservable<CultureInfo>
 }
@@ -42,6 +50,7 @@ type DetailPageProps = {
 type Event =
   | GenerateRequested
   | ReviewRequested of planId: Guid
+  | BackRequested
 
 type Model = {
   Plans: PlanEntity list
@@ -53,6 +62,11 @@ type Msg =
   | CultureChanged of CultureInfo
   | GenerateRequested
   | ReviewRequested of Guid
+  | ArchiveRequested
+  | RestoreRequested
+  | DeleteRequested
+  | DeleteConfirmed of bool
+  | ActionFinished of actionKey: string * result: Result<unit, exn>
 
 [<Struct>]
 type Context = {
@@ -77,6 +91,47 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
     model, Cmd.ofAction(fun () -> ctx.OnEvent Event.GenerateRequested)
   | ReviewRequested id ->
     model, Cmd.ofAction(fun () -> ctx.OnEvent(Event.ReviewRequested id))
+  | ArchiveRequested ->
+    model,
+    Cmd.OfTask.perform ctx.Env.Archive ctx.Props.Athlete.Id (fun result ->
+      ActionFinished(Keys.athleteArchive, result))
+  | RestoreRequested ->
+    model,
+    Cmd.OfTask.perform ctx.Env.Restore ctx.Props.Athlete.Id (fun result ->
+      ActionFinished(Keys.athleteRestore, result))
+  | DeleteRequested ->
+    let culture = model.Culture
+
+    let request: Briple.Trainer.Dialogs.ConfirmRequest = {
+      Title = get(culture, Keys.athleteDeleteTitle)
+      Body = get(culture, Keys.athleteDeleteBody)
+      Accept = get(culture, Keys.athleteDelete)
+      Cancel = get(culture, Keys.commonCancel)
+      Danger = true
+    }
+
+    model,
+    Cmd.OfAsync.perform ctx.Env.Dialogs.ConfirmAsync request DeleteConfirmed
+  | DeleteConfirmed false -> model, Cmd.none
+  | DeleteConfirmed true ->
+    model,
+    Cmd.OfTask.perform ctx.Env.Delete ctx.Props.Athlete.Id (fun result ->
+      ActionFinished(Keys.athleteDelete, result))
+  | ActionFinished(actionKey, Ok()) ->
+    let title = get(model.Culture, actionKey)
+
+    model,
+    Cmd.batch [
+      Cmd.ofAction(fun () -> ctx.Env.Toasts.Show(title, "", false))
+      Cmd.ofAction(fun () -> ctx.OnEvent Event.BackRequested)
+    ]
+  | ActionFinished(actionKey, Error e) ->
+    let culture = model.Culture
+    let title = get(culture, actionKey)
+
+    model,
+    Cmd.ofAction(fun () ->
+      ctx.Env.Toasts.Show(title, friendly(culture, title, e.Message), true))
 
 let subscribe (ctx: Context) (_: Model) : Sub<Msg> =
   Sub.batch [
@@ -166,17 +221,67 @@ let view
   let culture = model |> Observable.map _.Culture
   let plans = model |> Observable.map _.Plans
   let onReview id = dispatch(ReviewRequested id)
+  let archived = props.Athlete.ArchivedAt.IsSome
+
+  let title: Control =
+    if archived then
+      StackPanel()
+        .Orientation(Orientation.Horizontal)
+        .Spacing(8.0)
+        .VerticalAlignment(VerticalAlignment.Center)
+        .Children(
+          pageTitle props.Athlete.Profile.Name,
+          badgeObs(
+            culture
+            |> Observable.map(fun current -> get(current, Keys.athleteArchived))
+          )
+        )
+      :> Control
+    else
+      pageTitle props.Athlete.Profile.Name
+
+  let generateCommand =
+    iconPrimaryButtonKey(
+      Keys.plansGenerate,
+      Icons.flash,
+      (fun () -> dispatch GenerateRequested)
+    )
+
+  let archiveCommand =
+    iconCommandKey(
+      Keys.athleteArchive,
+      Icons.archive,
+      (fun () -> dispatch ArchiveRequested)
+    )
+
+  let restoreCommand =
+    iconCommandKey(
+      Keys.athleteRestore,
+      Icons.unarchive,
+      (fun () -> dispatch RestoreRequested)
+    )
+
+  let deleteCommand =
+    iconCommandKey(
+      Keys.athleteDelete,
+      Icons.delete,
+      (fun () -> dispatch DeleteRequested)
+    )
+
+  let commands: Control list =
+    if archived then
+      [ restoreCommand :> Control; deleteCommand :> Control ]
+    else
+      [
+        generateCommand :> Control
+        archiveCommand :> Control
+        deleteCommand :> Control
+      ]
 
   fluentPage {
     Lead = props.Lead
-    Title = pageTitle props.Athlete.Profile.Name
-    Commands = [
-      iconPrimaryButtonKey(
-        Keys.plansGenerate,
-        Icons.flash,
-        (fun () -> dispatch GenerateRequested)
-      )
-    ]
+    Title = title
+    Commands = commands
     Footer = noFooter
     Body =
       StackPanel()

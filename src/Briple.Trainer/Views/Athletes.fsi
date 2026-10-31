@@ -7,9 +7,11 @@ module Briple.Trainer.Views.Athletes
 
 open System
 open System.Globalization
+open System.Threading.Tasks
 
 open Avalonia.Controls
 
+open Briple.Trainer.Env
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
 
@@ -17,6 +19,14 @@ open Briple.Trainer.Stores
 [<Struct>]
 type AthleteDetailEnv = {
   Plans: PlanStore
+  /// Writes the archive flag and reloads the store.
+  Archive: Guid -> Task<Result<unit, exn>>
+  /// Clears the archive flag and reloads the store.
+  Restore: Guid -> Task<Result<unit, exn>>
+  /// Deletes the athlete aggregate and reloads the store.
+  Delete: Guid -> Task<Result<unit, exn>>
+  Dialogs: IDialogs
+  Toasts: IToasts
   Culture: CultureInfo
   CultureChanged: IObservable<CultureInfo>
 }
@@ -36,6 +46,8 @@ type DetailPageProps = {
 type Event =
   | GenerateRequested
   | ReviewRequested of planId: Guid
+  /// The page changed the athlete; the host returns to the list.
+  | BackRequested
 
 /// The detail page; live over the plan store.
 type AthleteDetailPage =

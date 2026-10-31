@@ -240,6 +240,50 @@ let buttonWithText(root: Control, text: string) : Button option =
 
     if direct || labelled || nested then Some button else None)
 
+/// Finds the first button whose tooltip text equals the given text.
+let buttonWithTooltip(root: Control, text: string) : Button option =
+  root.GetVisualDescendants()
+  |> Seq.tryPick(fun visual ->
+    match visual with
+    | :? Button as button ->
+      match ToolTip.GetTip(button) with
+      | :? TextBlock as tip when tip.Text = text -> Some button
+      | _ -> None
+    | _ -> None)
+
+/// Finds the first check box whose content contains the text.
+let checkBoxWithText(root: Control, text: string) : CheckBox option =
+  root.GetVisualDescendants()
+  |> Seq.tryPick(fun visual ->
+    match visual with
+    | :? CheckBox as check when hasText(check, text) -> Some check
+    | _ -> None)
+
+/// Finds the overflow menu item with the given header text.
+let menuItemWithText(button: Button, text: string) : MenuItem option =
+  match button.Flyout with
+  | :? MenuFlyout as flyout ->
+    if not flyout.IsOpen then
+      flyout.ShowAt button
+
+    let found =
+      flyout.Items
+      |> Seq.choose(fun item ->
+        match item with
+        | :? MenuItem as menuItem -> Some menuItem
+        | _ -> None)
+      |> Seq.tryFind(fun item -> hasText(item, text))
+
+    if found.IsSome then
+      flyout.Hide()
+
+    found
+  | _ -> None
+
+/// Clicks a menu item through its routed click event.
+let clickMenuItem(item: MenuItem) : unit =
+  item.RaiseEvent(Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent))
+
 /// The first control with the given name under the root.
 let controlByName(root: Control, name: string) : Control option =
   root.GetVisualDescendants()
