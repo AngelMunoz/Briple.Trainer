@@ -52,6 +52,7 @@ type DetailPageProps = {
 [<Struct>]
 type Event =
   | GenerateRequested
+  | ImportRequested
   | ReviewRequested of planId: Guid
   | BackRequested
 
@@ -67,6 +68,7 @@ type Msg =
   | ArchivedPlansChanged of PlanEntity list
   | CultureChanged of CultureInfo
   | GenerateRequested
+  | ImportRequested
   | ReviewRequested of Guid
   | ShowArchivedToggled
   | ArchiveRequested
@@ -110,6 +112,8 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
     Cmd.none
   | GenerateRequested ->
     model, Cmd.ofAction(fun () -> ctx.OnEvent Event.GenerateRequested)
+  | ImportRequested ->
+    model, Cmd.ofAction(fun () -> ctx.OnEvent Event.ImportRequested)
   | ReviewRequested id ->
     model, Cmd.ofAction(fun () -> ctx.OnEvent(Event.ReviewRequested id))
   | ArchiveRequested ->
@@ -524,6 +528,13 @@ let view
       (fun () -> dispatch GenerateRequested)
     )
 
+  let importCommand =
+    iconCommandKey(
+      Keys.plansImport,
+      Icons.upload,
+      (fun () -> dispatch ImportRequested)
+    )
+
   let archiveCommand =
     iconCommandKey(
       Keys.athleteArchive,
@@ -547,13 +558,9 @@ let view
 
   let commands: Control list =
     if archived then
-      [ restoreCommand :> Control; deleteCommand :> Control ]
+      [ restoreCommand; deleteCommand ]
     else
-      [
-        generateCommand :> Control
-        archiveCommand :> Control
-        deleteCommand :> Control
-      ]
+      [ generateCommand; importCommand; archiveCommand; deleteCommand ]
 
   fluentPage {
     Lead = props.Lead

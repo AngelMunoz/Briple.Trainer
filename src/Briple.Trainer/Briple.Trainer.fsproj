@@ -85,6 +85,8 @@
     <Compile Include="Views\Athletes.fs" />
     <Compile Include="Views\Generate.fsi" />
     <Compile Include="Views\Generate.fs" />
+    <Compile Include="Views\Import.fsi" />
+    <Compile Include="Views\Import.fs" />
     <Compile Include="Views\Login.fsi" />
     <Compile Include="Views\Login.fs" />
     <Compile Include="Views\Review.fsi" />

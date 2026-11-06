@@ -200,6 +200,8 @@ let detailPage
           match event with
           | Athletes.Event.GenerateRequested ->
             go(route.Nav, $"/athletes/{athleteId}/generate")
+          | Athletes.Event.ImportRequested ->
+            go(route.Nav, $"/athletes/{athleteId}/import")
           | Athletes.Event.ReviewRequested planId ->
             go(route.Nav, $"/athletes/{athleteId}/review/{planId}")
           | Athletes.Event.BackRequested -> go(route.Nav, "/")
@@ -302,6 +304,42 @@ let reviewPage
           Gate = route.Page.Gate
           Lifetime = route.Page.Lifetime
         }
+      )
+  | _ -> return notFound()
+}
+
+let importPage
+  (
+    env:
+      #IProvideStore & #IProvideStores & #IProvideCulture & #IProvideHost & #IProvideLogging & #IProvideToasts,
+    route: DetailRoute,
+    lead: unit -> Control
+  ) : Async<Control> = asyncEx {
+  let! athlete = env.Store.FindAthlete route.AthleteId
+
+  match athlete with
+  | Ok(ValueSome athlete) when athlete.ArchivedAt.IsNone ->
+    let pageEnv: Import.ImportEnv = {
+      Plans = env.Stores.Plans
+      Host = env.Host
+      Logger = env.LoggerFactory.CreateLogger "Import"
+      Toasts = env.Toasts
+      Culture = env.Culture
+      CultureChanged = env.CultureChanged
+    }
+
+    return
+      Import.ImportPage(
+        pageEnv,
+        {
+          Lead = ValueSome lead
+          Athlete = athlete
+          Lifetime = route.Lifetime
+        },
+        fun event ->
+          match event with
+          | Import.Imported planId ->
+            go(route.Nav, $"/athletes/{route.AthleteId}/review/{planId}")
       )
   | _ -> return notFound()
 }
@@ -549,6 +587,28 @@ let build(env: RouteDeps<'T>, leadOf: INavigable -> (unit -> Control)) =
     // strategy only keeps the router from holding the old run
     |> Route.cache CachePolicy.NoCache
     |> confirmLeave
+    |> gate
+    |> shown
+
+    Route.define<Control>(
+      "import",
+      "/athletes/:athleteId<guid>/import",
+      fun context nav -> asyncEx {
+        match context with
+        | GuidParam "athleteId" athleteId ->
+          let route = {
+            Lifetime = context.Disposables
+            Nav = nav
+            AthleteId = athleteId
+          }
+
+          return! importPage(env, route, leadOf nav)
+        | _ -> return notFound()
+      }
+    )
+    // a fresh import on every visit: the picked file belongs to the
+    // visit, and no cached document can come back
+    |> Route.cache CachePolicy.NoCache
     |> gate
     |> shown
 

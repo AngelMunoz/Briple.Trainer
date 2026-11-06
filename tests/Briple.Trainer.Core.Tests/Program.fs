@@ -18,6 +18,7 @@ let main args =
       Instructions.Tests.tests
       Wizard.Tests.tests
       Writer.Tests.tests
+      Slice.Tests.tests
       Data.Tests.tests
       Validator.Tests.tests
       Prompts.Tests.tests

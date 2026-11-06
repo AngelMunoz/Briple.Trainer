@@ -47,6 +47,7 @@ type DetailPageProps = {
 [<Struct>]
 type Event =
   | GenerateRequested
+  | ImportRequested
   | ReviewRequested of planId: Guid
   /// The page changed the athlete; the host returns to the list.
   | BackRequested

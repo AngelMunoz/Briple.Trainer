@@ -273,6 +273,48 @@ module Keys =
   val plansKindImport: string = "plans.kind.import"
 
   [<Literal>]
+  val plansImport: string = "plans.import"
+
+  [<Literal>]
+  val importPick: string = "import.pick"
+
+  [<Literal>]
+  val importFileType: string = "import.fileType"
+
+  [<Literal>]
+  val importEmptyHint: string = "import.emptyHint"
+
+  [<Literal>]
+  val importContents: string = "import.contents"
+
+  [<Literal>]
+  val importChoose: string = "import.choose"
+
+  [<Literal>]
+  val importConfirm: string = "import.confirm"
+
+  [<Literal>]
+  val importWeeksCount: string = "import.weeksCount"
+
+  [<Literal>]
+  val importExercises: string = "import.exercises"
+
+  [<Literal>]
+  val importNone: string = "import.none"
+
+  [<Literal>]
+  val importWarnings: string = "import.warnings"
+
+  [<Literal>]
+  val importParseFailed: string = "import.parseFailed"
+
+  [<Literal>]
+  val importReadFailed: string = "import.readFailed"
+
+  [<Literal>]
+  val importImported: string = "import.imported"
+
+  [<Literal>]
   val wizardTitle: string = "wizard.title"
 
   [<Literal>]

@@ -234,6 +234,48 @@
   <data name="plans.kind.import" xml:space="preserve">
     <value>Importado</value>
   </data>
+  <data name="plans.import" xml:space="preserve">
+    <value>Importar plan</value>
+  </data>
+  <data name="import.pick" xml:space="preserve">
+    <value>Elegir archivo</value>
+  </data>
+  <data name="import.fileType" xml:space="preserve">
+    <value>Plan Briple (.briple, .txt)</value>
+  </data>
+  <data name="import.emptyHint" xml:space="preserve">
+    <value>Elige un archivo .briple o .txt con planes.</value>
+  </data>
+  <data name="import.contents" xml:space="preserve">
+    <value>Contenido del archivo</value>
+  </data>
+  <data name="import.choose" xml:space="preserve">
+    <value>Elige un plan para este atleta</value>
+  </data>
+  <data name="import.confirm" xml:space="preserve">
+    <value>Importar</value>
+  </data>
+  <data name="import.weeksCount" xml:space="preserve">
+    <value>{0} semanas</value>
+  </data>
+  <data name="import.exercises" xml:space="preserve">
+    <value>{0} ejercicios</value>
+  </data>
+  <data name="import.none" xml:space="preserve">
+    <value>Este archivo no tiene un plan para un atleta {0}.</value>
+  </data>
+  <data name="import.warnings" xml:space="preserve">
+    <value>El archivo se leyó con avisos</value>
+  </data>
+  <data name="import.parseFailed" xml:space="preserve">
+    <value>El archivo no es un plan que Briple pueda leer.</value>
+  </data>
+  <data name="import.readFailed" xml:space="preserve">
+    <value>No se pudo leer el archivo.</value>
+  </data>
+  <data name="import.imported" xml:space="preserve">
+    <value>Plan importado</value>
+  </data>
   <data name="wizard.title" xml:space="preserve">
     <value>Generar plan</value>
   </data>

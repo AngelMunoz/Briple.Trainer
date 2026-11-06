@@ -19,6 +19,7 @@
     <Compile Include="Instructions.Tests.fs" />
     <Compile Include="Wizard.Tests.fs" />
     <Compile Include="Writer.Tests.fs" />
+    <Compile Include="Slice.Tests.fs" />
     <Compile Include="Data.Tests.fs" />
     <Compile Include="Validator.Tests.fs" />
     <Compile Include="Prompts.Tests.fs" />

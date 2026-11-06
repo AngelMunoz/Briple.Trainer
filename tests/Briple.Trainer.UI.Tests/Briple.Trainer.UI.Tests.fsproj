@@ -13,6 +13,7 @@
     <Compile Include="Persistence.Tests.fs" />
     <Compile Include="Stores.Tests.fs" />
     <Compile Include="App.Tests.fs" />
+    <Compile Include="PlanImport.Tests.fs" />
     <Compile Include="Component.Tests.fs" />
     <Compile Include="Leaks.Tests.fs" />
     <Compile Include="Snapshots.Tests.fs" />

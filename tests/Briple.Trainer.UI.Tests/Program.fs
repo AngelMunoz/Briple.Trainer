@@ -11,6 +11,7 @@ let main argv =
       Persistence.tests
       Stores.tests
       App.tests
+      PlanImport.Tests.tests
       Components.tests
       Components.noteTests
       Components.reviewTests

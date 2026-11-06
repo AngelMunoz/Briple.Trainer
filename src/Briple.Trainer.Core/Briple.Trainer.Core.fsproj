@@ -37,6 +37,8 @@
     <Compile Include="Plan.Sanitize.fs" />
     <Compile Include="Plan.Writer.fsi" />
     <Compile Include="Plan.Writer.fs" />
+    <Compile Include="Plan.Slice.fsi" />
+    <Compile Include="Plan.Slice.fs" />
     <Compile Include="Plan.Data.fsi" />
     <Compile Include="Plan.Data.fs" />
     <Compile Include="Validator.fsi" />

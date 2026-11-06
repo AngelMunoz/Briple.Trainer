@@ -101,6 +101,69 @@ let sampleRaw =
     Extras = []
   }
 
+/// A multi-plan file in the app's own format: one block per gender, two
+/// variants for the man, one for the woman. The import page reads this
+/// text the way it reads a picked file.
+let importRaw =
+  String.concat "\n" [
+    "#start plan v1"
+    "#meta titulo Importable"
+    "#meta semanas 2"
+    "#meta generado 2026-11-06"
+    "#meta origen import fixture"
+    "#start genero hombre"
+    "#start opcion 3dias"
+    "#start semana 1"
+    "#start dia Lunes"
+    "#ej A|3|1|Press de banca|8-10|2|90 s|-"
+    "#ej A|3|2|Remo con barra|8-10|2|90 s|-"
+    "#end dia"
+    "#start dia Miércoles"
+    "#ej A|3|1|Sentadilla|8-10|2|90 s|-"
+    "#ej A|3|2|Curl femoral|10-12|1|90 s|-"
+    "#end dia"
+    "#end semana"
+    "#start semana 2"
+    "#start dia Lunes"
+    "#ej A|3|1|Press militar|8-10|2|90 s|-"
+    "#ej A|3|2|Jalón al pecho|10-12|1|90 s|-"
+    "#end dia"
+    "#start dia Miércoles"
+    "#ej A|3|1|Prensa|10-12|1|90 s|-"
+    "#ej A|3|2|Face pull|12-20|0|90 s|-"
+    "#end dia"
+    "#end semana"
+    "#end opcion"
+    "#start opcion 5dias"
+    "#meta titulo Cinco días"
+    "#start semana 1"
+    "#start dia Lunes"
+    "#ej A|3|1|Press banca|6-8|2|3 min|-"
+    "#end dia"
+    "#start dia Martes"
+    "#ej A|3|1|Remo pesado|8-10|2|3 min|-"
+    "#end dia"
+    "#start dia Miércoles"
+    "#ej A|3|1|Sentadilla alta|6-8|2|3 min|-"
+    "#end dia"
+    "#end semana"
+    "#end opcion"
+    "#end genero"
+    "#start genero mujer"
+    "#start opcion 5dias"
+    "#start semana 1"
+    "#start dia Lunes"
+    "#ej A|3|1|Hip thrust|8-12|2|2 min|-"
+    "#end dia"
+    "#start dia Martes"
+    "#ej A|3|1|Press con mancuernas|8-12|2|2 min|-"
+    "#end dia"
+    "#end semana"
+    "#end opcion"
+    "#end genero"
+    "#end plan"
+  ]
+
 /// Answers the same reading every time, without touching the network.
 type FakeAgent(reading: NoteInterpretation) =
   interface Briple.Trainer.Env.IProvideAgent with

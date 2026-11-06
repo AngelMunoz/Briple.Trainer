@@ -280,6 +280,48 @@ module Keys =
   [<Literal>]
   let plansKindImport = "plans.kind.import"
 
+  [<Literal>]
+  let plansImport = "plans.import"
+
+  [<Literal>]
+  let importPick = "import.pick"
+
+  [<Literal>]
+  let importFileType = "import.fileType"
+
+  [<Literal>]
+  let importEmptyHint = "import.emptyHint"
+
+  [<Literal>]
+  let importContents = "import.contents"
+
+  [<Literal>]
+  let importChoose = "import.choose"
+
+  [<Literal>]
+  let importConfirm = "import.confirm"
+
+  [<Literal>]
+  let importWeeksCount = "import.weeksCount"
+
+  [<Literal>]
+  let importExercises = "import.exercises"
+
+  [<Literal>]
+  let importNone = "import.none"
+
+  [<Literal>]
+  let importWarnings = "import.warnings"
+
+  [<Literal>]
+  let importParseFailed = "import.parseFailed"
+
+  [<Literal>]
+  let importReadFailed = "import.readFailed"
+
+  [<Literal>]
+  let importImported = "import.imported"
+
 
   [<Literal>]
   let wizardTitle = "wizard.title"

@@ -54,6 +54,14 @@ val delete: StreamGeometry
 /// Export to a .briple file. MDIL `download`.
 val download: StreamGeometry
 
+/// Import from a .briple or .txt file. MDIL `upload`, the vertical
+/// mirror of `download`.
+val upload: StreamGeometry
+
+/// Import from a .briple or .txt file. MDIL `upload`, the vertical
+/// mirror of `download`.
+val upload: StreamGeometry
+
 /// Inline edit. MDIL `pencil`.
 val pencil: StreamGeometry
 
