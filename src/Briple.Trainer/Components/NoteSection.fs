@@ -160,8 +160,11 @@ let update (ctx: Context) (msg: Msg) (model: Model) =
     next, Cmd.batch [ Cmd.ofAction(fun () -> props.OnState next); cmd ]
 
   match msg with
-  | CultureChanged culture ->
-    settled({ model with Culture = culture }, Cmd.none)
+  // a culture change is display-only. Reporting it through OnState
+  // would echo every parent emission back into the parent's model
+  // (the parent re-emits, the culture slice fires again), so this one
+  // case never notifies.
+  | CultureChanged culture -> { model with Culture = culture }, Cmd.none
   | SetNote note -> settled({ model with Note = note }, Cmd.none)
 
   | InterpretRequested when
@@ -377,7 +380,8 @@ let view
 
     let memoryEnv: MemoryReview.MemoryReviewEnv = {
       Culture = env.Culture
-      CultureChanged = model |> Observable.map _.Culture
+      CultureChanged =
+        model |> Observable.map _.Culture |> Observable.distinctUntilChanged
     }
 
     MemoryReview.MemoryReview(

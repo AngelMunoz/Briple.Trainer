@@ -70,6 +70,10 @@ type Props = {
   Initial: Model
   /// Every transition travels to the page, which keeps the state and
   /// derives the exit phase from it.
+  /// Reports every state change the parent must track (note text,
+  /// reading, saving). Display-only changes, culture among them, never
+  /// report: the parent's re-emission would echo back through its
+  /// culture feed and loop the message queue.
   OnState: Model -> unit
 }
 

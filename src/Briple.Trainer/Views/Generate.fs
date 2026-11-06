@@ -870,7 +870,8 @@ let editingView
   ) : Control =
   let culture = {
     Current = current.Culture
-    Changed = model |> Observable.map _.Culture
+    Changed =
+      model |> Observable.map _.Culture |> Observable.distinctUntilChanged
   }
 
   let generate =
@@ -1079,7 +1080,8 @@ let phaseView
   : Control =
   let culture = {
     Current = current.Culture
-    Changed = model |> Observable.map _.Culture
+    Changed =
+      model |> Observable.map _.Culture |> Observable.distinctUntilChanged
   }
 
   match current.Phase with

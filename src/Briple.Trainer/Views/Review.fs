@@ -487,7 +487,8 @@ let view
         .Classes("caption", "secondary")
         .IsVisible(dirty)
 
-    let culture = model |> Observable.map _.Culture
+    let culture =
+      model |> Observable.map _.Culture |> Observable.distinctUntilChanged
 
     let planEnv: PlanReview.PlanReviewEnv = {
       Culture = current.Culture
@@ -513,7 +514,8 @@ let view
       Memories = ctx.Env.Memories
       Logger = ctx.Env.Logger
       Culture = current.Culture
-      CultureChanged = model |> Observable.map _.Culture
+      CultureChanged =
+        model |> Observable.map _.Culture |> Observable.distinctUntilChanged
     }
 
     let notes =
