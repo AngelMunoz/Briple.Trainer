@@ -9,6 +9,7 @@ module Briple.Trainer.UI.Tests.Harness
 open System
 open System.Diagnostics
 open System.Globalization
+open System.IO
 open System.Reactive.Subjects
 open System.Threading
 open System.Threading.Tasks
@@ -27,6 +28,15 @@ open Briple.Trainer.Startup
 
 type TestApp() =
   inherit App()
+
+  /// The suite's carrier: Skia over the headless platform with the
+  /// emulated drawing off, so CaptureRenderedFrame returns the pixels
+  /// a user would see and the camera can save them.
+  static member BuildAvaloniaApp() =
+    AppBuilder
+      .Configure<TestApp>()
+      .UseSkia()
+      .UseHeadless(AvaloniaHeadlessPlatformOptions(UseHeadlessDrawing = false))
 
 let private session =
   HeadlessUnitTestSession.StartNew(
@@ -153,6 +163,30 @@ let mount(control: Control) : Task<unit> = task {
   let! _ = mountWindow control
   return ()
 }
+
+/// Saves one rendered frame of a shown window as the named PNG under
+/// artifacts/snapshots (gitignored: captures are evidence, not fixtures)
+/// and returns its path. The session renders through Skia, so the pixels
+/// carry the theme and the text a user sees. Runs on the session thread:
+/// a uiTest body holds the one UI dispatch until it returns, and a nested
+/// session dispatch queues work the blocked thread can never serve, so
+/// every UI touch in a body runs inline before the body's first await.
+let capture(name: string, window: Window) : string =
+  match window.CaptureRenderedFrame() with
+  | null -> failwith $"no rendered frame to capture for {name}"
+  | bitmap ->
+    let file = Path.Combine("artifacts", "snapshots", name + ".png")
+
+    let dir =
+      match Path.GetDirectoryName file with
+      | null -> "."
+      | found -> found
+
+    Directory.CreateDirectory dir |> ignore
+
+    use stream = File.Create(file)
+    bitmap.Save(stream)
+    file
 
 let private closeTracked() : Task<unit> = task {
   let windows, lifetimes =

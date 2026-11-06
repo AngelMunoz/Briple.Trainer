@@ -34,53 +34,8 @@ open Briple.Trainer.Core.Plan.Types
 open Briple.Trainer.Core.Requests
 open Briple.Trainer.Persistence
 open Briple.Trainer.Stores
+open Briple.Trainer.UI.Tests.Fixtures
 open Briple.Trainer.UI.Tests.Harness
-
-// migrations under test log through the app's pipeline (silent under the
-// default Serilog)
-let private testLogger = Briple.Trainer.Env.loggerFactory.CreateLogger "Tests"
-
-let private generateEnv
-  (stores: DataStores)
-  (agent: Briple.Trainer.Env.IProvideAgent)
-  (culture: Briple.Trainer.Components.Page.PageCulture)
-  : Briple.Trainer.Views.Generate.GenerateEnv = {
-  Store = stores.Raw
-  Memories = stores.Memories
-  Plans = stores.Plans
-  Agent = agent
-  Logger = testLogger
-  Dialogs = {
-    new Briple.Trainer.Env.IDialogs with
-      member _.ConfirmAsync(_) = async { return true }
-  }
-  Toasts = {
-    new Briple.Trainer.Env.IToasts with
-      member _.Show(_, _, _) = ()
-  }
-  Culture = culture.Current()
-  CultureChanged = culture.Changed
-}
-
-let private reviewEnv
-  (stores: DataStores)
-  (agent: Briple.Trainer.Env.IProvideAgent)
-  (culture: Briple.Trainer.Components.Page.PageCulture)
-  : Briple.Trainer.Views.Review.ReviewEnv = {
-  Plans = stores.Plans
-  Memories = stores.Memories
-  Agent = agent
-  Host = ValueNone
-  Logger = testLogger
-  Toasts = {
-    new Briple.Trainer.Env.IToasts with
-      member _.Show(_, _, _) = ()
-  }
-  Culture = culture.Current()
-  CultureChanged = culture.Changed
-}
-
-let private es = Language.toCulture Es
 
 let private memoryReviewEnv
   (culture: Briple.Trainer.Components.Page.PageCulture)
@@ -102,57 +57,6 @@ let private scrollerIn(root: Control) : ScrollViewer =
     match visual with
     | :? ScrollViewer as scroller -> Some scroller
     | _ -> None)
-
-let private sampleAthlete: Athlete = {
-  Name = "Pepe"
-  Gender = Male
-  Goals = [ Hypertrophy; Strength ]
-}
-
-let private sampleRaw =
-  Briple.Trainer.Core.Plan.Writer.write {
-    Version = 1
-    Title = "Mes 1"
-    Weeks = 1
-    Generated = "2026-10-15"
-    Origin = "trainer"
-    Blocks = [
-      {
-        Gender = Male
-        Variants = [
-          {
-            Id = "3dias"
-            Title = None
-            Weeks = [
-              {
-                Number = 1
-                Days = [
-                  {
-                    Id = "Lunes"
-                    Title = Some "Empuje"
-                    Notes = []
-                    Exercises = [
-                      {
-                        Circuit = "A"
-                        Laps = "3"
-                        Order = 1
-                        Name = "Press de banca"
-                        Reps = "8-10"
-                        Rir = "2"
-                        Rest = "120s"
-                        Notes = "-"
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    ]
-    Extras = []
-  }
 
 let private textBoxes(root: Control) : TextBox list =
   root.GetVisualDescendants()
@@ -1414,19 +1318,6 @@ let tests =
 let private wait(task: Task<Result<'a, exn>>) : Result<'a, exn> =
   task.GetAwaiter().GetResult()
 
-/// Answers the same reading every time, without touching the network.
-type private FakeAgent(reading: NoteInterpretation) =
-  interface Briple.Trainer.Env.IProvideAgent with
-    member _.AgentAvailable = true
-
-    member _.GenerateNew(_, _) = failwith "not used in this flow"
-
-    member _.GenerateAdjustment(_, _) = failwith "not used in this flow"
-
-    member _.ConsolidateMarks(_, _) = failwith "not used in this flow"
-
-    member _.InterpretNote(_, _) = Task.FromResult(Ok reading)
-
 /// Answers the reading and records every note ask, so a test can assert
 /// the live plan vocabulary the agent receives.
 type private RecordingAgent(reading: NoteInterpretation) =
@@ -1772,8 +1663,6 @@ let noteTests =
   ]
 
 // --- the review page --------------------------------------------------------
-
-let private noReading: NoteInterpretation = { Memories = []; Rejections = [] }
 
 /// A real store with one athlete and one plan, plus the page's gate.
 let private reviewSetup() =
