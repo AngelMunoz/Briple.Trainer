@@ -900,6 +900,10 @@ let tests =
 
     uiTest "wizard brief reports every draft change"
     <| fun () -> task {
+      // the keyed labels bind through the app resource dictionary: the
+      // Spanish entries must be installed for the probes to read them
+      Briple.Trainer.Localization.install es
+
       let updates =
         ResizeArray<Briple.Trainer.Components.WizardBrief.BriefDraft>()
 
@@ -933,14 +937,26 @@ let tests =
         Briple.Trainer.Components.WizardBrief.Mode.Fresh
         "a first plan starts fresh"
 
-      let! weekTwo = probeUi(fun () -> radioWithText(brief, "2"))
+      Expect.isSome
+        (comboBoxWithText(brief, get(es, Keys.wizardCircuitsAuto)))
+        "the auto option carries its localized label"
 
-      let weekTwo =
-        weekTwo
+      let! weeks = probeUi(fun () -> comboBoxWithText(brief, "2"))
+
+      let weeks =
+        weeks
         |> Option.defaultWith(fun () ->
-          failtest "the week radio did not render")
+          failtest "the weeks dropdown did not render")
 
-      do! runUi(fun () -> click weekTwo)
+      let index =
+        weeks.Items
+        |> Seq.choose(fun item ->
+          match item with
+          | :? Avalonia.Controls.ComboBoxItem as comboItem -> Some comboItem
+          | _ -> None)
+        |> Seq.findIndex(fun item -> string item.Content = "2")
+
+      do! runUi(fun () -> weeks.SelectedIndex <- index)
 
       let! reported =
         waitFor(

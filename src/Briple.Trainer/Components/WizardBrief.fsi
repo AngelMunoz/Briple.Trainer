@@ -2,9 +2,10 @@ module Briple.Trainer.Components.WizardBrief
 
 // Step 2 of the wizard as a sealed component: props in (the culture, the
 // athlete and the draft the page owns), changes out through OnChanged.
-// Weeks, goal, frequency and emphasis are closed selections with
-// standard controls; nothing is typed and nothing derived (RIR, counts)
-// is asked. The page owns Generar; the component only edits the draft.
+// Mode, weeks, goal, frequency and the circuit count are closed
+// selections in dropdowns; emphasis is a checklist. Nothing is typed and
+// nothing derived (RIR, counts per day) is asked. The page owns Generar;
+// the component only edits the draft.
 
 open System
 open System.Globalization
@@ -29,6 +30,8 @@ type BriefDraft = {
   /// The language of the plan content.
   Language: ContentLanguage
   Mode: Mode
+  /// Circuits per training day; none lets the goal profile decide.
+  CircuitsPerDay: int voption
 }
 
 /// The default draft of a fresh wizard visit.

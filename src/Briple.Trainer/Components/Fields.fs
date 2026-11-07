@@ -478,6 +478,69 @@ let inline radioRowKeys(row: RadioRow<'T>) : Control =
 
   WrapPanel().Children [| for option in row.Options -> optionRow option |]
 
+/// The inputs of one single-choice dropdown: the options, the live
+/// selected value and the pick callback.
+[<Struct>]
+type SelectRow<'T when 'T: equality> = {
+  Options: ('T * string) list
+  Selected: IObservable<'T>
+  OnPick: 'T -> unit
+}
+
+/// A dropdown over typed options; the selected item follows the
+/// selected value, a model change moves the choice.
+let inline selectRow(row: SelectRow<'T>) : Control =
+  let combo = ComboBox(MinWidth = 160.0)
+
+  for _, label in row.Options do
+    combo.Items.Add(ComboBoxItem(Content = label)) |> ignore
+
+  let indexOf value =
+    row.Options
+    |> List.tryFindIndex(fun (candidate, _) -> candidate = value)
+    |> Option.defaultValue -1
+
+  combo.SelectedIndex(row.Selected |> Observable.map indexOf) |> ignore
+
+  combo.OnSelectionChangedHandler(fun _ _ ->
+    let index = combo.SelectedIndex
+
+    if index >= 0 then
+      row.Options
+      |> List.tryItem index
+      |> Option.iter(fun (choice, _) -> row.OnPick choice))
+  |> ignore
+
+  combo
+
+/// Dropdown options whose labels are resource keys.
+let inline selectRowKeys(row: SelectRow<'T>) : Control =
+  let combo = ComboBox(MinWidth = 160.0)
+
+  for _, key in row.Options do
+    combo.Items.Add(
+      ComboBoxItem(Content = TextBlock().Text(Localization.text key))
+    )
+    |> ignore
+
+  let indexOf value =
+    row.Options
+    |> List.tryFindIndex(fun (candidate, _) -> candidate = value)
+    |> Option.defaultValue -1
+
+  combo.SelectedIndex(row.Selected |> Observable.map indexOf) |> ignore
+
+  combo.OnSelectionChangedHandler(fun _ _ ->
+    let index = combo.SelectedIndex
+
+    if index >= 0 then
+      row.Options
+      |> List.tryItem index
+      |> Option.iter(fun (choice, _) -> row.OnPick choice))
+  |> ignore
+
+  combo
+
 /// One checkbox whose checked state follows an observable.
 let inline checkRow
   (

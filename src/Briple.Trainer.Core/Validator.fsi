@@ -17,9 +17,21 @@ type Verdict =
 
 /// Checks a plan of the domain against the parameters of the request:
 /// gender, the brief's frequency (one variant, its days per week), the
-/// weeks and the goal's mesocycle RIR.
+/// weeks, the brief's fixed circuit count and the goal's mesocycle RIR.
 val checkParameters:
   athlete: Athlete -> weeks: int -> brief: Brief -> plan: Plan -> Violation list
+
+/// The adjustment keeps the previous plan's exercises per training day
+/// on the variants the new plan keeps; a shorter period does not double
+/// the day.
+val checkAdjustmentCounts:
+  athlete: Athlete -> previousPlan: Plan -> plan: Plan -> Violation list
+
+/// The adjustment keeps the previous plan's circuit layout (the circuit
+/// letters of each training day) on the variants the new plan keeps,
+/// matched by day id against the previous plan's first week.
+val checkAdjustmentCircuits:
+  athlete: Athlete -> previousPlan: Plan -> plan: Plan -> Violation list
 
 /// The goal's structure rules: rows per day, a timed strength block, RIR
 /// on a timed row, a circuit with different laps and the cardio minutes
@@ -38,6 +50,7 @@ val checkPrescription: plan: Plan -> Violation list
 /// per week, the weeks and the derived RIR.
 val validateNew: request: NewPlanRequest -> output: string -> Verdict
 
-/// Validates the output of an adjustment: the same, plus the counts of
-/// the previous plan on the variant the adjustment keeps.
+/// Validates the output of an adjustment: the same, plus the counts and
+/// the circuit layout of the previous plan on the variant the adjustment
+/// keeps.
 val validateAdjustment: request: AdjustmentRequest -> output: string -> Verdict

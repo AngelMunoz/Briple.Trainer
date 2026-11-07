@@ -148,6 +148,10 @@ type Brief = {
   Emphasis: Emphasis list
   Adjustments: (Target * Delta list) list
   Language: ContentLanguage
+  /// Fixed circuit count the trainer picked; none follows the previous
+  /// plan's layout when the request carries one, and the goal profile
+  /// decides otherwise.
+  CircuitsPerDay: int voption
 }
 
 type NewPlanRequest = {
@@ -218,6 +222,9 @@ let relevantMemories
 let ofBrief (weeks: int) (brief: Brief) : Parameter list = [
   PlanWeeks(weeks, TrainerBrief)
   AthleteVariants(variantTokens brief, TrainerBrief)
+  match brief.CircuitsPerDay with
+  | ValueSome perDay -> CircuitsPerDay(perDay, TrainerBrief)
+  | ValueNone -> ()
   yield!
     rirFor (profileOf brief.Goal) weeks
     |> List.map(fun (week, target) -> WeekRir(week, target, Derived))
@@ -229,6 +236,21 @@ let ofBrief (weeks: int) (brief: Brief) : Parameter list = [
 
 let parametersForNew(request: NewPlanRequest) : Parameter list =
   ofConfirmedMemories request.Memories @ ofBrief request.Weeks request.Brief
+
+/// The circuits per training day of one variant's first week, in day
+/// order: the layout an adjustment keeps when the brief lets the
+/// previous plan decide.
+let circuitLayoutOf(variant: Variant) : (string * int) list =
+  match variant.Weeks with
+  | [] -> []
+  | first :: _ ->
+    first.Days
+    |> List.map(fun day ->
+      day.Id,
+      day.Exercises
+      |> List.map(fun exercise -> exercise.Circuit)
+      |> List.distinct
+      |> List.length)
 
 let parametersForAdjustment(request: AdjustmentRequest) : Parameter list =
   let frequency = variantTokens request.Brief
@@ -243,6 +265,22 @@ let parametersForAdjustment(request: AdjustmentRequest) : Parameter list =
         PreviousPlan
       ))
 
+  // a brief without a fixed circuit count follows the previous plan's
+  // layout on the variants it keeps
+  let previousLayouts =
+    match request.Brief.CircuitsPerDay with
+    | ValueSome _ -> []
+    | ValueNone ->
+      request.PreviousPlan.Blocks
+      |> List.tryFind(fun block -> block.Gender = request.Athlete.Gender)
+      |> Option.map(fun block ->
+        block.Variants
+        |> List.filter(fun variant -> List.contains variant.Id frequency)
+        |> List.map(fun variant ->
+          CircuitLayout(variant.Id, circuitLayoutOf variant, PreviousPlan)))
+      |> Option.defaultValue []
+
   ofConfirmedMemories request.Memories
   @ ofBrief request.Weeks request.Brief
   @ previousCounts
+  @ previousLayouts

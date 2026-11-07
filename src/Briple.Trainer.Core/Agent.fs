@@ -269,7 +269,14 @@ let generateAdjustment
       {
         Profile = profile
         RirPerWeek = rirFor profile request.Weeks
-        Check = checkParameters request.Athlete request.Weeks request.Brief
+        // the adjustment keeps the previous plan's per-day counts and
+        // circuit layout: the checks travel with the parameters, not
+        // only with the prompt
+        Check =
+          fun plan ->
+            checkParameters request.Athlete request.Weeks request.Brief plan
+            @ checkAdjustmentCounts request.Athlete request.PreviousPlan plan
+            @ checkAdjustmentCircuits request.Athlete request.PreviousPlan plan
       }
       response
 

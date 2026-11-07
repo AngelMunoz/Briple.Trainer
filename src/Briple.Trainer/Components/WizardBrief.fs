@@ -28,6 +28,7 @@ type BriefDraft = {
   Emphasis: Emphasis list
   Language: ContentLanguage
   Mode: Mode
+  CircuitsPerDay: int voption
 }
 
 [<Struct>]
@@ -46,6 +47,7 @@ type Msg =
   | SetFrequency of VariantFrequency
   | ToggleEmphasis of Emphasis
   | SetMode of Mode
+  | SetCircuits of int voption
 
 let goalOptions = [
   Hypertrophy, Keys.goalHypertrophy
@@ -100,6 +102,7 @@ let defaultDraft
   Emphasis = []
   Language = language
   Mode = if hasPrevious then Adjust else Fresh
+  CircuitsPerDay = ValueNone
 }
 
 let init(props: Props) = props.Draft, Cmd.none
@@ -130,6 +133,8 @@ let update (props: Props) (msg: Msg) (model: Model) =
       { model with Emphasis = picked }
 
     | SetMode mode -> { model with Mode = mode }
+
+    | SetCircuits circuits -> { model with CircuitsPerDay = circuits }
 
   next, Cmd.ofAction(fun () -> props.OnChanged next)
 
@@ -163,12 +168,11 @@ let view
       fieldKey(
         Keys.wizardMode,
         fun () ->
-          radioRowKeys {
+          selectRowKeys {
             Options = [
               Adjust, Keys.wizardModeAdjust
               Fresh, Keys.wizardModeNew
             ]
-            Group = "brief-mode"
             Selected = model |> Observable.map _.Mode
             OnPick = SetMode >> dispatch
           }
@@ -176,28 +180,45 @@ let view
     else
       StackPanel()
 
-  let weeksChips =
-    radioRow {
+  let weeksPicker =
+    selectRow {
       Options = [ for week in 1..4 -> week, string week ]
-      Group = "brief-weeks"
       Selected = model |> Observable.map _.Weeks
       OnPick = SetWeeks >> dispatch
     }
 
-  let goalChips =
-    radioRowKeys {
+  let goalPicker =
+    selectRowKeys {
       Options = [ for goal in athleteGoals -> goal, goalKey goal ]
-      Group = "brief-goal"
       Selected = model |> Observable.map _.Goal
       OnPick = SetGoal >> dispatch
     }
 
-  let frequencyChips =
-    radioRowKeys {
+  let frequencyPicker =
+    selectRowKeys {
       Options = frequencyOptions
-      Group = "brief-frequency"
       Selected = model |> Observable.map _.Frequency
       OnPick = SetFrequency >> dispatch
+    }
+
+  // the auto option follows what it decides: the previous plan's layout
+  // when there is one, the goal profile otherwise
+  let autoKey =
+    if props.HasPrevious then
+      Keys.wizardCircuitsAutoPrevious
+    else
+      Keys.wizardCircuitsAuto
+
+  let circuitsPicker =
+    selectRowKeys {
+      Options = [
+        ValueNone, autoKey
+        ValueSome 2, Keys.wizardCircuitsTwo
+        ValueSome 3, Keys.wizardCircuitsThree
+        ValueSome 4, Keys.wizardCircuitsFour
+      ]
+      Selected = model |> Observable.map _.CircuitsPerDay
+      OnPick = SetCircuits >> dispatch
     }
 
   // the emphasis catalog follows the picked goal: the keyed binding
@@ -233,9 +254,10 @@ let view
     .Spacing(4.0)
     .Children(
       modeRow,
-      fieldKey(Keys.wizardWeeks, (fun () -> weeksChips)),
-      fieldKey(Keys.wizardGoal, (fun () -> goalChips)),
-      fieldKey(Keys.wizardFrequency, (fun () -> frequencyChips)),
+      fieldKey(Keys.wizardWeeks, (fun () -> weeksPicker)),
+      fieldKey(Keys.wizardGoal, (fun () -> goalPicker)),
+      fieldKey(Keys.wizardFrequency, (fun () -> frequencyPicker)),
+      fieldKey(Keys.wizardCircuits, (fun () -> circuitsPicker)),
       fieldKey(Keys.wizardEmphasis, (fun () -> emphasisSection))
     )
 

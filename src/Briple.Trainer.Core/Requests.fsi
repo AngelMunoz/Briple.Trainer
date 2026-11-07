@@ -83,13 +83,16 @@ type ContentLanguage =
   | English
 
 /// The trainer's brief: the goal, the weekly frequency and the emphasis
-/// of this plan; the confirmed memories arrive as adjustments.
+/// of this plan; the confirmed memories arrive as adjustments. The
+/// circuit count is optional: none follows the previous plan's layout
+/// when the request carries one, and the goal profile decides otherwise.
 type Brief = {
   Goal: PlanGoal
   Frequency: VariantFrequency
   Emphasis: Emphasis list
   Adjustments: (Target * Delta list) list
   Language: ContentLanguage
+  CircuitsPerDay: int voption
 }
 
 /// Brand-new plan.
@@ -121,6 +124,10 @@ val planCounts: athlete: Athlete -> plan: Plan -> (string * int) list
 /// the exercises of each day.
 val perDayCount: athlete: Athlete -> variant: string -> plan: Plan -> int
 
+/// The circuit letters per training day of one variant's first week, in
+/// day order: the layout an adjustment keeps.
+val circuitLayoutOf: variant: Variant -> (string * int) list
+
 /// The confirmed memories a request carries: the athlete-scoped ones
 /// (they outlive plans) plus the plan-scoped ones observed on the plan
 /// being adjusted. Proposed and discarded never travel.
@@ -133,6 +140,7 @@ val relevantMemories:
 val parametersForNew: request: NewPlanRequest -> Parameter list
 
 /// The traced parameters of the adjustment: the new-plan ones plus the
-/// counts of the variants the previous plan shares with the brief's
-/// frequency.
+/// counts and the circuit layout of the variants the previous plan
+/// shares with the brief's frequency. A brief without a fixed circuit
+/// count lets the previous plan's layout decide.
 val parametersForAdjustment: request: AdjustmentRequest -> Parameter list

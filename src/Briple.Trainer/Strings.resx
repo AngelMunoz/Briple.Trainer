@@ -300,6 +300,24 @@
   <data name="wizard.frequency" xml:space="preserve">
     <value>Días por semana</value>
   </data>
+  <data name="wizard.circuits" xml:space="preserve">
+    <value>Circuitos por día</value>
+  </data>
+  <data name="wizard.circuits.auto" xml:space="preserve">
+    <value>Auto (decide el perfil)</value>
+  </data>
+  <data name="wizard.circuits.auto.previous" xml:space="preserve">
+    <value>Auto (sigue el plan anterior)</value>
+  </data>
+  <data name="wizard.circuits.two" xml:space="preserve">
+    <value>2</value>
+  </data>
+  <data name="wizard.circuits.three" xml:space="preserve">
+    <value>3</value>
+  </data>
+  <data name="wizard.circuits.four" xml:space="preserve">
+    <value>4</value>
+  </data>
   <data name="wizard.emphasis" xml:space="preserve">
     <value>Énfasis</value>
   </data>
@@ -599,6 +617,9 @@
   </data>
   <data name="violation.weeks" xml:space="preserve">
     <value>se esperaban {0} semanas, el plan declara {1}</value>
+  </data>
+  <data name="violation.circuits" xml:space="preserve">
+    <value>opción {0}, semana {1}, día {2}: se esperaban {3} circuitos, el día declara {4}</value>
   </data>
   <data name="violation.variants" xml:space="preserve">
     <value>variantes esperadas [{0}], el plan trae [{1}]</value>

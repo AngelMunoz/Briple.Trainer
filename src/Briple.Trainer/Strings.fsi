@@ -335,6 +335,30 @@ module Keys =
   [<Literal>]
   val wizardFrequency: string = "wizard.frequency"
 
+  /// Label of the circuits-per-day picker of the brief step.
+  [<Literal>]
+  val wizardCircuits: string = "wizard.circuits"
+
+  /// Label of the auto option when no previous plan exists: the goal
+  /// profile decides the circuits.
+  [<Literal>]
+  val wizardCircuitsAuto: string = "wizard.circuits.auto"
+
+  /// Label of the auto option when a previous plan exists: its layout
+  /// decides the circuits.
+  [<Literal>]
+  val wizardCircuitsAutoPrevious: string = "wizard.circuits.auto.previous"
+
+  /// The fixed circuit-count options of the picker.
+  [<Literal>]
+  val wizardCircuitsTwo: string = "wizard.circuits.two"
+
+  [<Literal>]
+  val wizardCircuitsThree: string = "wizard.circuits.three"
+
+  [<Literal>]
+  val wizardCircuitsFour: string = "wizard.circuits.four"
+
   [<Literal>]
   val wizardEmphasis: string = "wizard.emphasis"
 
@@ -646,6 +670,10 @@ module Keys =
 
   [<Literal>]
   val violationWeeks: string = "violation.weeks"
+
+  /// The brief's fixed circuit count does not hold on one day.
+  [<Literal>]
+  val violationCircuits: string = "violation.circuits"
 
   [<Literal>]
   val violationVariants: string = "violation.variants"

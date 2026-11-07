@@ -24,6 +24,7 @@ let private brief = {
   Emphasis = []
   Adjustments = []
   Language = Spanish
+  CircuitsPerDay = ValueNone
 }
 
 /// One male block, variant 3dias, one week, one exercise.
@@ -305,6 +306,11 @@ let tests =
 
         Expect.stringContains
           prompt
+          "keeps the previous plan's circuits per day"
+          "the previous layout travels"
+
+        Expect.stringContains
+          prompt
           "PREVIOUS PLAN"
           "the adjustment reference travels"
 
@@ -406,4 +412,49 @@ let tests =
           consolidationSystem
           "target | label | summary | delta[;delta...]"
           "the response protocol goes in the system")
+
+    testCase
+      "a fixed circuit count is mandatory and leaves the agent"
+      (fun () ->
+        let prompt =
+          newPlanPrompt(
+            {
+              Athlete = man
+              Memories = []
+              Weeks = 4
+              Brief = {
+                brief with
+                    CircuitsPerDay = ValueSome 3
+              }
+            }
+          )
+
+        Expect.stringContains
+          prompt
+          "exactly 3 circuits"
+          "the count gets fixed"
+
+        Expect.isFalse
+          (prompt.Contains "each exercise circuit")
+          "the agent no longer decides the circuit")
+
+    testCase "the adjustment demotes the profile structure" (fun () ->
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief
+        PreviousPlan = tinyPlan
+      }
+
+      let prompt = adjustmentPrompt request
+
+      Expect.stringContains
+        prompt
+        "the previous plan's circuit layout"
+        "the reference outranks the profile"
+
+      Expect.isFalse
+        (prompt.Contains "STRUCTURE THIS PLAN MUST HAVE")
+        "the profile structure is not a must")
   ]

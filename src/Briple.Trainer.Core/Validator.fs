@@ -56,6 +56,23 @@ let checkParameters
           WrongFrequency(variant.Id, week.Number, week.Days.Length, days)
         )
 
+      // the brief's fixed circuit count: every training day carries
+      // exactly that many circuit letters
+      match brief.CircuitsPerDay with
+      | ValueSome expected ->
+        for day in week.Days do
+          let actual =
+            day.Exercises
+            |> List.map(fun exercise -> exercise.Circuit)
+            |> List.distinct
+            |> List.length
+
+          if actual <> expected then
+            violations.Add(
+              WrongCircuits(variant.Id, week.Number, day.Id, expected, actual)
+            )
+      | ValueNone -> ()
+
   for week, target in rirFor (profileOf brief.Goal) weeks do
     match tryMesocycleRir plan week with
     | Some actual when actual = target -> ()
@@ -83,6 +100,55 @@ let checkAdjustmentCounts
       None
     else
       Some(CountChanged(variant, expected, actual)))
+
+/// The circuit letters of each training day follow the previous plan's
+/// first week, matched by day id, on the variants the new plan keeps.
+let checkAdjustmentCircuits
+  (athlete: Athlete)
+  (previousPlan: Plan)
+  (plan: Plan)
+  : Violation list =
+  let kept = planCounts athlete plan |> List.map fst |> Set.ofList
+
+  let layouts =
+    previousPlan.Blocks
+    |> List.tryFind(fun block -> block.Gender = athlete.Gender)
+    |> Option.map(fun block ->
+      block.Variants
+      |> List.map(fun variant -> variant.Id, circuitLayoutOf variant)
+      |> Map.ofList)
+
+  match layouts with
+  | None -> []
+  | Some layouts -> [
+      for block in plan.Blocks do
+        for variant in block.Variants do
+          if Set.contains variant.Id kept then
+            match Map.tryFind variant.Id layouts with
+            | None -> ()
+            | Some layout ->
+              for week in variant.Weeks do
+                for day in week.Days do
+                  match
+                    layout |> List.tryFind(fun (dayId, _) -> dayId = day.Id)
+                  with
+                  | Some(_, expected) ->
+                    let actual =
+                      day.Exercises
+                      |> List.map(fun exercise -> exercise.Circuit)
+                      |> List.distinct
+                      |> List.length
+
+                    if actual <> expected then
+                      WrongCircuits(
+                        variant.Id,
+                        week.Number,
+                        day.Id,
+                        expected,
+                        actual
+                      )
+                  | None -> ()
+    ]
 
 /// The prescription findings of one row: a compound name, a dose that is
 /// not a pure range or duration, and an effort target inconsistent with
@@ -260,6 +326,9 @@ let validateAdjustment (request: AdjustmentRequest) (output: string) =
   match validateNew asNew output with
   | Rejected violations -> Rejected violations
   | Valid(plan, advisories) ->
-    match checkAdjustmentCounts request.Athlete request.PreviousPlan plan with
+    match
+      checkAdjustmentCounts request.Athlete request.PreviousPlan plan
+      @ checkAdjustmentCircuits request.Athlete request.PreviousPlan plan
+    with
     | [] -> Valid(plan, advisories)
     | violations -> Rejected violations

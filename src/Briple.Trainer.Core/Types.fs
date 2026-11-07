@@ -224,6 +224,12 @@ type Violation =
   | WrongFrequency of variant: string * week: int * found: int * expected: int
   | WrongRir of week: int * found: string * expected: string
   | MissingRir of week: int * expected: string
+  | WrongCircuits of
+    variant: string *
+    week: int *
+    day: string *
+    expected: int *
+    found: int
   | CountChanged of variant: string * expected: int * found: int
   | BrokenFormat of failure: PlanFailure
   | FormatWarning of warning: ParseWarning

@@ -29,6 +29,7 @@ let private brief = {
   Emphasis = []
   Adjustments = []
   Language = Spanish
+  CircuitsPerDay = ValueNone
 }
 
 let private dayIds = [ "Lunes"; "Martes"; "Miercoles"; "Jueves"; "Viernes" ]
@@ -87,6 +88,40 @@ let private planOf perWeek perDay : Plan = {
 }
 
 let private outputOf(perWeek, perDay) = write(planOf perWeek perDay)
+
+/// Relabels every other row of a plan into circuit B, so each day holds
+/// two circuit letters instead of one; the row count stays.
+let private spread(plan: Plan) : Plan =
+  let relabel(exercise: Exercise) = {
+    exercise with
+        Circuit = if exercise.Order % 2 = 0 then "B" else "A"
+  }
+
+  {
+    plan with
+        Blocks =
+          plan.Blocks
+          |> List.map(fun block -> {
+            block with
+                Variants =
+                  block.Variants
+                  |> List.map(fun variant -> {
+                    variant with
+                        Weeks =
+                          variant.Weeks
+                          |> List.map(fun week -> {
+                            week with
+                                Days =
+                                  week.Days
+                                  |> List.map(fun day -> {
+                                    day with
+                                        Exercises =
+                                          day.Exercises |> List.map relabel
+                                  })
+                          })
+                  })
+          })
+  }
 
 /// The man's fixture output carries two variants.
 let private manOutput() =
@@ -630,6 +665,7 @@ let tests =
         Emphasis = []
         Adjustments = []
         Language = Spanish
+        CircuitsPerDay = ValueNone
       }
 
       let request = {
@@ -652,4 +688,64 @@ let tests =
           | _ -> false)
           "the hypertrophy progression is rejected for cardio"
       | Valid _ -> failtest "the hypertrophy progression must be rejected")
+
+    testCase "a fixed circuit count checks every day" (fun () ->
+      let pinned = {
+        brief with
+            CircuitsPerDay = ValueSome 2
+      }
+
+      // one letter per day: the fixed count of two rejects it
+      expectViolation
+        (function
+        | WrongCircuits _ -> true
+        | _ -> false)
+        "circuits"
+        (validateNew
+          {
+            Athlete = man
+            Memories = []
+            Weeks = 4
+            Brief = pinned
+          }
+          (outputOf(3, 2)))
+
+      // two letters per day on every day: it passes
+      match
+        validateNew
+          {
+            Athlete = man
+            Memories = []
+            Weeks = 4
+            Brief = pinned
+          }
+          (write(spread(planOf 3 2)))
+      with
+      | Valid _ -> ()
+      | Rejected violations -> failtest $"expected Valid: %A{violations}")
+
+    testCase "an auto adjustment keeps the previous circuit layout" (fun () ->
+      let previous = planOf 3 2 // one circuit letter per day
+
+      let request = {
+        Athlete = man
+        Memories = []
+        Weeks = 4
+        Brief = brief // auto: no fixed count
+        PreviousPlan = previous
+      }
+
+      // the same layout as the previous plan: it passes
+      match validateAdjustment request (outputOf(3, 2)) with
+      | Valid _ -> ()
+      | Rejected violations -> failtest $"expected Valid: %A{violations}"
+
+      // two letters per day where the previous plan had one: the layout
+      // check rejects it even though the counts still hold
+      expectViolation
+        (function
+        | WrongCircuits _ -> true
+        | _ -> false)
+        "circuits"
+        (validateAdjustment request (write(spread(previous)))))
   ]

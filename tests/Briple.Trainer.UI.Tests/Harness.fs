@@ -293,6 +293,31 @@ let checkBoxWithText(root: Control, text: string) : CheckBox option =
     | :? CheckBox as check when hasText(check, text) -> Some check
     | _ -> None)
 
+/// Finds the first combo box whose items carry the given text, as the
+/// plain item content or in the keyed label's TextBlock. The dropdown
+/// panel is closed in a headless probe, so the content is read from the
+/// item itself, never from the visual tree.
+let comboBoxWithText(root: Control, text: string) : ComboBox option =
+  root.GetVisualDescendants()
+  |> Seq.choose(fun visual ->
+    match visual with
+    | :? ComboBox as combo when
+      combo.Items
+      |> Seq.choose(fun item ->
+        match item with
+        | :? Avalonia.Controls.ComboBoxItem as comboItem ->
+          Some comboItem.Content
+        | _ -> None)
+      |> Seq.exists(fun content ->
+        match content with
+        | :? string as plain -> plain = text
+        | :? Avalonia.Controls.TextBlock as textBlock -> textBlock.Text = text
+        | _ -> false)
+      ->
+      Some combo
+    | _ -> None)
+  |> Seq.tryHead
+
 /// Finds the overflow menu item with the given header text.
 let menuItemWithText(button: Button, text: string) : MenuItem option =
   match button.Flyout with

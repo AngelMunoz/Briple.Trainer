@@ -35,6 +35,7 @@ let private brief = {
   Emphasis = []
   Adjustments = []
   Language = Spanish
+  CircuitsPerDay = ValueNone
 }
 
 let tests =

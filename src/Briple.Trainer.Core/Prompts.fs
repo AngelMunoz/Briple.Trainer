@@ -45,6 +45,15 @@ let parameterText parameter =
     $"- the plan has one option per variant: {list}"
   | VariantCount(variant, perDay, _) ->
     $"- option {variant} has exactly {perDay} exercises per training day"
+  | CircuitsPerDay(perDay, _) ->
+    $"- each training day has exactly {perDay} circuits (circuit letters in order)"
+  | CircuitLayout(variant, layout, _) ->
+    let days =
+      layout
+      |> List.map(fun (day, circuits) -> $"{day} {circuits}")
+      |> join ", "
+
+    $"- option {variant} keeps the previous plan's circuits per day: {days}"
   | WeekRir(week, target, _) ->
     $"- week {week} targets RIR {target} (added automatically, do not write it)"
   | Adjustment(target, deltas, ConfirmedMemory memory) ->
@@ -303,7 +312,7 @@ load N = N percent of the habitual load; duration N = N minutes; zone N = N effo
 
 The app adds the mesociclo effort line for each week: do not write it and do not copy a weekly RIR target into the rows.
 
-STRUCTURE THIS PLAN MUST HAVE:
+{instructions.StructureLead}
 {structureText profile.Structure}
 
 WHAT YOU DECIDE:

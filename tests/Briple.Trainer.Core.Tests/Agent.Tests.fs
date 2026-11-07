@@ -9,11 +9,19 @@ open System
 open System.Threading
 open System.Threading.Tasks
 open Expecto
+open IcedTasks
 open Microsoft.Extensions.AI
 open Microsoft.Extensions.Logging.Abstractions
+open Briple.Trainer.Core.Plan.Types
+open Briple.Trainer.Core.Plan.Data
+open Briple.Trainer.Core.Athletes
+open Briple.Trainer.Core.Goals
+open Briple.Trainer.Core.Parameters
 open Briple.Trainer.Core.Memories
+open Briple.Trainer.Core.Requests
 open Briple.Trainer.Core.Agent
 open Briple.Trainer.Core.Prompts
+open Briple.Trainer.Core.Validator
 
 /// The test env: the fake client plus the null log, the two capabilities
 /// the agent flows name.
@@ -88,6 +96,97 @@ let private consolidateWith answer marks =
   |> Async.AwaitTask
   |> Async.RunSynchronously
 
+let private maleAthlete = {
+  Name = "hombre"
+  Gender = Male
+  Goals = []
+}
+
+let private adjustBrief = {
+  Goal = Hypertrophy
+  Frequency = TresDias
+  Emphasis = []
+  Adjustments = []
+  Language = Spanish
+  CircuitsPerDay = ValueNone
+}
+
+/// The previous plan tree: variant 3dias, four weeks, a given number of
+/// exercises per day on each of the three training days.
+let private previousPlan perDay : Plan = {
+  Version = 1
+  Title = "Mes 1"
+  Weeks = 4
+  Generated = "2026-10-15"
+  Origin = "trainer"
+  Blocks = [
+    {
+      Gender = Male
+      Variants = [
+        {
+          Id = "3dias"
+          Title = None
+          Weeks = [
+            for number in 1..4 ->
+              {
+                Number = number
+                Days = [
+                  for dayId in [ "Lunes"; "Martes"; "Miercoles" ] ->
+                    {
+                      Id = dayId
+                      Title = None
+                      Notes = []
+                      Exercises = [
+                        for order in 1..perDay ->
+                          {
+                            Circuit = "A"
+                            Laps = "3"
+                            Order = order
+                            Name = $"Ejercicio {order}"
+                            Reps = "6-8"
+                            Rir = "1-2"
+                            Rest = "3 min"
+                            Notes = "-"
+                          }
+                      ]
+                    }
+                ]
+              }
+          ]
+        }
+      ]
+    }
+  ]
+  Extras = []
+}
+
+/// The fake model answer: the same plan in the response schema.
+let private answerOf(plan: Plan) =
+  match toJson(Gender.Male, plan) with
+  | Some json -> json
+  | None -> failtest "the male plan did not serialize"
+
+let private adjustWith answer =
+  use client = new FakeClient(answer)
+
+  let request = {
+    Athlete = maleAthlete
+    Memories = []
+    Weeks = 4
+    Brief = adjustBrief
+    PreviousPlan = previousPlan 2
+  }
+
+  let result = ref Unchecked.defaultof<Run>
+
+  let work = asyncEx {
+    let! run = generateAdjustment(TestEnv client, request)
+    result.Value <- run
+  }
+
+  Async.StartAsTask(work).Wait()
+  result.Value
+
 let tests =
   testList "Agent" [
     testCase "a delta with sign and percentage is tolerated" (fun () ->
@@ -112,6 +211,74 @@ let tests =
       let memories = consolidateWith "loose note without pipes" [ pressMark ]
 
       Expect.isEmpty memories "no memory from a malformed line")
+
+    testCase "the adjustment rejects a shrunken output" (fun () ->
+      let run = adjustWith(answerOf(previousPlan 1))
+
+      match run.Verdict with
+      | Rejected violations ->
+        Expect.exists
+          violations
+          (function
+          | CountChanged _ -> true
+          | _ -> false)
+          "the count change is rejected"
+      | Valid _ -> failtest "the shrunken counts must be rejected")
+
+    testCase "the adjustment accepts the kept counts" (fun () ->
+      let run = adjustWith(answerOf(previousPlan 2))
+
+      match run.Verdict with
+      | Valid _ -> ()
+      | Rejected violations -> failtest $"expected Valid: %A{violations}")
+
+    testCase "the adjustment rejects a changed circuit layout" (fun () ->
+      // the same rows per day, regrouped into two circuit letters: the
+      // counts hold but the auto layout does not
+      let regrouped plan =
+        let relabel(exercise: Exercise) = {
+          exercise with
+              Circuit = if exercise.Order % 2 = 0 then "B" else "A"
+        }
+
+        {
+          plan with
+              Blocks =
+                plan.Blocks
+                |> List.map(fun block -> {
+                  block with
+                      Variants =
+                        block.Variants
+                        |> List.map(fun variant -> {
+                          variant with
+                              Weeks =
+                                variant.Weeks
+                                |> List.map(fun week -> {
+                                  week with
+                                      Days =
+                                        week.Days
+                                        |> List.map(fun day -> {
+                                          day with
+                                              Exercises =
+                                                day.Exercises
+                                                |> List.map relabel
+                                        })
+                                })
+                        })
+                })
+        }
+
+      let run = adjustWith(answerOf(regrouped(previousPlan 2)))
+
+      match run.Verdict with
+      | Rejected violations ->
+        Expect.exists
+          violations
+          (function
+          | WrongCircuits _ -> true
+          | _ -> false)
+          "the layout change is rejected"
+      | Valid _ -> failtest "the changed layout must be rejected")
   ]
 
 let private noteDate = DateOnly(2026, 10, 15)

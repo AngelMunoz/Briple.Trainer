@@ -41,6 +41,7 @@ let private manBrief = {
   Emphasis = []
   Adjustments = []
   Language = Spanish
+  CircuitsPerDay = ValueNone
 }
 
 let tests =
@@ -116,6 +117,30 @@ let tests =
         parameters
         (VariantCount("3dias", 6, PreviousPlan))
         "3dias keeps its previous 6 per training day"
+
+      let expectedLayout =
+        let variant =
+          month1.Plan.Blocks
+          |> List.find(fun block -> block.Gender = Male)
+          |> fun block ->
+              block.Variants
+              |> List.find(fun candidate -> candidate.Id = "3dias")
+
+        match variant.Weeks with
+        | first :: _ ->
+          first.Days
+          |> List.map(fun day ->
+            day.Id,
+            day.Exercises
+            |> List.map(fun exercise -> exercise.Circuit)
+            |> List.distinct
+            |> List.length)
+        | [] -> []
+
+      Expect.contains
+        parameters
+        (CircuitLayout("3dias", expectedLayout, PreviousPlan))
+        "the previous circuit layout travels with the auto brief"
 
       Expect.isFalse
         (parameters |> List.contains(VariantCount("5dias", 6, PreviousPlan)))
@@ -224,4 +249,22 @@ let tests =
            | VariantCount _ -> true
            | _ -> false))
         "a new plan fixes no counts")
+
+    testCase "a fixed circuit count travels as a parameter" (fun () ->
+      let parameters =
+        {
+          Athlete = man
+          Memories = []
+          Weeks = 2
+          Brief = {
+            manBrief with
+                CircuitsPerDay = ValueSome 3
+          }
+        }
+        |> parametersForNew
+
+      Expect.contains
+        parameters
+        (CircuitsPerDay(3, TrainerBrief))
+        "the brief fixes the circuits")
   ]

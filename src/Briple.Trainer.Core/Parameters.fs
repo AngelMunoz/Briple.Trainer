@@ -23,6 +23,11 @@ type Parameter =
   | PlanWeeks of weeks: int * origin: Origin
   | AthleteVariants of variants: string list * origin: Origin
   | VariantCount of variant: string * perDay: int * origin: Origin
+  | CircuitsPerDay of perDay: int * origin: Origin
+  | CircuitLayout of
+    variant: string *
+    layout: (string * int) list *
+    origin: Origin
   | WeekRir of week: int * target: string * origin: Origin
   | Adjustment of target: Target * deltas: Delta list * origin: Origin
 
@@ -59,7 +64,7 @@ let originsFor(field: Field) : OriginClass list =
   | Days -> [ FromProfile; FromPreviousPlan; FromBrief; FromDerived ]
   | DayTitle -> [ FromAgent ]
   | DayNotes -> [ FromAgent; FromBrief ]
-  | Circuit -> [ FromPreviousPlan; FromAgent ]
+  | Circuit -> [ FromPreviousPlan; FromBrief; FromAgent ]
   | Laps -> [ FromPreviousPlan; FromAgent; FromBrief ]
   | Order -> [ FromPreviousPlan; FromAgent ]
   | Name -> [ FromPreviousPlan; FromAgent; FromConfirmedMemory; FromBrief ]

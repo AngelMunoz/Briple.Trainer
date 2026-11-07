@@ -247,6 +247,22 @@ val inline radioRow: row: RadioRow<'T> -> Control when 'T: equality
 /// Radio options whose labels are resource keys.
 val inline radioRowKeys: row: RadioRow<'T> -> Control when 'T: equality
 
+/// The inputs of one single-choice dropdown: the options, the live
+/// selected value and the pick callback.
+[<Struct>]
+type SelectRow<'T when 'T: equality> = {
+  Options: ('T * string) list
+  Selected: IObservable<'T>
+  OnPick: 'T -> unit
+}
+
+/// A dropdown over typed options; the selected item follows the
+/// selected value.
+val inline selectRow: row: SelectRow<'T> -> Control when 'T: equality
+
+/// Dropdown options whose labels are resource keys.
+val inline selectRowKeys: row: SelectRow<'T> -> Control when 'T: equality
+
 /// One checkbox whose checked state follows an observable; the
 /// subscription is disposed when the control detaches.
 val inline checkRow:

@@ -26,6 +26,7 @@ let private brief = {
   Emphasis = []
   Adjustments = []
   Language = Spanish
+  CircuitsPerDay = ValueNone
 }
 
 /// One male block, variant 3dias, one week, `perDay` exercises per day.
@@ -161,4 +162,47 @@ let tests =
         newPlan.Fix
         (AthleteVariants([ "3dias" ], TrainerBrief))
         "the frequency variant is fixed")
+
+    testCase "a fixed circuit count travels and drops the field" (fun () ->
+      let instructions =
+        forNew(
+          {
+            Athlete = maleAthlete
+            Memories = []
+            Weeks = 4
+            Brief = {
+              brief with
+                  CircuitsPerDay = ValueSome 3
+            }
+          }
+        )
+
+      Expect.contains
+        instructions.Fix
+        (CircuitsPerDay(3, TrainerBrief))
+        "the brief fixes the circuits"
+
+      Expect.isFalse
+        (instructions.Ask |> List.contains Circuit)
+        "the agent no longer owns the circuit field")
+
+    testCase "the auto circuit count leaves the circuit to the agent" (fun () ->
+      let instructions =
+        forNew(
+          {
+            Athlete = maleAthlete
+            Memories = []
+            Weeks = 4
+            Brief = brief
+          }
+        )
+
+      Expect.isFalse
+        (instructions.Fix
+         |> List.exists(function
+           | CircuitsPerDay _ -> true
+           | _ -> false))
+        "no circuits get fixed"
+
+      Expect.contains instructions.Ask Circuit "the agent owns the circuit")
   ]

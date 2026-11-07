@@ -184,6 +184,7 @@ let inline briefOf(draft: Draft) : Brief = {
   Emphasis = draft.Emphasis
   Adjustments = []
   Language = draft.Language
+  CircuitsPerDay = draft.CircuitsPerDay
 }
 
 /// The app owns the generation date: the model may write a placeholder,
@@ -271,6 +272,12 @@ let describeViolation(culture: CultureInfo, violation: Violation) : string =
       culture,
       Keys.violationCount,
       [ variant :> obj; expected :> obj; found :> obj ]
+    )
+  | WrongCircuits(variant, week, day, expected, found) ->
+    getf(
+      culture,
+      Keys.violationCircuits,
+      [ variant :> obj; week :> obj; day :> obj; expected :> obj; found :> obj ]
     )
   | BrokenFormat failure ->
     Briple.Trainer.Core.Plan.Parser.Parse.describe failure
@@ -370,8 +377,12 @@ let auditPayload(draft: Draft, request: Generation) =
     Json.sequence(draft.Emphasis |> List.map Emphasis.toToken, Encode.string)
     "memories", Json.sequence(memories, memoryJson)
     "weeks", Encode.int draft.Weeks
+    "circuits",
+    match draft.CircuitsPerDay with
+    | ValueSome perDay -> Encode.int perDay
+    | ValueNone -> Encode.string "auto"
   ]
-  |> fun node -> node.ToJsonString()
+  |> _.ToJsonString()
 
 // --- the page state machine ---
 

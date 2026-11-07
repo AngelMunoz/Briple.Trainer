@@ -14,11 +14,14 @@ type Prohibition =
   | OutsideVariants
   | LeaveFormat
 
-/// The full mapping of a request.
+/// The full mapping of a request. The structure lead is the heading the
+/// prompt puts over the goal profile's structure: a must in the new-plan
+/// flow, guidance under the previous plan in the adjustment flow.
 type Instructions = {
   Fix: Parameter list
   Ask: Field list
   Forbid: Prohibition list
+  StructureLead: string
 }
 
 /// Instructions of the new-plan flow.

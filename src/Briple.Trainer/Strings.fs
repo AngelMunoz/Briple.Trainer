@@ -345,6 +345,24 @@ module Keys =
   let wizardFrequency = "wizard.frequency"
 
   [<Literal>]
+  let wizardCircuits = "wizard.circuits"
+
+  [<Literal>]
+  let wizardCircuitsAuto = "wizard.circuits.auto"
+
+  [<Literal>]
+  let wizardCircuitsAutoPrevious = "wizard.circuits.auto.previous"
+
+  [<Literal>]
+  let wizardCircuitsTwo = "wizard.circuits.two"
+
+  [<Literal>]
+  let wizardCircuitsThree = "wizard.circuits.three"
+
+  [<Literal>]
+  let wizardCircuitsFour = "wizard.circuits.four"
+
+  [<Literal>]
   let wizardEmphasis = "wizard.emphasis"
 
   [<Literal>]
@@ -648,6 +666,9 @@ module Keys =
 
   [<Literal>]
   let violationWeeks = "violation.weeks"
+
+  [<Literal>]
+  let violationCircuits = "violation.circuits"
 
   [<Literal>]
   let violationVariants = "violation.variants"
